@@ -37,4 +37,8 @@ end = main.index("    for(let mac,at in state.forced", start)
 write("test-comparison-snapshot.uc", "import {same,group} from '../channel-coordinator/files/policy.uc';\n" +
       "let state={},executor=null;function now(){return 100;}\n" + main[start:end] + "}\n" +
       read(root / "tests/comparison-cases.uc"))
-print("Prepared isolated history, recovery and comparison-snapshot test modules.")
+start = main.index("function candidates(r,radios,rules)")
+end = main.index("function sum_overlap", start)
+write("test-width-limit.uc", read(root / "tests/width-limit-header.uc") + "\n" +
+      main[start:end] + "\n" + read(root / "tests/width-limit-cases.uc"))
+print("Prepared isolated history, recovery, comparison and width-limit test modules.")

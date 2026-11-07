@@ -281,6 +281,7 @@ function sample(radios) {
         s.candidate_channels=r.config.channels;
         s.candidate_widths=r.config.widths;
         s.hardware_widths=r.config.hardware_widths;s.unavailable_widths=r.config.unavailable_widths;
+        if(s.width_limit?.until<=t)delete s.width_limit;
         s.ht40_constraint=r.band=='2g'&&r.config.width_method=='csa'?'HT40 requires restart for coexistence checks; explicit CSA cannot apply it':null;
     }
     let history_rows=map(radios,r=>{
@@ -317,6 +318,7 @@ function candidates(r,radios,rules) {
         t-(s.last_attempt ?? -100000)<cfg.retry_delay?'Short retry delay':null;
     if(s.planning_hold)return [current];
     for(let w in r.config.widths)for(let ch in r.config.channels)for(let g in placements(frequency(ch,r.band),w)){
+        if(s.width_limit?.until>t&&w>s.width_limit.actual)continue;
         if(!permitted(g,r.caps,rules,r.config.channels,dm))continue;
         let method=move_method(r.config,r.current,g);
         if(!same(g,current)&&method=='csa'&&!r.csa)continue;
@@ -335,7 +337,7 @@ evaluate=function(radios){
     next_eval=now()+cfg.interval;
     if(!scan_result||now()-scan_result.at>cfg.max_age){state.status='Waiting for a fresh survey';save();return;}
     let rules=request(N.NL80211_CMD_GET_REG,0,{}).reg_rules ?? [],models=[];
-    for(let r in radios){let choices=candidates(r,radios,rules);push(models,{name:r.name,current:filter(choices,g=>same(g,r.current))[0],candidates:choices});}
+    for(let r in radios){let choices=candidates(r,radios,rules),s=state.radios[r.name];push(models,{name:r.name,current:filter(choices,g=>same(g,r.current))[0],candidates:choices,last_action:max(s.last_attempt ?? 0,s.last_move ?? 0)});}
     let result=choose(models,cfg),decision=decide(result,models,admission,scan_result.at,cfg,intent?.until>now()?intent.signature:null);
     admission=decision.signature?decision:null;
     let changes=[];for(let i,r in radios)if(!same(r.current,result.choices[i]))push(changes,{radio:r.name,from:channel(r.current.freq),to:channel(result.choices[i].freq),width:result.choices[i].width});
@@ -346,6 +348,7 @@ evaluate=function(radios){
         steps:map(result.path,s=>({radio:models[s.index].name,to:channel(s.target.freq),width:s.target.width,staging:s.staging})),
         alternatives:map(models,m=>({radio:m.name,current:m.current,hold:state.radios[m.name].planning_hold,rejected:json(sprintf('%J',state.radios[m.name].rejected ?? [])),
             channels:state.radios[m.name].candidate_channels,widths:state.radios[m.name].candidate_widths,
+            width_limit:state.radios[m.name].width_limit,
             candidates:map(m.candidates,g=>({...g,channel:channel(g.freq),shared:sum_overlap(g,models,m.name),current:same(g,m.current)}))})),
         scan_age:now()-scan_result.at,neighbors:length(scan_result.observations)};
     state.status=decision.reason;

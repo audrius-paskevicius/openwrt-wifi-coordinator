@@ -128,6 +128,7 @@ check(ex.pending().kind=='verify'&&ex.pending().target.width==40&&!ex.pending().
 T+=41;ex.tick([radio]);
 check(!ex.busy()&&!st.radios.r.failed&&events[-1].event=='switch-verified','hostapd20 fallback verifies service without false connectivity failure');
 check(st.radios.r.rejected[0].target.width==40&&st.radios.r.rejected[0].until==T+900,'coexistence refusal remembered only for evidence freshness period');
+check(st.radios.r.width_limit.actual==20&&st.radios.r.width_limit.requested==40&&st.radios.r.width_limit.until==T+900,'observed width limit defers repeated widening across primary channels');
 radio.config.width_method='csa';ex.start(radio,group(2412,40),[radio]);T+=15;denied=false;
 try{ex.tick([radio]);}catch(e){denied=index(''+e,'coexistence')>=0;ex.abort(e);}
 check(denied,'explicit CSA cannot bypass HT40 coexistence');

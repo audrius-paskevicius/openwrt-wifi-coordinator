@@ -66,6 +66,20 @@ let x=g(5180,40,50,0),y=g(5220,40,50,0),a=g(5180,80,0,0),b=g(5500,80,0,0);
 let joint=[model('a',x,[x,a]),model('b',y,[y,b])],jp=choose(joint,cfg);
 check(jp.choices[0].width==80&&jp.choices[1].width==80,'joint widths are evaluated against final placements');
 check(jp.path[0].index==1,'occupying radio leaves before broadening into its old block');
+// Reproduce live starvation: repeated independent HT40 attempts must not keep
+// an older two-step 5 GHz widening plan waiting behind radio enumeration order.
+let fair=[{...model('main',g(5500,80,52),[]),last_action:100},
+ {...model('two',g(2422,20,64),[]),last_action:200},
+ {...model('spare',g(5260,80,0),[]),last_action:0}];
+let goals=[g(5180,160,18),g(2422,40,28),g(5745,80,0)];
+let steps=transition(fair,goals,cfg);
+check(steps[0].index==2&&steps[1].index==0,'older spectrum-unblocking move precedes another HT40 attempt');
+let intermediate=map(fair,m=>m.current);
+for(let step in steps){intermediate[step.index]=step.target;check(layout(intermediate,cfg).overlap==0,'fair execution preserves spectrum separation');}
+fair[2].current=goals[2];fair[2].last_action=300;
+check(transition(fair,goals,cfg)[0].index==0,'replanning after spare move completes main-radio widening next');
+let shuffled=[fair[1],fair[2],fair[0]],shuffledGoals=[goals[1],goals[2],goals[0]];
+check(shuffled[transition(shuffled,shuffledGoals,cfg)[0].index].name=='main','scheduling is independent of radio names and enumeration');
 // A neutral staging move can unlock a profitable swap without colliding.
 let ac=g(5180,80,50,50),bc=g(5500,80,50,50),at=g(5500,80,0,0),bt=g(5180,80,0,0),stage=g(5580,80,50,50);
 let swap=[model('a',ac,[ac,at,stage]),model('b',bc,[bc,bt])],sp=choose(swap,cfg);

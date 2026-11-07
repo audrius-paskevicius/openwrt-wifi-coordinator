@@ -40,6 +40,7 @@ return view.extend({
     if(r.csa_recovery_left>0)rows.push(E('p',{},'Recent CSA failure remembered for '+Math.ceil(r.csa_recovery_left/60)+' more minutes. Only Auto adapts the method.'));
     if(r.dfs_constraint)rows.push(E('p',{},r.dfs_constraint));
     if(r.ht40_constraint)rows.push(E('p',{},r.ht40_constraint));
+    if(r.width_limit&&r.width_limit.until>st.updated)rows.push(E('p',{},r.width_limit.reason+'. Widths above '+r.width_limit.actual+' MHz deferred for '+Math.ceil((r.width_limit.until-st.updated)/60)+' more minutes; configured Auto/manual widths are unchanged.'));
     if(r.hardware_widths)rows.push(E('p',{},'Driver widths: '+r.hardware_widths.join(' / ')+' MHz. Widths to compare: '+(r.candidate_widths||[]).join(' / ')+' MHz.'));
     if((r.unavailable_widths||[]).length)rows.push(E('p',{},'Requested widths unavailable on this radio: '+r.unavailable_widths.join(' / ')+' MHz.'));
     var rejected=(r.rejected||[]).filter(function(x){return x.until>st.updated;});
@@ -83,6 +84,7 @@ return view.extend({
      E('h4',{},a.radio+(a.hold?' — at comparison: '+a.hold:'')),
      E('p',{},_('Channel pool at comparison: ')+(a.channels||[]).join(' ')),
      E('p',{},_('Widths at comparison: ')+(a.widths||[]).join(' / ')+' MHz'),
+     a.width_limit?E('p',{},'Width constraint at comparison: '+a.width_limit.reason+'; widths above '+a.width_limit.actual+' MHz temporarily deferred.'):null,
      ...((a.rejected||[]).length?[E('p',{},'Excluded at comparison: '+a.rejected.map(function(x){return (x.target.freq<3000?(x.target.freq-2407)/5:(x.target.freq-5000)/5)+' / '+x.target.width+' MHz — '+(x.reason||'Connectivity check failed');}).join('; ')+'.')]:[]),
      E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[
       E('thead',{},E('tr',{},['Channel / width','Cost','Estimated congestion','Estimated usable width','Sharing','Radar memory','Evidence uncertainty'].map(function(x){return E('th',{},x);}))),

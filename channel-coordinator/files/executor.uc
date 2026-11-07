@@ -422,6 +422,9 @@ function operation(radios) {
             let requested=pending.target,s=state.radios[r.name];
             s.rejected=s.rejected ?? [];
             push(s.rejected,{target:requested,until:t+(cfg.max_age ?? 900),reason:'20 MHz retained during HT40 setup: coexistence or driver constraint'});
+            // Trying a different primary immediately does not remove a width
+            // constraint. Let fresh evidence accumulate before another attempt.
+            s.width_limit={actual:r.current.width,requested:requested.width,until:t+(cfg.max_age ?? 900),reason:'HT40 setup retained 20 MHz'};
             while(length(s.rejected)>16)shift(s.rejected);
             history({event:'width-constrained',radio:r.name,channel:channel(r.current.freq),width:r.current.width,requested_width:40});
             pending.target=r.current;pending.coexistence=true;channel_ok=true;

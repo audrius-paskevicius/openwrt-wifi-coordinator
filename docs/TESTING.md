@@ -1,6 +1,10 @@
 # Validation
 
-Source release: **0.6.0-r14**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r15**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r15 progress toward wide-channel plans
+
+Live r14 evidence showed a selected 160 MHz joint plan repeatedly deferred behind radio1 HT40 attempts, each reduced to 20 MHz by hostapd. The route traversal used radio enumeration order and execution reevaluated after each first step. The corrected traversal serves the oldest eligible radio first while retaining overlap dependencies. All 103 planner/radar/survey cases passed, including the exact three-radio widening sequence, intermediate separation, replanning after the prerequisite move and shuffled enumeration. All 48 executor cases passed, including the cross-primary width constraint after an observed fallback. Four cases extracted from actual candidate generation verify narrower optimization during the constraint, no bypass by changing primary, restoration after expiry and unchanged configured widths. Portable UI checks, entry-point compilation, signed APK verification and extracted-source comparisons passed.
 
 ## r14 retained channel comparison
 

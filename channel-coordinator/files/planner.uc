@@ -43,10 +43,10 @@ export function worthwhile_narrowing(current,choices,base,candidate,cfg) {
     return !length(filter(choices,(g,i)=>g.width<current[i].width))||candidate.cost<base.cost||
         cfg.separate&&candidate.overlap<base.overlap-0.000001;
 };
-function route(start,goal,cfg) {
+function route(start,goal,cfg,order) {
     function visit(at,path){
         if(!length(filter(at,(g,i)=>!same(g,goal[i]))))return path;
-        for(let i,g in at){if(same(g,goal[i]))continue;
+        for(let i in order){let g=at[i];if(same(g,goal[i]))continue;
             let next=[...at];next[i]=goal[i];
             if(cfg.separate&&layout(next,cfg).overlap>layout(at,cfg).overlap+0.000001)continue;
             let found=visit(next,[...path,{index:i,target:goal[i],staging:false}]);if(found)return found;
@@ -56,15 +56,19 @@ function route(start,goal,cfg) {
     return visit(start,[]);
 }
 export function transition(models,goal,cfg) {
-    let start=map(models,m=>m.current),direct=route(start,goal,cfg);if(direct)return direct;
+    // Replanning must not let the first independent radio monopolize execution.
+    // Oldest-served eligible moves go first; overlap dependencies still apply.
+    let order=[];for(let i,m in models)push(order,i);
+    order=sort(order,(a,b)=>(models[a].last_action ?? 0)-(models[b].last_action ?? 0)||a-b);
+    let start=map(models,m=>m.current),direct=route(start,goal,cfg,order);if(direct)return direct;
     let best=null;
     // One neutral staging move is enough to break ordinary two-radio swaps.
     // Bound the search, do not claim a path exists if more staging is required.
-    for(let i,m in models)for(let g in m.candidates){
+    for(let i in order)for(let g in models[i].candidates){
         if(same(g,start[i])||same(g,goal[i]))continue;
         let via=[...start];via[i]=g;
         if(cfg.separate&&layout(via,cfg).overlap>layout(start,cfg).overlap+0.000001)continue;
-        let path=route(via,goal,cfg);
+        let path=route(via,goal,cfg,order);
         if(path&&(!best||length(path)+1<length(best)))best=[{index:i,target:g,staging:true},...path];
     }
     return best;
