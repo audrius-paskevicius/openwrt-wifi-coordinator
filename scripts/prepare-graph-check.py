@@ -42,8 +42,21 @@ try{
  const upper=full.scales.y.getPixelForValue(axis.position(5815));
  const edge=full.ctx.getImageData(Math.round(x)-1,Math.round(upper)-1,3,3).data;
  assert(Array.from({length:9},(_,i)=>i*4).some(i=>edge[i]<60&&edge[i+2]>180),'radio outline retains its complete upper edge');
+ // Dense constant readings must not acquire dark seams from overlapping
+ // translucent Chart.js rectangles at measurement or frequency boundaries.
+ const dense=Array.from({length:360},(_,i)=>({time:start+i*60,bands:[{start:5490,step:20,levels:[64,64,64,64]}]}));
+ const smooth=graph.channelChart(document.getElementById('smooth'),[],[],start,end,dense,{events:[]},['5g']);
+ smooth.options.scales.x.grid.display=false;smooth.options.scales.y.grid.display=false;smooth.update('none');
+ const row=Math.round(smooth.scales.y.getPixelForValue(graph.spectrumAxis(['5g']).position(5520)));
+ const left=Math.ceil(smooth.chartArea.left)+2,right=Math.floor(smooth.chartArea.right)-2;
+ const pixels=smooth.ctx.getImageData(left,row,right-left,1).data;
+ const alphas=Array.from({length:right-left},(_,i)=>pixels[i*4+3]);
+ assert(Math.max(...alphas)<=130,'dense survey boundaries cannot accumulate darker opacity');
+ assert(Math.min(...alphas)>=90,'dense survey remains visible between readings');
+ assert(smooth.data.datasets.filter(d=>d.wcSurvey).every(d=>d.inflateAmount===0),'survey cells have no inflated edges');
+ assert(full.data.datasets.filter(d=>d.wcRadar).every(d=>d.inflateAmount===0),'radar cells have no inflated edges');
  document.getElementById('legend').innerHTML=names.map((r,i)=>'<span style="color:'+graph.colour(r,i)+';margin-right:24px"><i style="display:inline-block;width:25px;height:12px;border:2px solid;'+graph.patternStyle(r,i)+'"></i> '+r+'</span>').join('');
- document.getElementById('result').textContent='PASS: actual Chart.js render, complete plans, band isolation, gap clipping and patterned legend';
+ document.getElementById('result').textContent='PASS: actual Chart.js render, complete plans, band isolation, gap clipping, patterned legend and dense survey without dark seams';
  document.getElementById('result').dataset.status='pass';
 }catch(e){document.getElementById('result').textContent='FAIL: '+e.stack;document.getElementById('result').dataset.status='fail';}
 '''
@@ -53,6 +66,7 @@ html = '''<!doctype html><meta charset="utf-8"><title>Standard spectrum axis che
 <p>Full standard plans for declared bands. // marks compressed gaps; MHz spacing remains proportional inside each block.</p>
 <section><canvas id="full"></canvas></section><p id="legend"></p>
 <h2>5 GHz declaration only (same history)</h2><section><canvas id="five"></canvas></section>
+<h2>Dense survey boundaries</h2><section><canvas id="smooth"></canvas></section>
 <script>const payload=''' + json.dumps(payload) + ';\n' + script + '</script>'
 Path(sys.argv[1]).write_text(html, encoding='utf-8')
 print('Prepared offline Chart.js spectrum fixture: ' + sys.argv[1])

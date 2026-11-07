@@ -1,6 +1,12 @@
 # Validation
 
-Source release: **0.6.0-r21**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r22**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r22 quieter history presentation
+
+Survey and radar bars disable Chart.js rectangle inflation: adjacent translucent cells no longer overlap into dark boundary marks. The actual Chart.js browser fixture renders 360 consecutive survey readings and checks that boundary opacity does not darken while the background stays visible. Existing radio colours, patterns, white edging, axis labels and radar-decay legend remain.
+
+History captions are shortened; technical interpretation stays in hover text. Storage diagnostics are collapsed by default and retain their expanded state across refreshes. No planner, radio settings, recorded data or retention changes.
 
 ## r21 large-history reads
 

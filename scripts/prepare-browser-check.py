@@ -130,6 +130,16 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  const failedHistory=await page('history').render([null,{read_errors:['Synthetic unreadable recent history']}]);
  assert(failedHistory.querySelector('.alert-message.warning').textContent.includes('History is incomplete'),'failed reads must stay visible even without any radio records');
  assert(failedHistory.textContent.indexOf('History is incomplete')<failedHistory.textContent.indexOf('History is collecting'),'read failure must precede the empty-history message');
+ const recent=Math.floor(Date.now()/1000);
+ const historyData={periods:[{radio:'radio0',channel:36,width:80,start:recent-60,end:recent}],samples:[],events:[],surveys:[],ram_bytes:100,archive_bytes:0,archive_files:0};
+ graphs.channelChart=graphs.trafficChart=()=>({destroy(){}});
+ graphs.colour=()=>'#005dff';graphs.patternStyle=()=>'';graphs.patternName=()=>'diagonal lines';
+ fs.list=async()=>[];fs.read_direct=async path=>JSON.stringify(path.includes('state')?state:historyData);
+ const historyPane=await page('history').render([null,historyData]);
+ historyPane.querySelectorAll('link').forEach(n=>n.remove());document.getElementById('pages').appendChild(historyPane);
+ const storage=historyPane.querySelector('.wc-history-storage');assert(!storage.open,'storage diagnostics start collapsed');
+ storage.open=true;storage.dispatchEvent(new Event('toggle'));
+ await polls[polls.length-1]();assert(historyPane.querySelector('.wc-history-storage').open,'expanded storage diagnostics survive history refresh');
  result.textContent='PASS: '+explanations.length+' setting descriptions rendered through actual LuCI Value/NamedSection methods; native hover, icon hover, focus, tap, Escape, status polling and form rerender passed.';
  result.dataset.status='pass';
  // Leave one useful example visible in the screenshot.

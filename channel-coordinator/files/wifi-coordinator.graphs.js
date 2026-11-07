@@ -122,7 +122,7 @@ function surveyData(surveys,start,end,axis){
  });
  return Object.keys(bins).map(function(key){var bin=bins[key];bin.points.sort(function(a,b){return a.observed-b.observed;});var points=bin.points.map(function(p,i){return Object.assign({},p,{x:[Math.max(start,p.observed),Math.min(end,bin.points[i+1]?bin.points[i+1].observed:end)]});}).filter(function(p){return p.x[1]>p.x[0];});return {
   type:'bar',indexAxis:'y',label:'Spectrum survey '+bin.low+'–'+bin.high+' MHz',wcSurvey:true,
-  data:points,parsing:true,grouped:false,order:10,borderWidth:0,borderSkipped:false,
+  data:points,parsing:true,grouped:false,order:10,borderWidth:0,borderSkipped:false,inflateAmount:0,
   backgroundColor:function(c){return 'rgba(30,30,30,'+(0.02+0.60*Math.sqrt((c.raw?c.raw.level:0)/100))+')';},
   barThickness:function(c){var y=c.chart.scales.y;return Math.abs(y.getPixelForValue(axis.position(bin.high))-y.getPixelForValue(axis.position(bin.low)));}
  };});
@@ -150,7 +150,7 @@ function radarData(records,start,end,halfLife,axis){
    points.push({x:[a,b],y:(span.yLow+span.yHigh)/2,low:span.low,high:span.high,radar:true,level:v,endLevel:level(b-0.001),observed:Math.max.apply(null,seen)});
   }
   return {type:'bar',indexAxis:'y',label:'Radar history',wcRadar:true,data:points,parsing:true,grouped:false,
-   order:8,borderWidth:0,borderSkipped:false,
+   order:8,borderWidth:0,borderSkipped:false,inflateAmount:0,
    backgroundColor:function(c){var p=c.raw,x=c.chart.scales.x;if(!p||!x)return 'transparent';
     var a=x.getPixelForValue(p.x[0]),b=x.getPixelForValue(p.x[1]);
     if(!Number.isFinite(a)||!Number.isFinite(b)||a==b)return 'rgba(185,125,0,'+(0.22*p.level)+')';
