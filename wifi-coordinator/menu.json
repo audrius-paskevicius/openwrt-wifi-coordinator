@@ -1,0 +1,6 @@
+{
+ "admin/network/wifi_coordinator": {"title":"Wi-Fi Coordinator","order":65,"action":{"type":"firstchild"},"depends":{"acl":["luci-app-channel-coordinator","luci-app-radio-prefer"]}},
+ "admin/network/wifi_coordinator/channels": {"title":"Channels","order":10,"action":{"type":"view","path":"wifi-channels"}},
+ "admin/network/wifi_coordinator/clients": {"title":"Clients","order":20,"action":{"type":"view","path":"wifi-clients"}},
+ "admin/network/wifi_coordinator/history": {"title":"History","order":30,"action":{"type":"view","path":"wifi-history"}}
+}

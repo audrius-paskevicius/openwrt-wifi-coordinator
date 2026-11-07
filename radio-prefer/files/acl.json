@@ -1,0 +1,11 @@
+{
+  "luci-app-radio-prefer": {
+    "description": "Manage radio preference settings",
+    "read": {
+      "uci": ["radio_prefer", "wireless"],
+      "ubus": { "service": ["list"], "file": ["read"] },
+      "file": { "/tmp/radio-prefer-state.json": ["read"] }
+    },
+    "write": { "uci": ["radio_prefer"] }
+  }
+}

@@ -1,0 +1,12 @@
+#!/bin/sh
+[ -z "${IPKG_INSTROOT:-}" ] || exit 0
+for svc in channel-coordinator radio-prefer; do
+ if ubus call service list "{\"name\":\"$svc\"}" | /usr/bin/ucode -e 'import * as fs from "fs"; exit(length(json(fs.stdin.read("all"))) ? 0 : 1);'; then
+  /etc/init.d/$svc stop
+ elif [ "$svc" = channel-coordinator ]; then
+  /usr/bin/ucode /usr/share/channel-coordinator/main.uc --recover
+ fi
+done
+/etc/init.d/channel-coordinator disable
+/etc/init.d/radio-prefer disable
+exit 0

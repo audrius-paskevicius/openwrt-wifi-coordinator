@@ -1,0 +1,63 @@
+.wifi-coordinator { line-height: 1.5; }
+.wifi-coordinator .wc-status {
+  margin: 18px 0 12px; padding: 10px 14px;
+  border: 1px solid #b9d7c0; border-left: 4px solid #39854b;
+  border-radius: 4px; background: #f0f8f2; color: #234c2d;
+}
+.wifi-coordinator .wc-status[data-level="warning"] {
+  background: #fff7e6; border-color: #e3c77b; border-left-color: #b57a13; color: #62460e;
+}
+.wifi-coordinator .wc-table-wrap { width: 100%; overflow-x: auto; margin: 0 0 16px; }
+.wifi-coordinator .wc-table {
+  width: 100%; min-width: 650px; margin: 0; border-collapse: collapse;
+  font-variant-numeric: tabular-nums; background: #fff; color: #25333c;
+}
+.wifi-coordinator .wc-table th,
+.wifi-coordinator .wc-table td {
+  padding: 9px 12px; text-align: left; vertical-align: top;
+  border-bottom: 1px solid #dce2e7; line-height: 1.5;
+}
+.wifi-coordinator .wc-table th {
+  background: #f1f4f6; color: #35414c; font-weight: 600; white-space: nowrap;
+}
+.wifi-coordinator .wc-table tbody tr:nth-child(even) { background: #fafbfc; }
+.wifi-coordinator .wc-table td:first-child { font-weight: 600; white-space: nowrap; }
+.wifi-coordinator .wc-summaries {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 12px; margin-bottom: 10px;
+}
+.wifi-coordinator .wc-summary {
+  padding: 12px 14px; background: #f8fafb; color: #35414c; border: 1px solid #dce2e7; border-radius: 4px;
+}
+.wifi-coordinator .wc-summary h4 { margin: 0 0 6px; font-size: 1em; color: #35414c; }
+.wifi-coordinator .wc-summary p { margin: 0 0 6px; }
+.wifi-coordinator .wc-summary ul { margin: 4px 0 0; padding-left: 20px; }
+.wifi-coordinator .wc-caption { display: block; margin: 8px 0 18px; color: #596570; }
+.wifi-coordinator .wc-chart { position: relative; width: 100%; box-sizing: border-box; border: 1px solid #999; background: #fff; padding: 8px 8px 2px 0; }
+.wifi-coordinator .wc-spectrum-chart { height: 560px; }
+.wifi-coordinator .wc-traffic-chart { height: 300px; }
+.wifi-coordinator .wc-line-key { display: inline-block; width: 24px; border-top: 2.5px solid; vertical-align: middle; margin-right: 7px; }
+.wifi-coordinator .wc-legend { margin: 10px 0 16px; }
+.wifi-coordinator .wc-grey-scale { display: inline-block; width: 120px; height: 12px; margin: 0 8px; vertical-align: middle; background: linear-gradient(to right, #fafafa, #747474); border: 1px solid #aaa; }
+.wifi-coordinator .wc-survey-key { line-height: 1.8; }
+.wifi-coordinator .wc-radar-key { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 12px; }
+.wifi-coordinator .wc-radar-ramp { width: 300px; max-width: 100%; }
+.wifi-coordinator .wc-amber-scale { height: 12px; background: linear-gradient(to right, rgba(185,125,0,.22), rgba(185,125,0,.11) 33.33%, rgba(185,125,0,.055) 66.67%, rgba(185,125,0,.0275)), #fff; }
+.wifi-coordinator .wc-radar-ticks { display: flex; justify-content: space-between; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.wifi-coordinator .wc-radar-ticks > span { text-align: center; }
+.wifi-coordinator .wc-radar-ticks > span:first-child { text-align: left; }
+.wifi-coordinator .wc-radar-ticks > span:last-child { text-align: right; }
+.wifi-coordinator .wc-radar-ticks small { display: block; }
+.wifi-coordinator .wc-log-wrap { max-height: 340px; }
+.wifi-coordinator .cbi-section-node-tabbed > [data-tab-active="false"] { display: none; }
+.wifi-coordinator .cbi-value-description { max-width: 65em; line-height: 1.5; }
+@media (prefers-color-scheme: dark) {
+  .wifi-coordinator .wc-table { background: #1c252d; color: #edf1f4; }
+  .wifi-coordinator .wc-table th, .wifi-coordinator .wc-summary { background: #26313a; color: #edf1f4; }
+  .wifi-coordinator .wc-summary h4 { color: #edf1f4; }
+  .wifi-coordinator .wc-table tbody tr:nth-child(even) { background: #202b33; }
+  .wifi-coordinator .wc-table th, .wifi-coordinator .wc-table td, .wifi-coordinator .wc-summary { border-color: #4c5963; }
+  .wifi-coordinator .wc-caption { color: #aebbc4; }
+}
+
+.wifi-coordinator .wc-pattern-key { display: inline-block; width: 28px; height: 14px; border: 1.5px solid; vertical-align: middle; margin-right: 7px; background-repeat: repeat; }

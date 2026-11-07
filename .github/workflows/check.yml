@@ -1,0 +1,21 @@
+name: Project checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  portable-checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Check source and signed release checksums
+        run: python3 scripts/check-project.py
+      - name: Check LuCI syntax and history/cache behavior
+        run: node tests/check-ui.cjs
+      - name: Generate isolated OpenWrt test modules
+        run: python3 scripts/prepare-tests.py
+      - name: Check POSIX shell syntax
+        run: |
+          sh -n wifi-coordinator/build-apk.sh
+          sh -n scripts/test-ucode.sh
+          sh -n channel-coordinator/files/channel-coordinator.init
+          sh -n radio-prefer/files/radio-prefer.init

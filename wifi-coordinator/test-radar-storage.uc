@@ -1,0 +1,26 @@
+import * as fs from 'fs';
+import {open_memory,strength} from '../channel-coordinator/files/radar.uc';
+let path='/tmp/wifi-coordinator-radar-storage-test.json',T=0,W=100000,count=0;
+fs.unlink(path);fs.unlink(path+'.new');
+function check(v,s){if(!v)die('FAIL: '+s+'\n');count++;}
+let memory=open_memory(path,21600,()=>W,()=>T);
+memory.add({time:W,center:5610,width:80,region:2,phy:0,radar_event:0});memory.flush();
+check(!fs.stat(path),'new event remains in RAM instead of forcing a flash write');
+T=21599;W+=21599;memory.flush();check(!fs.stat(path),'no early six-hour checkpoint');
+T++;W++;memory.flush();check(length(json(fs.readfile(path)).records)==1,'eligible checkpoint writes bounded memory');
+memory.add({time:W,center:5610,width:80,region:2,phy:0,radar_event:0});memory.flush();
+check(length(json(fs.readfile(path)).records)==1,'another detection does not immediately rewrite checkpoint');
+T+=21600;W+=21600;memory.flush();check(length(json(fs.readfile(path)).records)==2,'next checkpoint includes later detections');
+let restored=open_memory(path,21600,()=>W,()=>0);
+check(length(restored.records())==2,'radar history survives process restart');
+let before=restored.risk({freq:5580,members:[5580]},2);
+let clockBack=open_memory(path,21600,()=>W-1000,()=>0);
+check(clockBack.risk({freq:5580,members:[5580]},2)==before,'backward boot clock preserves saved event ages');
+let recent=[{time:W+10,center:5290,width:80,region:2,phys:[0,2],weight:1}];
+let restarted=open_memory(path,21600,()=>W+10,()=>T,recent);
+check(length(restarted.records())==3&&length(restarted.records()[2].phys)==2,'same-boot RAM incidents survive restart without graph history');
+restarted.flush();check(length(json(fs.readfile(path)).records)==2,'restoring recent RAM does not force a flash checkpoint');
+check(restarted.flush(true)&&length(json(fs.readfile(path)).records)==3,'orderly shutdown can save recent radar memory early');
+let checkpoint=fs.readfile(path);W++;
+check(restarted.flush(true)&&fs.readfile(path)==checkpoint,'unchanged radar shutdown makes no extra write');
+fs.unlink(path);fs.unlink(path+'.new');print('PASS: '+count+' radar persistence cases\n');

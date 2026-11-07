@@ -1,0 +1,39 @@
+#!/bin/sh /etc/rc.common
+START=98
+STOP=9
+USE_PROCD=1
+
+start_service() {
+ [ ! -f /usr/share/channel-coordinator/defaults.uc ] || /usr/bin/ucode /usr/share/channel-coordinator/defaults.uc --apply
+ [ ! -f /usr/share/channel-coordinator/country.uc ] || /usr/bin/ucode /usr/share/channel-coordinator/country.uc --apply
+ [ "$(uci -q get channel_coordinator.main.enabled)" = 1 ] || return 0
+ procd_open_instance
+ procd_set_param command /usr/bin/ucode /usr/share/channel-coordinator/main.uc
+ procd_set_param respawn 3600 5 5
+ procd_set_param term_timeout 15
+ procd_set_param stdout 1
+ procd_set_param stderr 1
+ procd_close_instance
+}
+service_stopped() {
+ /usr/bin/ucode /usr/share/channel-coordinator/main.uc --recover
+ rm -f /tmp/channel-coordinator-lease.json
+}
+reload_service() { restart; }
+service_triggers() { procd_add_reload_trigger channel_coordinator; }
+
+shutdown() {
+ local pids pid waited=0 alive
+ pids=$(ubus call service list '{"name":"channel-coordinator"}' | /usr/bin/ucode -e 'let s=json(require("fs").stdin.read("all")); for(let i in values(s["channel-coordinator"]?.instances ?? {}))if(i.running&&i.pid>0)print(i.pid+" ");')
+ stop
+ # procd termination is asynchronous: allow the daemon to save its RAM snapshot.
+ while [ "$waited" -lt 20 ]; do
+  alive=0
+  for pid in $pids; do kill -0 "$pid" 2>/dev/null && alive=1; done
+  [ "$alive" = 1 ] || break
+  sleep 1
+  waited=$((waited + 1))
+ done
+ [ "$alive" != 1 ] || { logger -t wifi-coordinator 'History checkpoint skipped: service has not stopped'; return 1; }
+ /usr/bin/ucode /usr/share/channel-coordinator/history-shutdown.uc
+}

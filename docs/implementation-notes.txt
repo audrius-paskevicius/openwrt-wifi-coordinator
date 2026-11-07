@@ -1,0 +1,184 @@
+Wi-Fi Coordinator 0.6.0-r7
+Local signed APK for OpenWrt 25.12, developed on Linksys WRT3200ACM.
+
+One package combines channel planning and Radio Preference. usteer supplies
+measurements with its competing steering decisions held passive. The LuCI pages
+are under Network -> Wi-Fi Coordinator. No SSID, Wi-Fi password or router
+password is included. Existing administrator settings are preserved.
+
+The controller follows one observe / plan / execute / verify cycle:
+- survey.uc schedules paced, single-frequency scans, preferring empty radios.
+  For occupied radios, selection estimates the client link capacity interrupted
+  by a visit, using negotiated rates and measured visit duration. It waits for
+  the least-cost scanner rather than borrowing a costlier radio during its gap.
+  Serving radios receive at least three seconds between visits, increased using
+  the measured scan duration to respect a default 10% scan-duty budget. Steady
+  traffic does not prevent coverage. Only the scanning radio is reserved from
+  normal steering. Full broad sweeps remain the measurement unit; a close
+  comparison requests an earlier full repeat, not a targeted partial refresh.
+- planner.uc ranks legal joint channel AND width arrangements. Separation comes
+  first, then usable width, then estimated capacity. All radios follow the same
+  policy. Other radios' old positions do not constrain the final width choice.
+  A transition route can include one neutral staging move; every step avoids
+  increasing overlap and is reevaluated against fresh observations afterwards.
+- An explicit benefit/evidence margin replaces fixed confirmation counts and
+  stacked switching thresholds. Clear gains can act after one complete sweep.
+  Each eligible destination records consecutive fresh surveys where its cost
+  beats that radio's current placement, including surveys where it ranks second.
+  A rotating winner or another radio's proposed move does not erase that support.
+  New destinations start fresh; changed incumbents, contrary evidence, missing
+  candidates and stale comparisons reset it. Counters are bounded at 64 and kept
+  only in daemon RAM. Each moving radio uses its own destination's support to
+  reduce the uncertainty margin; the minimum benefit and joint feasibility checks
+  still apply. This is a heuristic, not a statistical confidence guarantee.
+  Missing airtime increases uncertainty rather than inventing congestion.
+  Recent radar incidents reduce expected service, separately from Wi-Fi load.
+- executor.uc owns handoff, DFS preparation, switching, verification and recovery.
+  Live CSA can run with traffic and attached clients. Automatic mode first tries
+  a compatible handoff. If clients stay, a shared allow_reconnect policy permits
+  a brief restart of only that radio; clients reconnect to the same network.
+  With no compatible AP, skip the impossible handoff. This common fallback is
+  enabled by default. Explicit protected clients and quiet/empty-only policies
+  remain respected. Radar preparation still needs an empty helper radio.
+  Width changes use the configured width-specific method.
+  Restart transactions keep a private RAM recovery journal. Clients receive a
+  60-second reconnection grace, followed by service checks. Persistent failure
+  restores the previous live channel and excludes the failed destination for
+  six hours. A service interruption also restores the recorded previous channel;
+  power loss instead boots the saved UCI configuration. No extra flash writes.
+- Verification combines authorization, fresh bidirectional data and probes that
+  worked before the move. Unknown service remains identified as unproven. A
+  sustained failure initiates bounded recovery on the affected radio. An ignored
+  command, failed placement and regulatory evacuation have distinct outcomes.
+
+Default cadence: 60 seconds between completed surveys, earlier repeat after 30
+seconds for a close comparison, 180-second minimum residence after a verified
+move and 30-second retry delay after a deferred operation. Failed destinations
+are excluded for six hours. A failed CSA data path temporarily selects an
+radio restart instead, using the shared handoff/reconnect policy. Explicit quiet-only/empty-only policies remain.
+
+The spectrum score uses the same neighbour geometry as the grey graph layer.
+Measured airtime and beacon-derived competition remain distinguishable; the
+capacity proxy is not measured goodput. The default heavy-congestion boundary
+is 70/100. Wide usable blocks are preferred; 40/20 MHz are considered when wide
+space is crowded or cannot fit. Narrowing must improve estimated capacity or
+spectrum separation. Allowed transmit power only breaks equal ties.
+The policy is a bounded heuristic, not a guarantee of maximum client throughput.
+At most four radios and 100000 search nodes are supported. Unsupported HE/EHT,
+MLO and multi-interface arrangements are not managed as if they were validated.
+
+DFS remains enforced by the kernel and hostapd. A compatible empty radio can
+perform CAC while another serves clients. Shared clearance must be confirmed;
+there is no fabricated clearance. The helper's original configuration is restored.
+Radar or an unexpected driver channel change invalidates the old operation and
+reconciles the actual legal placement, instead of treating the old target as an
+outage. Hardware radar behavior still requires live validation on each platform.
+
+radar.uc keeps at most 128 recent incidents, combining duplicate shared-PHY
+notifications within five seconds. Each incident covers its affected spectrum,
+regardless of primary channel, radio or candidate width. The default half-life
+is six hours. Repeated independent events strengthen avoidance; old incidents
+fade. No decay can shorten a kernel prohibition or replace mandatory CAC.
+Subtle amber bands use the same decay in the Chart.js history plot, with no
+lightning markers or extra outlines. The legend shows detection, one, two and
+three half-lives using the current setting. This is remembered interruption risk,
+not the probability of a future detection.
+
+Handoff escalation is uniform: gentle, stronger, then optionally one bounded
+disconnect. An appropriate live AP on the same network and band is required.
+If handoff cannot finish, the common fallback clears temporary bans and lets
+clients reconnect to the changing radio after its brief restart. A temporary
+return ban defaults to 20 seconds; forced retries are limited to one per client
+per five minutes. Protected clients are never forced. Client choice and brief
+interruptions remain possible. The package never promises seamless roaming.
+Radio Preference pauses on reserved radios, yields completely during channel
+operations, and resumes afterwards. Its attempt budget expires; clients without
+measurement support may receive a gentle advisory, never an unmeasured strong
+request. Ordinary preference is not a throughput optimizer or forced steering.
+
+Verified channel placements and radar memory are checkpointed at most once per
+six hours, separately from the history archive below. Channel checkpoints occur
+only while no scan/move is active and preserve administrator edits. Power loss
+can lose recent observations or return to an older saved channel. No radio
+movement causes an immediate wireless-config commit. Same-boot service restarts
+retain queued placements and recent radar incidents in RAM, even if optional
+graph history is disabled.
+
+History uses a recent RAM buffer and immutable flash batches:
+- Retention dropdown: 1, 3, 6, 12, 24, 48, 72, 96, 120, 168 or 200 hours.
+  Default remains 24 hours. The Show dropdown follows the selected retention.
+- /tmp/wifi-coordinator-history.json: up to 1 MiB of recent data in tmpfs.
+- /etc/wifi-coordinator/batch-TIMESTAMP.json: one new file per six-hour offload.
+  Flash archive size is determined by retention and recorded activity, with no
+  fixed archive-size cap. Existing completed batches are never rewritten.
+- Five-minute traffic summaries, each spectrum survey with original per-frequency
+  measurements/times, actions and channel/width residence intervals retain their
+  detail throughout retention. No two-hour aggregation or per-list count caps.
+- Routine offload at most once per six hours when observations have changed. Copy only
+  new/extended records, then keep the most recent hour cached in RAM. Boundary
+  snapshots are merged by stable key, avoiding double-counted partial summaries.
+- Delete only wholly expired batches during scheduled maintenance. Display uses
+  the exact selected cutoff; physical deletion can lag because a batch straddles
+  that cutoff and maintenance runs every six hours. Clear removes all immediately.
+- A 4 MiB free-space reserve protects normal router operations. If a batch would
+  breach that reserve or a write fails, leave previous batches intact, retain RAM
+  and report the failure; retry after six hours. Never delete unexpired archives
+  to force a batch to fit. A full RAM buffer reports any dropped records.
+- Writes use a temporary file, sync, atomic rename and sync. Restarts, page reads
+  and normal sampling never force an offload. The browser caches closed batches
+  and reads new batches plus the RAM file on later refreshes.
+- Existing history.json from 0.4.0 remains readable and byte-identical until it
+  expires. Already aggregated or discarded old records cannot be reconstructed.
+- Orderly shutdown makes one final checkpoint of pending history and radar memory.
+  Repeating shutdown without new data makes no new archive. Archives survive reboot.
+  Unexpected power loss can lose data since the last checkpoint (normally up to
+  six hours, longer if writes failed).
+- No client addresses, SSIDs, passwords, browsing activity or raw network scans
+  are archived. Spectrum history is anonymous frequency-bin data.
+- Turning recording off pauses new observations and preserves existing records.
+  Retention still applies. Clear recorded history is the explicit delete action;
+  it removes graph/action history but preserves operational radar-avoidance memory.
+- No automatic export or remote telemetry. UCI defaults commit only real changes.
+  Verified radio configuration changes still save as before.
+
+Runtime steering state separately retains a bounded, expiring set of client
+addresses for retry cooldowns. This is operational state, not exported history.
+Traffic graphs show actual traffic carried, not available link capacity.
+The channel-comparison panel keeps its expanded/collapsed state during polling.
+Recent actions uses the same retention and Show window, with no separate count cap.
+
+Install: trust radio-prefer-public.pem in /etc/apk/keys, then upload the APK in
+LuCI System -> Software. The public key is already installed on the target.
+Keep signature verification enabled. Official feed dependencies must be present
+or downloadable. This merged package conflicts with the old standalone packages;
+remove those first if migrating another installation, preserving its settings.
+They have already been replaced on the target router.
+
+Firmware upgrades: keep settings and reinstall the compatible APK/dependencies
+as necessary. Preservation entries are included; a firmware upgrade has not been
+tested. The package is local, not an official OpenWrt feed or Attended Sysupgrade
+package. Private signing keys and router configuration backups are not releases.
+
+Source modules live in ../channel-coordinator/files and ../radio-prefer/files.
+Build with native apk v3: SIGN_KEY=/private/path APK_TOOL=/path/apk.static
+sh build-apk.sh. Keep the signing key outside source and release directories.
+
+Graphs use a privately scoped local Chart.js 4.5.1 library (MIT), bundled in
+the APK. No CDN or browser internet access is needed. Traffic curves have no
+fill. Radio ribbons use a light transparent fill and span their occupied width
+on one frequency-proportional channel axis with the inter-band gap removed.
+Grey spectrum surveys are regular Chart.js datasets behind the radio ribbons.
+Each channel-level result extends until its next measurement, with the latest
+shown to the end of the displayed timeline. There is no layer checkbox or
+separate freshness cutoff. Hover identifies the actual measurement time.
+The grey range runs from near-white to medium-dark grey. It estimates congestion
+from overlapping Wi-Fi signals and advertised load, not exact airtime.
+
+Partial surveys: available batches run even when another batch has no eligible
+scanner. Every successful portion is saved immediately. Later deferral or scan
+failure cannot discard earlier history. One sweep shares a compact record;
+per-bin time offsets preserve the actual measurement times. Each survey record represents a sweep rather than a small batch. Automatic channel decisions
+require full fresh coverage for the radio being moved; a partial sweep holds any radio whose eligible band is incomplete.
+Manual --evaluate performs one paced survey and remains observation-only.
+
+Radio visibility: radio0 is magenta with left-slanting hatches, radio1 orange with vertical hatches, and radio2 blue with right-slanting hatches. Hatch backgrounds are transparent. Overlapping ribbons combine their patterns. White edging surrounds the coloured outlines; there are no centre rails. Dashed outlines indicate radar preparation. Survey shading runs from near-white to medium-dark grey; values and channel geometry are unchanged. Hatch swatches match the plot; traffic lines remain unfilled.

@@ -1,0 +1,15 @@
+wifi-coordinator/dist/
+wifi-coordinator/history-test-module.uc
+wifi-coordinator/history-storage-test.uc
+wifi-coordinator/test-reconnect-recovery.uc
+__pycache__/
+*.pyc
+*.log
+*.tmp
+*.new
+*.private.pem
+private.pem
+signing-private/
+backups/
+.env
+.env.*

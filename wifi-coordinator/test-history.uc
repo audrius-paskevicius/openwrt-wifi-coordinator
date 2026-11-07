@@ -1,0 +1,49 @@
+import * as fs from 'fs';
+import {open_history,set_now} from './history-test-module.uc';
+const path='/tmp/wifi-history-test.json';
+function check(ok,why){if(!ok)die('FAIL: '+why+'\n');}
+let t=time(),seed={boot:'test',started:t,periods:[],samples:[],events:[]};
+set_now(t);
+push(seed.events,{time:t-90000,event:'expired'});
+for(let i=0;i<1100;i++){
+    let s={time:t,end:t,radio:'radio0',channel:100,width:80,role:'serving',n:60,traffic_sum:2.5,traffic_peak:1.2,clients_peak:2,busy_sum:0,busy_n:0,signal_min:-60};
+    push(seed.samples,s);
+    if(length(sprintf('%J',seed))>261900){pop(seed.samples);break;}
+}
+fs.writefile(path,sprintf('%J',seed));
+let h=open_history('test',true,24);
+for(let i=0;i<140;i++)h.event({event:'test',reason:'Client AA:BB:CC:DD:EE:FF '+join('',map([1,2,3,4,5,6,7,8,9,10],x=>'abcdefghijklmnopqrstuvwxyz')),mac:'11:22:33:44:55:66',ssid:'PRIVATE-NAME'});
+h.record([{radio:'radio2',channel:36,center:5210,width:80,role:'serving',traffic:1.5,clients:2,busy:10,signal:-65}]);h.flush(true);
+let raw=fs.readfile(path),data=json(raw);
+check(length(raw)<=1048576,'RAM size cap');
+check(length(data.events)==140,'events retained without old 128-event cap');
+check(!length(filter(data.events,e=>e.event=='expired')),'retention');
+check(index(raw,'AA:BB')<0&&index(raw,'11:22')<0&&index(raw,'PRIVATE-NAME')<0,'identity filtering');
+check(length(filter(data.samples,s=>s.radio=='radio2'))==1,'summary recorded');
+check(length(data.periods)==1,'residence recorded');
+check(data.periods[0].center==5210,'occupied centre retained');
+h.survey([{center:5210,width:80,signal:-40,load:null,ssid:'PRIVATE-SURVEY',bssid:'aa:bb:cc:dd:ee:ff'}],[5180,5200,5220,5240]);
+data=json(fs.readfile(path));let survey=data.surveys[0];
+check(survey.bands[1].levels[0]>0,'survey overlap recorded');
+check(survey.bands[1].levels[20]==null,'unscanned spectrum stays unknown');
+check(index(fs.readfile(path),'PRIVATE-SURVEY')<0&&index(fs.readfile(path),'aa:bb:cc')<0,'survey identity filtering');
+check(fs.stat(path).size<=1048576,'survey shares RAM size cap');
+h.clear();
+let obs=[{center:2412,width:20,signal:-45,load:null}];
+h.survey(obs,[2412,2437],'sweep-1',[2412,2437]);
+data=json(fs.readfile(path));let first=data.surveys[0].bands[0].levels[2];
+check(length(data.surveys)==1&&first>0,'first portion immediately persisted');
+check(!length(filter(data.surveys[0].bands[1].levels,v=>v!=null)),'unvisited band stays unknown');
+h=open_history('test',true,24);
+push(obs,{center:5210,width:80,signal:-60,load:null});
+h.survey(obs,[2412,2437,5180],'sweep-1',[5180]);
+data=json(fs.readfile(path));
+check(length(data.surveys)==1,'same sweep coalesces after reopening');
+check(data.surveys[0].bands[0].levels[2]==first&&data.surveys[0].bands[1].levels[0]>0,'earlier portion retained when later band arrives');
+check(length(data.surveys[0].bands[0].offsets)==19&&length(data.surveys[0].bands[1].offsets)==34,'per-bin measurement times');
+h.survey(obs,[2412],'sweep-2',[2412]);
+check(length(json(fs.readfile(path)).surveys)==2,'new sweep starts separate history');
+h=open_history('different-boot',true,24);h.flush(true);data=json(fs.readfile(path));
+check(!length(data.samples)&&!length(data.events)&&!length(data.surveys),'reboot reset');
+h=open_history('different-boot',false,24);check(fs.stat(path),'pausing preserves RAM history');
+print('PASS: 19 bounded history, partial-survey, privacy, retention and reset checks\n');
