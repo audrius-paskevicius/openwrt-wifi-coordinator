@@ -166,7 +166,7 @@ function channelChart(canvas,periods,names,start,end,surveys,radar,bands){
  options.scales.y.afterBuildTicks=function(s){s.ticks=ticks.map(function(t){return {value:t.value};});};
  options.scales.y.ticks={autoSkip:false,color:'#444',font:{size:11},callback:function(v){return (ticks.find(function(t){return t.value==v;})||{}).label||'';}};
  options.scales.y.grid={color:function(c){return axis.breaks.some(g=>c.tick&&g.value==c.tick.value)?'#999':'#e5e5e5';}};
- options.scales.y.title={display:true,text:'Channel / band',color:'#444'};
+ options.scales.y.title={display:true,text:'Band / channel',color:'#444'};
  options.plugins.tooltip.filter=function(item){return !item.dataset.wcHalo&&!item.dataset.wcFill;};
  options.plugins.tooltip.callbacks={
   title:function(items){var raw=items[0]&&items[0].raw,p=raw&&raw.period;return p?dated(p.start)+' – '+dated(p.end):raw?(raw.radar?'Last radar detection: ':'Survey measured at ')+dated(raw.observed):'';},

@@ -1,6 +1,10 @@
 # Validation
 
-Source release: **0.6.0-r18**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r19**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r19 axis label order
+
+The spectrum axis title now reads "Band / channel", matching the band-first tick labels. This is a text-only correction; the r18 mapping and rendering behavior are unchanged.
 
 ## r18 standard band axes
 
