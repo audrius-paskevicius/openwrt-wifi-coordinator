@@ -5,9 +5,9 @@ import * as ubus from 'ubus';
 import * as uci from 'uci';
 import * as uloop from 'uloop';
 import {open_history} from './history.uc';
-import {channel, group, same, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample,declared_bands} from './policy.uc';
+import {channel, group, same, same_block, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample,declared_bands} from './policy.uc';
 import {survey_covers,move_method,configured_channels,configured_widths,frequency,switch_methods,setting_integer,hardware_widths,placements,live_width} from './policy.uc';
-import {assess,choose,decide} from './planner.uc';
+import {assess,choose,decide,spatial_streams} from './planner.uc';
 import {open_memory} from './radar.uc';
 import {create_survey} from './survey.uc';
 import {create_executor} from './executor.uc';
@@ -48,7 +48,6 @@ let cfg={enabled:raw.enabled=='1',mode:raw.mode ?? 'observe',interval:number('in
     overlap_penalty:number('overlap_penalty',25,0,500),max_mbps:+(raw.max_mbps ?? '0.05'),
     separate:raw.separate_radios!='0',
 
-    wide_threshold:number('wide_threshold',70,10,100),
     verify_unprobed:number('verify_unprobed',180,150,600),
     allow_reconnect:raw.allow_reconnect!='0',
     protected_clients:map(type(raw.protected_clients)=='array'?raw.protected_clients:split(raw.protected_clients ?? '',/\s+/),x=>lc(x)),
@@ -203,7 +202,8 @@ function inventory() {
         for(let index,band in p.wiphy_bands ?? []) if(band){
             let first=band.freqs?.[0]?.freq,key=first?(first<3000?'2g':'5g'):(index==0?'2g':'5g');
             let old=info.bands[key] ?? {};
-            info.bands[key]={ht_capa:band.ht_capa ?? old.ht_capa,vht_capa:band.vht_capa ?? old.vht_capa};
+            info.bands[key]={ht_capa:band.ht_capa ?? old.ht_capa,vht_capa:band.vht_capa ?? old.vht_capa,
+                ht_mcs_set:band.ht_mcs_set ?? old.ht_mcs_set,vht_mcs_set:band.vht_mcs_set ?? old.vht_mcs_set};
             for(let f in band.freqs ?? [])if(f)info.caps[f.freq]=f;
         }
     }
@@ -328,8 +328,9 @@ function candidates(r,radios,rules) {
     }
     let snapshot={...scan_result,busy};
     function rated(g){
-        let key=r.name+':'+g.center+':'+g.width;
-        let q=assess(g,snapshot,maxw,radar.records(),time(),cfg.radar_half_life,r.dfs_region,estimate_cache[key]);
+        let key=r.name+':'+g.freq+':'+g.center+':'+g.width;
+        let caps=r.band=='2g'?{ht_mcs_set:r.band_caps?.ht_mcs_set}:r.band_caps;
+        let q=assess(g,snapshot,maxw,radar.records(),time(),cfg.radar_half_life,r.dfs_region,estimate_cache[key],spatial_streams(caps));
         estimate_cache[key]=q;
         let powers=map(g.members,f=>r.caps[f]?.max_tx_power ?? 0);
         return {...q,max_width:maxw,power:min(...powers)};
@@ -349,7 +350,7 @@ function candidates(r,radios,rules) {
         if(!same(g,current)&&method=='csa'&&!r.csa)continue;
         if(!same(g,current)&&r.band=='2g'&&g.width==40&&method=='csa')continue;
         if(!same(g,current)&&method=='idle_reconfigure'&&length(filter(keys(r.clients),m=>index(cfg.protected_clients,lc(m))>=0)))continue;
-        if(length(filter(s.rejected,x=>same(g,x.target))))continue;
+        if(length(filter(s.rejected,x=>same_block(g,x.target))))continue;
         if(length(filter(g.members,f=>index(scan_result.frequencies,f)<0)))continue;
         if(length(filter(list,x=>same(x,g))))continue;
         push(list,same(g,current)?current:rated(g));

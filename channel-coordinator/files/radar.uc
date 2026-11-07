@@ -2,7 +2,7 @@
 // remains authoritative and is checked separately by the hardware layer.
 import * as fs from 'fs';
 export function strength(e,t,half_life) {
-    return (e.weight ?? 1)*2 ** (-max(0,t-e.time)/max(60,half_life));
+    return (e.weight ?? 1)*2 ** (-1.0*max(0,t-e.time)/max(60,half_life));
 };
 export function remember(events,event) {
     if(event.radar_event!=0||!event.center||!event.width)return events;

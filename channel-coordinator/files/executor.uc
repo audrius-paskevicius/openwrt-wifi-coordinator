@@ -1,6 +1,6 @@
 import * as system_fs from 'fs';
 import * as nl from 'nl80211';
-import {channel,group,same,overlap,permitted,uses_dfs,dfs_ready,preparation_text,reconfigure_text,same_network,force_signal_ok,private_ipv4,liveness_progress,move_method,quiet_ready} from './policy.uc';
+import {channel,group,same,same_block,overlap,permitted,uses_dfs,dfs_ready,preparation_text,reconfigure_text,same_network,force_signal_ok,private_ipv4,liveness_progress,move_method,quiet_ready} from './policy.uc';
 export function data_flow(previous,current){
     if(!previous||!current)return false;
     let reset=current.rx<previous.rx||current.tx<previous.tx;
@@ -73,7 +73,7 @@ function start_cac(r,g,radios) {
             for(let f in g.members){
                 let part=w==g.width?g:group(f,w);
                 if(!part||length(filter(part.members,m=>index(g.members,m)<0))||dfs_ready(part,r.caps))continue;
-                if(!length(filter(groups,x=>same(x,part))))push(groups,part);
+                if(!length(filter(groups,x=>same_block(x,part))))push(groups,part);
             }
         }
         for(let part in groups)if(permitted(part,h.caps,rules,h.config.channels,'prepare')&&
@@ -574,7 +574,7 @@ function operation(radios) {
             // An ignored command with the original channel and healthy clients
             // is not an outage. Quarantine this target and keep serving.
             let s=state.radios[pending.radio];
-            s.rejected=filter(s.rejected ?? [],x=>x.until>t&&!same(x.target,pending.target));
+            s.rejected=filter(s.rejected ?? [],x=>x.until>t&&!same_block(x.target,pending.target));
             push(s.rejected,{target:pending.target,until:t+21600,reason:'Driver left the original channel/width unchanged'});
             while(length(s.rejected)>16)shift(s.rejected);
             if(pending.reconnect)restore_preparation();
@@ -613,7 +613,7 @@ function operation(radios) {
             let kind=failure_kind(r,pending.target,health);
             if(pending.method=='csa'&&kind=='radio')s.csa_failed_until=t+21600;
             pending.own_stop='Service verification failed';
-            s.rejected=filter(s.rejected ?? [],x=>x.until>t&&!same(x.target,pending.target));
+            s.rejected=filter(s.rejected ?? [],x=>x.until>t&&!same_block(x.target,pending.target));
             pending.failure_clients=keys(progress.failed);
             pending.failed_entry={target:pending.target,kind,until:t+(kind=='inconclusive'?(cfg.max_age ?? 900):21600),
                 reason:kind=='radio'?'Radio did not establish the requested placement':kind=='client'?

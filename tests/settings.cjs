@@ -29,7 +29,7 @@ const page=new Function('view','form','uci','rpc','fs','poll','help','E','_','L'
  {add:fn=>polls.push(fn)},{compact:()=>{},sectionStatus:(s,n)=>{s.statusNode=n;}},E,x=>x,{resource:x=>x});
 function option(name,section='main'){const o=options.find(x=>x.option===name&&x.section===section);assert(o,'Missing '+section+'.'+name);return o;}
 module.exports=page.render([null,null,state,{}]).then(async()=>{
- for(const name of ['retry_delay','scan_wait','scan_batch','cac_timeout','csa_count','ban_seconds'])assert(!options.some(x=>x.option===name));
+ for(const name of ['retry_delay','scan_wait','scan_batch','cac_timeout','csa_count','ban_seconds','wide_threshold'])assert(!options.some(x=>x.option===name));
  for(const radio of radios){
   const name=radio['.name'];
   for(const key of ['channels','widths','method','width_method'])assert.equal(option(key,name).default,'auto');

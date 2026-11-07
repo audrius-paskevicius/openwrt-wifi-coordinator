@@ -1,0 +1,62 @@
+import {group,same,same_block} from '../channel-coordinator/files/policy.uc';
+import {assess,spatial_streams,choose,decide} from '../channel-coordinator/files/planner.uc';
+import {strength} from '../channel-coordinator/files/radar.uc';
+let count=0;
+function check(v,label){if(!v)die('FAIL: '+label+'\n');count++;}
+function close(a,b){return max(a-b,b-a)<0.000001;}
+let cfg={separate:true,overlap_penalty:10,improvement:3};
+let empty={observations:[],busy:{},scanners:{}};
+function rate(f,w,s,streams,radars){return {...assess(group(f,w),s ?? empty,160,radars ?? [],100,3600,2,null,streams ?? 1),max_width:160,power:20};}
+function model(name,current,choices){return {name,current,candidates:choices};}
+let widths=map([20,40,80,160],w=>rate(5180,w));
+for(let i=1;i<length(widths);i++)check(widths[i].service>widths[i-1].service,'clear wider block earns capacity '+widths[i].width);
+let wide=choose([model('r',widths[0],widths)],cfg);
+check(wide.choices[0].width==160,'future-capable clients retain full-width headroom without connected clients');
+check(close(widths[2].service,50),'fixed same-band score reference preserves bandwidth differences');
+let busy={...empty,busy:{'5180':90}};
+let bad=rate(5180,80,busy),good=rate(5240,80,busy);
+check(good.service>bad.service,'clean primary earns fallback capacity in the same wide block');
+check(!same(bad,good)&&same_block(bad,good),'primary placement differs while spectral footprint agrees');
+let p=choose([model('r',bad,[bad,good])],cfg);
+check(p.choices[0].freq==5240&&decide(p,[model('r',bad,[bad,good])],null,1,cfg,null).action=='move','primary-only improvement is executable');
+check(close(good.at_width[20],20)&&close(good.at_width[40],40),'narrow clients have a clear primary path');
+check(good.capacity<80&&good.capacity>40,'busy secondary discounts only additional bonded capacity');
+let n={center:5210,width:80,signal:-40,load:32};
+let uniform=rate(5180,80,{...empty,observations:[n]});
+check(close(uniform.capacity,60),'one wide neighbouring BSS is not counted four times');
+let separated=rate(5180,80,{...empty,observations:[{...n,center:5180,width:20},{...n,center:5240,width:20}]});
+check(separated.capacity<uniform.capacity,'distinct interferers on separate subchannels constrain bonded availability');
+let crowd={...empty,busy:{'5180':95,'5200':95,'5220':95,'5240':95,'5260':95,'5280':95,'5300':95,'5320':95}};
+let crowded=rate(5180,160,crowd),clean=rate(5745,80,crowd);
+check(choose([model('r',crowded,[crowded,clean])],cfg).choices[0].width==80,'clean narrow block beats badly occupied 160 without an arbitrary narrowing gate');
+let tiny={...widths[2],cost:widths[3].cost+1,uncertainty:0};
+let tinyModels=[model('r',tiny,[tiny,{...widths[3],uncertainty:0}])];
+check(decide(choose(tinyModels,cfg),tinyModels,null,1,cfg,null).action=='measure','width increase never bypasses minimum gain');
+let radar={time:100,center:5250,width:160,region:2,weight:1};
+for(let fraction in [0.25,0.5,0.75,1.25])check(close(strength(radar,100+3600*fraction,3600),2**(-fraction)),'continuous radar decay '+fraction);
+check(rate(5180,160,empty,1,[radar]).service<rate(5745,80).service,'cleaner narrower placement can beat fresh radar risk');
+let ht={rx_mcs_indexes:[0,7,8,15,16,23,32],tx_mcs_set_defined:true,tx_rx_mcs_set_equal:true};
+check(spatial_streams({ht_mcs_set:ht})==3,'HT special MCS32 does not invent a fifth stream');
+check(spatial_streams({ht_mcs_set:{...ht,tx_rx_mcs_set_equal:false,tx_max_spatial_streams:2}})==2,'asymmetric HT transmit ceiling respected');
+check(spatial_streams({ht_mcs_set:{...ht,tx_mcs_set_defined:false}})==1,'unknown TX capacity not invented');
+let vht={rx_mcs_set:[{streams:1,mcs_indexes:[0,9]},{streams:3,mcs_indexes:[0,9]}],tx_mcs_set:[{streams:1,mcs_indexes:[0,9]},{streams:2,mcs_indexes:[0,9]}]};
+check(spatial_streams({vht_mcs_set:vht})==2,'bidirectional VHT stream capacity uses the limiting direction');
+check(spatial_streams(null)==1,'absent capability defaults conservatively');
+let main=rate(5180,80,empty,3),spare=rate(5500,80,empty,1);
+let mainDirty={...main,cost:main.cost+30},spareClean=rate(5180,80,empty,1);
+let joint=[model('main',mainDirty,[mainDirty,rate(5500,80,empty,3)]),model('spare',spare,[spare,spareClean,rate(5745,80,empty,1)])];
+let answer=choose(joint,cfg);
+check(answer.gain>0&&answer.overlap==0,'different PHY capacities are optimized jointly on separate spectrum');
+check(close(main.service,3*rate(5180,80,empty,1).service),'main and spare capacity are not normalized into equality');
+let incumbent=rate(5200,80),equivalent=rate(5180,80);
+check(!length(choose([model('r',incumbent,[equivalent,incumbent])],cfg).path),'equal primary evidence retains incumbent');
+let renamed=map(joint,(m,i)=>({...m,name:'arbitrary'+i,clients:{new:true},mbps:1000}));
+check(close(choose(renamed,cfg).cost,answer.cost),'client arrival, offered load and radio naming do not redefine capacity objective');
+let snapshot={...empty,busy:{'5180':40}};
+let once=rate(5180,80,snapshot),again=rate(5180,80,{...snapshot,clients:{legacy:true}});
+check(close(once.service,again.service),'a legacy client does not shrink the long-term channel objective');
+// Candidate compression is exact: primaries share route footprint, not scores.
+let choices=[];for(let f in [5180,5200,5220,5240])push(choices,rate(f,80,busy));
+let best=choose([model('r',choices[0],choices)],cfg);
+check(close(best.cost,min(...map(choices,g=>g.cost))),'compressed primary search preserves best service');
+print('PASS: '+count+' service, primary-channel and future-client cases\n');

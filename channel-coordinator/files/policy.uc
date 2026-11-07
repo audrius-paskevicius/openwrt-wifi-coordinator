@@ -56,7 +56,8 @@ export function overlap(a, b) {
     let hi = min(a.center + a.width / 2, b.center + b.width / 2);
     return 1.0 * max(0, hi - lo) / min(a.width, b.width);
 };
-export function same(a, b) { return a.center == b.center && a.width == b.width; };
+export function same_block(a, b) { return a.center == b.center && a.width == b.width; };
+export function same(a, b) { return a.freq == b.freq && same_block(a,b); };
 export function quiet_ready(since, now, seconds) {
     return since != null && now >= since && now-since >= seconds;
 };

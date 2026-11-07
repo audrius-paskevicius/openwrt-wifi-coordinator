@@ -1,11 +1,11 @@
 import {group,same} from '../channel-coordinator/files/policy.uc';
-import {assess,layout,better,transition,choose,decide,worthwhile_narrowing} from '../channel-coordinator/files/planner.uc';
+import {assess,layout,better,transition,choose,decide} from '../channel-coordinator/files/planner.uc';
 import {remember,strength,risk} from '../channel-coordinator/files/radar.uc';
 import {create_survey,scan_cost} from '../channel-coordinator/files/survey.uc';
 import {create_executor} from '../channel-coordinator/files/executor.uc';
 import * as nl from 'nl80211';
 let count=0;function check(v,s){if(!v)die('FAIL: '+s+'\n');count++;}
-let cfg={separate:true,wide_threshold:70,overlap_penalty:10,improvement:3};
+let cfg={separate:true,overlap_penalty:10,improvement:3};
 function g(f,w,c,occ){return {...group(f,w),cost:c,occupancy:occ??c,radar_risk:0,uncertainty:3,max_width:80,power:20};}
 function model(name,c,choices){return {name,current:c,candidates:choices};}
 let old=g(5500,80,5.88),clean=g(5580,80,0),m=[model('main',old,[old,clean])];
@@ -56,7 +56,7 @@ let tiny=comparison(incumbent,[{...altA,cost:9,uncertainty:1}],null,1);
 for(let round=2;round<=70;round++)tiny=comparison(incumbent,[{...altA,cost:9,uncertainty:1}],tiny,round);
 check(tiny.count==64&&tiny.required>=cfg.improvement&&tiny.action=='measure','bounded evidence never bypasses minimum benefit');
 let narrow=g(5580,40,50,0),wide=g(5500,80,55,55);
-check(choose([model('main',narrow,[narrow,wide])],cfg).choices[0].width==80,'usable wide spectrum preferred despite cleaner narrow block');
+check(choose([model('main',narrow,[narrow,wide])],cfg).choices[0].width==40,'service benefit ranks ahead of nominal width');
 let blockedWide={...wide,cost:95,occupancy:95};
 check(choose([model('main',blockedWide,[blockedWide,narrow])],cfg).choices[0].width==40,'severely crowded wide block can lose to clear narrow block');
 let marginalWide=g(5500,80,70,70),worseNarrow=g(5580,40,80,60);
@@ -92,7 +92,7 @@ for(let k=0;k<40;k++){
  let got=choose(ms,cfg),ref={...layout(map(ms,z=>z.current),cfg)};
  for(let c0 in ms[0].candidates)for(let c1 in ms[1].candidates)for(let c2 in ms[2].candidates){
   let cs=[c0,c1,c2],l=layout(cs,cfg),current=map(ms,z=>z.current);
-  if(worthwhile_narrowing(current,cs,layout(current,cfg),l,cfg)&&better(l,ref,cfg)&&transition(ms,cs,cfg))ref=l;
+  if(better(l,ref,cfg)&&transition(ms,cs,cfg))ref=l;
  }
  check(!got.truncated&&got.cost==ref.cost&&got.width==ref.width&&got.overlap==ref.overlap,'joint plan matches exhaustive feasible reference '+k);
 }
@@ -108,7 +108,7 @@ check(strength(events[0],50,3600)==1,'clock reversal cannot create negative-age 
 events=remember(events,{...e,time:3700});check(risk(events,group(5580,80),7300,3600,2)==0.75,'repeated independent incidents strengthen memory');
 let snap={observations:[],busy:{},scanners:{'5580':'r','5600':'r','5620':'r','5640':'r'}};
 let q=assess(group(5580,80),snap,80,[],100,3600,2,null);
-check(q.cost==0&&q.airtime==null&&q.uncertainty>0,'missing airtime is uncertainty rather than invented congestion');
+check(q.service==50&&q.airtime==null&&q.uncertainty>0,'missing airtime is uncertainty rather than invented congestion');
 let qr=assess(group(5580,80),snap,80,remember([],e),100,3600,2,null);
 check(qr.cost>q.cost&&qr.radar_risk==1,'empty Wi-Fi survey cannot erase radar risk');
 // Exercise the actual survey module under continuous high traffic.

@@ -3,7 +3,7 @@
 import * as uci from 'uci';
 import * as fs from 'fs';
 let c=uci.cursor(getenv('WIFI_COORDINATOR_CONFIG_DIR') ?? '/etc/config');
-for(let key in ['retry_delay','scan_wait','scan_batch','cac_timeout','csa_count','ban_seconds'])
+for(let key in ['retry_delay','scan_wait','scan_batch','cac_timeout','csa_count','ban_seconds','wide_threshold'])
     c.delete('channel_coordinator','main',key);
 let board=trim(fs.readfile('/tmp/sysinfo/board_name') ?? '');
 let wrt=index(['linksys,wrt3200acm','linksys,wrt32x'],board)>=0;

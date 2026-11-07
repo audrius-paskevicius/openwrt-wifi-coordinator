@@ -1,6 +1,14 @@
 # Validation
 
-Source release: **0.6.0-r19**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r20**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r20 service-based joint planning
+
+The planner uses one service objective in place of width-first ranking and the separate narrowing gate. The new isolated service suite covers clean 160 MHz headroom without connected clients, primary-only moves, nested narrower transmission capacity, avoiding repeated counting of one wide neighbouring BSS, distinct subchannel interferers, clean narrow versus crowded wide spectrum, minimum-gain admission for widening, fractional radar half-lives, HT/VHT stream decoding, unequal AP capacity, incumbent primary ties and invariance to client names/counts/offered traffic. Candidate tests also ensure a different primary cannot evade a failed-footprint exclusion. The exhaustive small-layout reference and existing executor/recovery tests remain in the runtime suite.
+
+The isolated runtime suite passed 1,131 checks, including 30 new service cases and 7 candidate-limit cases. Portable UI checks and the offline fixture using actual LuCI methods passed, including all 55 setting descriptions. The signed APK verified, packaged files matched source, and installation required no dependency changes. Both services resumed, all three APs remained present, and router internet probes succeeded (3/3).
+
+The service index is a spectrum/capability model, not a measured throughput result. These tests establish policy behavior and regression coverage; they do not establish globally optimal client speeds or uninterrupted roaming for every device.
 
 ## r19 axis label order
 

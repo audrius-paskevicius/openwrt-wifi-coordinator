@@ -26,7 +26,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `enabled` | Stops this controller; distinct from observation, which still scans and proposes. Client steering has its own switch. |
 | `mode` | Observe versus automatic channel changes. Does not control preferred-radio steering. |
 | `interval` | Administrator's scan-overhead budget: minimum wait after completed surveys/operations, including close comparisons. Startup begins after 15 seconds. |
-| `improvement` | Minimum gain for cost-only moves. Improved separation/usable width can bypass it; evidence uncertainty can raise it. |
+| `improvement` | Minimum service-index gain for every capacity move, including widening. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
 | `min_dwell` | Avoids repeated moves after successful verification. Independent of survey frequency. |
 | `persist` | Whether verified wireless placements are checkpointed, at most every six hours. Separate from graph history and radar memory. |
 | `clear_stop` | One-shot recovery acknowledgement, reset after use. Does not erase remembered failed destinations. |
@@ -50,7 +50,6 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `max_age` | Advanced: freshness ceiling for evidence; also bounds the cross-primary retry pause after HT40 setup retains 20 MHz. The active width constraint and remaining time are shown. Too short for a full scan can prevent decisions; unknown spectrum is never assumed clear. |
 | `separate_radios` | Whether separation ranks before width/cost, or overlap is a cost term. Distinct priorities, not interchangeable thresholds. |
 | `overlap_penalty` | Shown only when strict separation is disabled: allows the administrator to trade overlap against other costs. |
-| `wide_threshold` | When congestion permits narrower channels to compete. Distinct from the minimum improvement needed to justify moving. |
 
 ## Per-radio controls
 
