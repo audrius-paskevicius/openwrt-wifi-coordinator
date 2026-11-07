@@ -70,11 +70,10 @@
 }
 
 .wifi-coordinator .wc-pattern-key { display: inline-block; width: 28px; height: 14px; border: 1.5px solid; vertical-align: middle; margin-right: 7px; background-repeat: repeat; }
-.wc-disclaimer-banner{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin:0 0 1rem;padding:1rem;border:2px solid #b76600;border-left-width:6px;background:#fff3d6;color:#382300}
-.wc-disclaimer-banner strong{font-size:1rem}
-.wc-disclaimer-gate{padding:1.25rem;border:2px solid #b76600;background:#fffaf0;color:#302315;max-width:64rem}
+.wc-disclaimer-gate,.wc-disclaimer-notice{padding:1.25rem;border:2px solid #b76600;background:#fffaf0;color:#302315;max-width:64rem}
 .wc-disclaimer-full{max-width:64rem;line-height:1.6}
 .wc-disclaimer-full h3{font-weight:700;line-height:1.4}
 .wc-disclaimer-full p{margin:1em 0}
 .wc-disclaimer-full p:last-child{font-weight:700}
 .wc-disclaimer-host:has(.wc-disclaimer-gate) ~ .cbi-page-actions{display:none}
+a[href*="/wifi_coordinator/disclaimer"]{font-weight:700;white-space:normal;overflow-wrap:break-word}

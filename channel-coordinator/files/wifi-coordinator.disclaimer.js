@@ -1,5 +1,4 @@
 'use strict';
-'require ui';
 
 // The build inserts DISCLAIMER.txt here; acknowledgement follows the exact text,
 // independently of package version. Nothing is written to the router's flash.
@@ -13,21 +12,19 @@ function accepted(){
  if(acknowledged)return true;
  try{return window.localStorage.getItem(key)===text;}catch(e){return false;}
 }
-function banner(){
- return E('aside',{'class':'wc-disclaimer-banner','aria-label':'Software risk warning'},[
-  E('strong',{},'AI-generated software. No warranties. Use entirely at your own risk.'),
-  E('button',{'type':'button','class':'cbi-button','click':function(){
-   ui.showModal('Software disclaimer',[fullText(),E('div',{'class':'right'},[
-    E('button',{'type':'button','class':'cbi-button','click':ui.hideModal},'Close')])]);
-  }},'Read full disclaimer')
+function page(){
+ return E('div',{'class':'wifi-coordinator'},[
+  E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),
+  E('h2',{},'Wi-Fi Coordinator: disclaimer'),
+  E('section',{'class':'wc-disclaimer-notice'},[fullText()])
  ]);
 }
 function gate(render){
  var host=E('div',{'class':'wifi-coordinator wc-disclaimer-host'},[
-  E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),banner()
+  E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'})
  ]);
  function showPage(){return Promise.resolve().then(render).then(function(page){
-  host.replaceChildren(host.firstChild,banner(),page);return host;
+  host.replaceChildren(host.firstChild,page);return host;
  });}
  if(accepted())return showPage();
  var error=E('p',{'role':'alert'});
@@ -41,4 +38,4 @@ function gate(render){
   E('p',{},'Acknowledgement is remembered in this browser for this router. It does not enable, disable, or change the running services.'),button,error]));
  return Promise.resolve(host);
 }
-return L.Class.extend({gate:gate});
+return L.Class.extend({gate:gate,page:page});

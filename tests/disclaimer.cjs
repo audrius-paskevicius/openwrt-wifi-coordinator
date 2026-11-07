@@ -20,9 +20,15 @@ module.exports=(async()=>{
  assert(JSON.stringify(page).includes(text.trim().split('\n\n')[1]),'full notice is visible on first visit');
  const gate=find(page,'section');await find(gate,'button').attrs.click();
  assert.equal(rendered,1);assert.equal(writes,1);assert.equal(value,text);
- assert(!find(page,'section'));assert(find(page,'aside'),'persistent warning remains after acknowledgement');
- find(find(page,'aside'),'button').attrs.click();assert(f.modal());
- assert(JSON.stringify(f.modal()).includes(text.trim().split('\n\n')[4]),'full disclaimer remains accessible');
+ assert(!find(page,'section'));assert(!find(page,'aside'),'no recurring banner after acknowledgement');
+ assert(JSON.stringify(f.api.page()).includes(text.trim().split('\n\n')[4]),'dedicated disclaimer page contains full text');
+ const menu=JSON.parse(fs.readFileSync(path.join(root,'wifi-coordinator/menu.json'),'utf8'));
+ assert.equal(menu['admin/network/wifi_coordinator/disclaimer'].action.path,'wifi-disclaimer');
+ assert.equal(menu['admin/network/wifi_coordinator/disclaimer'].title,'AI-generated software. No warranties. Use entirely at your own risk.');
+ const tab=fs.readFileSync(path.join(root,'channel-coordinator/files/wifi-disclaimer.js'),'utf8');
+ const view=new Function('view','disclaimer',tab)({extend:x=>x},f.api);
+ const direct=await view.render();assert(JSON.stringify(direct).includes(text.trim().split('\n\n')[1]));
+ assert.equal(view.handleSave,null);assert.equal(view.handleSaveApply,null);
  await fixture(storage).api.gate(render);assert.equal(rendered,2,'same text stays acknowledged across module loads and upgrades');
  const changed=await fixture(storage,text+'\nRevised notice.').api.gate(render);
  assert(find(changed,'section'));assert.equal(rendered,2,'changed text requires new acknowledgement');
@@ -38,5 +44,5 @@ module.exports=(async()=>{
  for(const paragraph of text.trim().split('\n\n'))assert(readme.includes(paragraph),'README and APK wording must match');
  assert(readme.indexOf('<!-- project-disclaimer:start -->')<readme.indexOf('Coordinated channel selection'));
  assert(fs.readFileSync(path.join(root,'wifi-coordinator/build-apk.sh'),'utf8').includes('"$BASE/../DISCLAIMER.txt"'));
- console.log('PASS: canonical disclaimer, all three page gates, browser acknowledgement, text revisions, unavailable storage and persistent warning');
+ console.log('PASS: canonical disclaimer, first-use gates, browser acknowledgement, text revisions, unavailable storage and dedicated tab without recurring banners');
 })().catch(e=>{console.error(e);process.exitCode=1;});

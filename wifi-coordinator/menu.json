@@ -1,6 +1,47 @@
 {
- "admin/network/wifi_coordinator": {"title":"Wi-Fi Coordinator","order":65,"action":{"type":"firstchild"},"depends":{"acl":["luci-app-channel-coordinator","luci-app-radio-prefer"]}},
- "admin/network/wifi_coordinator/channels": {"title":"Channels","order":10,"action":{"type":"view","path":"wifi-channels"}},
- "admin/network/wifi_coordinator/clients": {"title":"Clients","order":20,"action":{"type":"view","path":"wifi-clients"}},
- "admin/network/wifi_coordinator/history": {"title":"History","order":30,"action":{"type":"view","path":"wifi-history"}}
+ "admin/network/wifi_coordinator/history": {
+  "title": "History",
+  "order": 30,
+  "action": {
+   "path": "wifi-history",
+   "type": "view"
+  }
+ },
+ "admin/network/wifi_coordinator/clients": {
+  "title": "Clients",
+  "order": 20,
+  "action": {
+   "path": "wifi-clients",
+   "type": "view"
+  }
+ },
+ "admin/network/wifi_coordinator/channels": {
+  "title": "Channels",
+  "order": 10,
+  "action": {
+   "path": "wifi-channels",
+   "type": "view"
+  }
+ },
+ "admin/network/wifi_coordinator/disclaimer": {
+  "title": "AI-generated software. No warranties. Use entirely at your own risk.",
+  "order": 40,
+  "action": {
+   "path": "wifi-disclaimer",
+   "type": "view"
+  }
+ },
+ "admin/network/wifi_coordinator": {
+  "title": "Wi-Fi Coordinator",
+  "order": 65,
+  "action": {
+   "type": "firstchild"
+  },
+  "depends": {
+   "acl": [
+    "luci-app-channel-coordinator",
+    "luci-app-radio-prefer"
+   ]
+  }
+ }
 }
