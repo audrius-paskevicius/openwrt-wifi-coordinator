@@ -222,4 +222,14 @@ check(!ex.busy()&&radio.current.freq==5500&&st.radios.r.failed,'associated clien
 opt=recovery_setup();ex.start(radio,group(5580,80),pair);health_tick(15);
 radio.clients={};radio.authorized={};probe_ok=false;T+=5;ex.tick(pair);T+=16;ex.tick(pair);
 check(st.radios.r.rejected[0].kind=='inconclusive'&&st.radios.r.rejected[0].until==T+900&&!st.radios.r.csa_failed_until,'absence without AP service evidence earns short deferral, not six-hour CSA blame');
+// DFS preparation must reach the occupied-helper handoff, not an unresolved
+// forward function reference. No live radio is touched by this fixture.
+opt=setup();radio.aps=[{config:net,status:{status:'ENABLED'}}];
+content+='interface=test0\nieee80211h=1\n';
+radio.config.managed=true;radio.radar_widths=8;
+for(let f in group(5580,80).members)radio.caps[f]={max_tx_power:2000,radar:true,dfs_state:0};
+peer={...radio,name:'peer',phy:2,ifname:'peer0',current:group(5745,80),clients:{other:true},authorized:{other:true},aps:[{config:net,status:{status:'ENABLED'}}]};
+pair=[radio,peer];ex.start(radio,group(5580,80),pair);T+=15;ex.tick(pair);
+check(ex.pending().kind=='spare-handoff'&&ex.pending().handoff_target=='peer','occupied DFS helper reaches compatible handoff');
+check(length(filter(calls,c=>c.method=='bss_transition_request'))==1&&!journal&&!repairs,'helper handoff starts without prematurely reconfiguring occupied AP');
 print('PASS: '+checks+' executor integration and failure cases\n');

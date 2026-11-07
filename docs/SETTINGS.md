@@ -48,7 +48,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `improvement` | Minimum service-index gain to admit a new capacity plan, including widening. Admitted multi-step plans do not repay this margin while remaining benefit is positive. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
 | `min_dwell` | Avoids repeated moves after successful verification. Independent of survey frequency. |
 | `persist` | Whether verified wireless placements are checkpointed, at most every six hours. Separate from graph history and radar memory. |
-| `clear_stop` | One-shot recovery acknowledgement, reset after use. Does not erase remembered failed destinations. |
+| `clear_stop` | One-shot acknowledgement after resolving a recovery failure, reset after use. Routine interrupted-operation recovery resumes automatically. Does not erase remembered failed destinations. |
 | `handoff_wait` | Time to give compatible clients a chance to roam before restart. Skipped if no compatible target exists. |
 | `handoff_escalation` | Gentle, Strong or Decisive handoff requests. Does not disable the separately selected restart fallback. |
 | `allow_reconnect` | Allows occupied restart after handoff fails. Protected clients and explicit quiet/empty policies still restrict it. |

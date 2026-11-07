@@ -10,9 +10,13 @@
 var service = rpc.declare({object:'service',method:'list',params:['name'],expect:{'':{}}});
 function radioName(r) { return r['.name']+' ('+(r.band=='2g'?'2.4':'5')+' GHz)'; }
 function readState() { return fs.read('/tmp/channel-coordinator-state.json').then(JSON.parse).catch(function(){return {};}); }
+function operationText(st) {
+ return st.restart_check?(st.status||'Checking radios after interruption'):
+  st.halted?'Coordination paused: '+st.halted:(st.status||'No evaluation yet.');
+}
 function statusText(st, services) {
  var running=Object.values(((services||{})['channel-coordinator']||{}).instances||{}).some(function(i){return i.running;});
- return (running?'Running. ':'Stopped. ')+(st.halted?'Safety stop: '+st.halted:(st.status||'No evaluation yet.'));
+ return (running?'Running. ':'Stopped. ')+operationText(st);
 }
 function comparisonTime(p,st) {
  if(!p.evaluated_at)return _('Last completed comparison.');
@@ -24,7 +28,7 @@ return view.extend({
  load:function(){return Promise.all([uci.load('channel_coordinator'),uci.load('wireless'),readState(),service('channel-coordinator')]);},
  render:function(data){
   var state=data[2], radios=uci.sections('wireless','wifi-device'),methodStatus={};
-  var status=E('p',{'class':'wc-status','data-level':state.halted?'warning':'normal'},statusText(state,data[3]));
+  var status=E('p',{'class':'wc-status','data-level':state.halted&&!state.restart_check?'warning':'normal'},statusText(state,data[3]));
   var details=E('div');
   var comparisonContent=E('div');
   var comparison=E('details',{},[
@@ -75,7 +79,7 @@ return view.extend({
    if(cards.length)items.push(E('div',{'class':'wc-summaries'},cards));
    if(p&&p.alternatives)comparisonContent.replaceChildren.apply(comparisonContent,[
     E('p',{'class':'wc-caption'},comparisonTime(p,st)+' '+
-     (st.halted?'Safety stop: '+st.halted:'Now: '+(st.status||'No operation reported.'))+
+     ('Now: '+operationText(st))+
      (p.placements_changed?' Radio placements have changed; the tables retain the previous comparison.':'')+
      ' Results stay visible until replaced by a completed comparison.'),
     E('p',{},_('The planner jointly maximizes estimated service after applying your spectrum-separation policy. Higher service is better: usable bandwidth is weighted by advertised radio spatial streams. The primary channel matters to narrow clients and to fallback transmissions. Wide channels earn their extra capacity only where the secondary spectrum is usable. This is hardware headroom for present and future clients, not predicted Mbps or a score fitted to currently connected devices.')),
@@ -95,13 +99,13 @@ return view.extend({
      ]))
     ]);}))
    ]);
-   else comparisonContent.replaceChildren(E('p',{},_('No completed comparison yet. ')+(st.halted?'Safety stop: '+st.halted:(st.status||'The first survey has not completed.'))));
+   else comparisonContent.replaceChildren(E('p',{},_('No completed comparison yet. ')+operationText(st)));
    items.push(comparison);
    if(st.updated)items.push(E('small',{'class':'wc-caption'},'Updates every 5 seconds. Traffic is measured between samples; it is not a speed-test result.'));
    details.replaceChildren.apply(details,items);
   }
   refresh(state);
-  poll.add(function(){return Promise.all([readState(),service('channel-coordinator')]).then(function(x){status.textContent=statusText(x[0],x[1]);status.setAttribute('data-level',x[0].halted?'warning':'normal');refresh(x[0]);});},5);
+  poll.add(function(){return Promise.all([readState(),service('channel-coordinator')]).then(function(x){status.textContent=statusText(x[0],x[1]);status.setAttribute('data-level',x[0].halted&&!x[0].restart_check?'warning':'normal');refresh(x[0]);});},5);
   var intro=E('div',{},[
    E('h2',{},_('Wi-Fi Coordinator: channels')),
    E('p',{},_('Channel planning chooses where your radios transmit. Client steering chooses which radio each device uses. Both are managed by this package so they can take turns.')),
@@ -125,7 +129,7 @@ return view.extend({
   val('general','min_dwell','Minimum residence after a verified move (seconds)',180,'range(30,86400)','A short anti-hopping period after a completed change. Deferred attempts use a fixed 30-second retry gate.');
   val('dfs','radar_half_life','Radar-memory half-life (seconds)',3600,'range(900,604800)','3600 is one hour. Remembered interruption risk halves over this time; repeated detections strengthen it. This never shortens the kernel radar prohibition or replaces required clearance. Amber history bands use this same decay.');
   flag('general','persist','Remember verified channels after restart','1','Verified placements are checkpointed at most every six hours. Power loss may return to the last saved working placement.');
-  flag('general','clear_stop','Clear the safety stop when applying settings','0','First check that the radios and clients work normally. The switch clears itself after restarting the coordinator.');
+  flag('general','clear_stop','Clear the safety stop when applying settings','0','Restart recovery is automatic. Use this only after resolving a reported recovery failure and checking the radios. The switch clears itself after use.');
   val('advanced','max_mbps','Quiet-traffic threshold for channel changes (Mbps)',0.05,'range(0.01,1000)','Applies to quiet-only channel changes and sustained-quiet scanning. Automatic live CSA and paced scanning do not require traffic silence.');
   val('advanced','quiet_seconds','Continuous quiet period (seconds)',60,'range(10,600)','For quiet-only channel changes and sustained-quiet scanning, traffic must remain below the threshold for this period. A single quiet sample is insufficient.');
   val('clients','handoff_wait','Time allowed for client handoff (seconds)',90,'range(60,300)','The first third allows a gentle request; the second can use a stronger request; the final third allows the decisive step if selected below. Live CSA does not need a handoff. Without a compatible destination, skip this wait and use brief reconnection if enabled below.');

@@ -41,7 +41,7 @@ export function failure_kind(r,target,health){
 export function create_executor(io) {
 let fs=io.fs ?? system_fs;
 let cfg=io.cfg,state=io.state,now=io.now,save=io.save,lease=io.lease,release=io.release,call=io.call,request=io.request,config_fingerprint=io.config_fingerprint,phy_caps=io.phy_caps,allclients=io.allclients,empty_interface=io.empty_interface,apply_empty_config=io.apply_empty_config,restore_preparation=io.restore_preparation,private_json=io.private_json,coordination_ready=io.coordination_ready,dfs_mode=io.dfs_mode,history=io.history,boot=io.boot;
-let N=nl.const,JOURNAL='/tmp/channel-coordinator-cac.json',pending=null;
+let N=nl.const,JOURNAL='/tmp/channel-coordinator-cac.json',pending=null,handoff;
 function log(s){io.log(s);}
 function reconnect_allowed(r){return cfg.allow_reconnect&&r.config.occupied=='handoff'&&length(r.aps)==1&&!r.unsafe&&
     !length(filter(keys(r.clients),m=>index(cfg.protected_clients,lc(m))>=0));}
@@ -127,7 +127,8 @@ function handoff_destination(r,radios,preferred,selected) {
         (h.aps[0].status.airtime?.utilization ?? 0)<180);
     return sort(targets,(a,b)=>(a.name==preferred?-100:0)-(b.name==preferred?-100:0)+length(a.clients)-length(b.clients))[0];
 }
-function handoff(r,radios,preferred,strong) {
+// Forward-declared: occupied-helper preparation calls this earlier in the module.
+handoff=function(r,radios,preferred,strong) {
     for(let mac in keys(r.clients))pending.before[mac]=true;
     if(!pending.handoff_clients){pending.handoff_clients=keys(r.clients);pending.handoff_source=r.name;}
     let target=handoff_destination(r,radios,preferred);if(!target)return 0;

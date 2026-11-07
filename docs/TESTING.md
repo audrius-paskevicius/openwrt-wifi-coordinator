@@ -1,12 +1,20 @@
 # Validation
 
-Source release: **0.6.0-r27**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release.
+Source release: **0.6.0-r28**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 35 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r28 interrupted-operation recovery
+
+Fixed a ucode forward-reference error in occupied-helper DFS handoff. The executor regression test reaches that branch without touching real interfaces. Restart recovery now observes radio readiness and resumes automatically after 30 seconds of stability. Tests cover missing radios, configuration journals, channel changes during verification, long DFS startup, existing recovery errors, and preservation of timed exclusions.
+
+Validation: the complete isolated OpenWrt runtime suite passed (1,151 checks, including 82 executor and 18 restart-recovery checks). Portable source and UI checks passed. The signed APK verified and installed on the WRT3200ACM. After migrating the inspected old restart latch into automatic verification, the live daemon cleared `halted` and `restart_check`, then resumed surveys. All three APs were enabled before the check; verification required no radio restart. LuCI displayed active scanning without a network error. WireGuard remained up and router internet probes passed. This was a restart-recovery test, not a new RF throughput test.
+
+Correction to earlier live-validation notes: the safety-stop check inspected `halt` instead of the actual `halted` field. Earlier claims that installation resumed without a safety stop were not established by those checks. This revision checks the actual field and the recovery lifecycle.
 
 ## r27 legend heading alignment
 
@@ -18,11 +26,11 @@ The spectrum legend is labelled **Estimated congestion**, matching its 0-100 ind
 
 ## r25 aligned legend scales
 
-Both ramps and their labels align. Radar labels combine elapsed time and avoidance strength on one line. Neighbour activity has a 0-100 estimate scale; its gradient follows the graph's square-root intensity mapping. Hover text distinguishes this index from airtime percentages. Portable source/UI checks and the native LuCI fixture passed; a rendered preview confirmed aligned ramps and single-line labels. Package signature and extracted source matched. Both services resumed after installation without a safety stop, and internet probes succeeded (3/3).
+Both ramps and their labels align. Radar labels combine elapsed time and avoidance strength on one line. Neighbour activity has a 0-100 estimate scale; its gradient follows the graph's square-root intensity mapping. Hover text distinguishes this index from airtime percentages. Portable source/UI checks and the native LuCI fixture passed; a rendered preview confirmed aligned ramps and single-line labels. Package signature and extracted source matched. Both service processes ran after installation, and internet probes succeeded (3/3). The safety-stop check was invalid; see the r28 correction.
 
 ## r24 compact spectrum legends
 
-Neighbour activity and radar memory share one horizontal legend row when space permits. On narrow screens, the groups wrap rather than overlap. The radar ramp, decay values and hover explanations are unchanged. This is a layout-only change. Portable source/UI checks and the native LuCI fixture passed (55 descriptions). A browser-rendered legend preview confirmed the side-by-side layout. The signed APK verified, extracted files matched source, and installation upgraded only this package. Both services resumed without a safety stop; router internet probes succeeded (3/3).
+Neighbour activity and radar memory share one horizontal legend row when space permits. On narrow screens, the groups wrap rather than overlap. The radar ramp, decay values and hover explanations are unchanged. This is a layout-only change. Portable source/UI checks and the native LuCI fixture passed (55 descriptions). A browser-rendered legend preview confirmed the side-by-side layout. The signed APK verified, extracted files matched source, and installation upgraded only this package. Both service processes ran; router internet probes succeeded (3/3). The safety-stop check was invalid; see the r28 correction.
 
 ## r23 one-hour radar memory
 

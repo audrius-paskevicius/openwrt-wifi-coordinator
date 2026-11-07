@@ -90,7 +90,7 @@ Disable automatic coordination in LuCI or stop its service:
 /etc/init.d/radio-prefer stop
 ```
 
-Stopping the coordinator during an active operation can restore a recovery journal and latch a safety stop. Inspect wireless status before clearing it. Removing the package disables the services; do not delete the public key if another installed package still relies on it.
+After an interrupted operation, the coordinator restores its recovery journal and checks the enabled radios. It resumes automatically after 30 seconds of stable AP state. It allows the configured radar-check timeout plus 60 seconds for recovery; an unresolved journal, inconsistent AP state or an existing recovery failure still needs attention. This verifies AP operation, not end-to-end internet access. No radio is restarted by the observation check. Removing the package disables the services; do not delete the public key if another installed package still relies on it.
 
 ## Upgrades
 

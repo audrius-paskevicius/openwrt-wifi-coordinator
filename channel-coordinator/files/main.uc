@@ -11,6 +11,7 @@ import {assess,choose,decide,spatial_streams} from './planner.uc';
 import {open_memory} from './radar.uc';
 import {create_survey} from './survey.uc';
 import {create_executor} from './executor.uc';
+import {begin_restart_check,check_restart} from './recovery.uc';
 
 const N=nl.const, STATE='/tmp/channel-coordinator-state.json', LEASE='/tmp/channel-coordinator-lease.json', JOURNAL='/tmp/channel-coordinator-cac.json';
 const CLIENT_AVOIDS='/tmp/wifi-coordinator-client-avoids.json';
@@ -113,14 +114,17 @@ function restore_preparation() {
 }
 if(ARGV[0]=='--recover'){
     let reconnect=readjson(JOURNAL,{})?.kind=='reconnect';
-    if(restore_preparation()){
-        let s=readjson(STATE,{});
+    let s=readjson(STATE,{});
+    try{if(restore_preparation()){
         if(s.boot==boot){
             if(!reconnect)s.dfs={...s.dfs,phase:'recovered'};delete s.pending;
             s.status=reconnect?'Previous channel restored after interrupted reconnect operation':'Spare radio configuration restored after interruption';
-            s.halted='Interrupted radio operation recovered; check radios before clearing safety stop';
+            begin_restart_check(s,now());
             atomic(STATE,s);
         }
+    }}catch(err){
+        if(s.boot==boot){s.halted='Restart recovery needs attention: '+err;delete s.restart_check;atomic(STATE,s);}
+        die('Restart recovery needs attention: '+err);
     }
     exit(0);
 }
@@ -146,12 +150,15 @@ function avoid_client(radio,mac,g,until){
     while(length(client_avoids.entries)>256)shift(client_avoids.entries);
     private_json(CLIENT_AVOIDS,client_avoids);
 }
-if(state.pending&&state.pending!='scan') state.halted='Service restarted during an operation; inspect radios before clearing safety stop';
-if(fs.stat(JOURNAL)){restore_preparation();state.halted='Interrupted radio operation recovered; inspect radios before clearing safety stop';}
+if(state.pending&&state.pending!='scan') begin_restart_check(state,now());
+if(fs.stat(JOURNAL)){
+    try{restore_preparation();begin_restart_check(state,now());}
+    catch(err){state.halted='Restart recovery needs attention: '+err;delete state.restart_check;}
+}
 if(!state.pending&&index(['listening','restoring'],state.dfs?.phase)>=0)state.dfs.phase='inactive';
 delete state.pending;
 if(raw.clear_stop=='1'&&!length(ARGV)){
-    delete state.halted;for(let name,r in state.radios)delete r.failed;
+    delete state.halted;delete state.restart_check;for(let name,r in state.radios)delete r.failed;
     cursor.set('channel_coordinator','main','clear_stop','0');cursor.commit('channel_coordinator');
 }
 let evidence={}, previous={}, traffic={}, rates={}, quiet_since={}, discovered=[], next_eval=now()+15,scanner,executor;
@@ -433,7 +440,7 @@ if(one_shot||ARGV[0]=='--test-switch'||ARGV[0]=='--test-prepare'){
     let services=call('service','list',{name:'channel-coordinator'});
     for(let k,v in services['channel-coordinator']?.instances ?? {})if(v.running)die('Stop coordinator before a manual test');
 }
-if(ARGV[0]=='--clear-stop'){delete state.halted;for(let n,r in state.radios)delete r.failed;save();exit(0);}
+if(ARGV[0]=='--clear-stop'){delete state.halted;delete state.restart_check;for(let n,r in state.radios)delete r.failed;save();exit(0);}
 if(!cfg.enabled&&!one_shot)exit(0);
 uloop.init();
 let stopping=false;
@@ -455,6 +462,15 @@ let test_started=false;
 timer=uloop.timer(1000,()=>{try{
     if(stopping)return;
     discovered=inventory();sample(discovered);persist_channels();
+    if(state.restart_check){
+        let enabled=[];
+        cursor.foreach('wireless','wifi-iface',s=>{
+            if(s.mode=='ap'&&s.disabled!='1'&&cursor.get('wireless',s.device,'disabled')!='1'&&index(enabled,s.device)<0)push(enabled,s.device);
+        });
+        let result=check_restart(state,discovered,enabled,now(),!!fs.stat(JOURNAL),cfg.cac_timeout+60);
+        if(result=='resumed'){history({event:'restart-recovered'});next_eval=now()+1;}
+        else if(result=='failed')history({event:'restart-recovery-failed',message:state.halted});
+    }
     if(!test_started&&(ARGV[0]=='--test-switch'||ARGV[0]=='--test-prepare')){
         if(state.halted)die('Resolve safety stop before manual operation');test_started=true;
         let r=filter(discovered,r=>r.name==ARGV[1])[0];if(!r)die('Unknown radio');
