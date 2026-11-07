@@ -4,7 +4,7 @@ const graph=new Function('baseclass','chartlib',fs.readFileSync(path.join(__dirn
 assert.equal(graph.radarColour(1),'rgba(140,90,0,0.9)');
 assert.equal(graph.radarColour(0.125),'rgba(140,90,0,0.1125)');
 assert.equal(graph.radarColour(0),'rgba(140,90,0,0)');
-for(const n of [0,1,2,3])assert(graph.radarGradient().includes(graph.radarColour(Math.pow(2,-n))));
+assert.equal(graph.radarGradient(),'linear-gradient(to right,'+graph.radarColour(1)+','+graph.radarColour(0)+'), #fff');
 assert.equal(graph.geometry({channel:100,width:160}).center,5570);
 assert.equal(graph.geometry({channel:36,width:160}).center,5250);
 assert.equal(graph.geometry({channel:5,width:40,center:2422}).center,2422);

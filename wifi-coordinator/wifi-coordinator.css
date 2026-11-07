@@ -42,8 +42,7 @@
 .wifi-coordinator .wc-survey-key, .wifi-coordinator .wc-radar-key { display: grid; grid-template-columns: max-content auto; grid-template-rows: 12px auto; column-gap: 18px; line-height: 18px; }
 .wifi-coordinator .wc-survey-key > :first-child, .wifi-coordinator .wc-radar-key > :first-child { grid-area: 1 / 1; align-self: center; }
 .wifi-coordinator .wc-survey-ramp, .wifi-coordinator .wc-radar-ramp { grid-area: 1 / 2 / 3 / 3; }
-.wifi-coordinator .wc-survey-ramp { width: 180px; max-width: 100%; }
-.wifi-coordinator .wc-radar-ramp { width: 380px; max-width: 100%; }
+.wifi-coordinator .wc-survey-ramp, .wifi-coordinator .wc-radar-ramp { width: 180px; max-width: 100%; }
 .wifi-coordinator .wc-grey-scale, .wifi-coordinator .wc-amber-scale { height: 12px; }
 .wifi-coordinator .wc-grey-scale { background: linear-gradient(to right, rgba(30,30,30,.02), rgba(30,30,30,.17) 6.25%, rgba(30,30,30,.32) 25%, rgba(30,30,30,.47) 56.25%, rgba(30,30,30,.62)), #fff; }
 .wifi-coordinator .wc-radar-ticks, .wifi-coordinator .wc-scale-ticks { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }

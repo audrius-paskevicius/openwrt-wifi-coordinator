@@ -130,7 +130,7 @@ function surveyData(surveys,start,end,axis){
  };});
 }
 function radarColour(level){return 'rgba(140,90,0,'+(0.90*Math.max(0,Math.min(1,level)))+')';}
-function radarGradient(){return 'linear-gradient(to right,'+Array.from({length:25},(_,i)=>radarColour(Math.pow(2,-3*i/24))+' '+(100*i/24)+'%').join(',')+'), #fff';}
+function radarGradient(){return 'linear-gradient(to right,'+radarColour(1)+','+radarColour(0)+'), #fff';}
 function radarData(records,start,end,halfLife,axis){
  axis=axis||defaultAxis;
  var bins={},half=Math.max(60,halfLife||3600),step=Math.max(60,(end-start)/160,half/12);

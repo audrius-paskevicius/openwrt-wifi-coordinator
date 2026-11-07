@@ -109,11 +109,11 @@ return view.extend({
    function legend(patterns){return E('p',{'class':'wc-legend'},radioNames.map(function(r,i){return E('span',{'style':'color:'+graphs.colour(r,i)+';margin-right:22px;font-weight:600;'},[E('span',{'class':patterns?'wc-pattern-key':'wc-line-key','style':patterns?graphs.patternStyle(r,i):'border-color:'+graphs.colour(r,i),'title':patterns?graphs.patternName(r,i):r}),r]);}));}
    var radarHalf=Number(h.radar&&h.radar.half_life)||3600;
    function elapsedLabel(seconds){return seconds>=3600?+(seconds/3600).toFixed(1)+' h':+(seconds/60).toFixed(1)+' min';}
-   var radarKey=E('div',{'class':'wc-radar-key','title':'Amber marks radar detections. Memory halves every '+elapsedLabel(radarHalf)+'. Percentages describe avoidance strength, not probability. Radar clearance rules still apply.'},[
+   var radarKey=E('div',{'class':'wc-radar-key','title':'Amber marks radar detections. Detection: 100%; after '+elapsedLabel(radarHalf)+': 50%; after '+elapsedLabel(2*radarHalf)+': 25%; after '+elapsedLabel(3*radarHalf)+': 12.5%. White represents zero remembered strength. Percentages describe avoidance strength, not probability. Radar clearance rules still apply.'},[
     E('span',{},_('Radar memory')),
     E('div',{'class':'wc-radar-ramp'},[
      E('div',{'class':'wc-amber-scale','aria-hidden':'true','style':'background:'+graphs.radarGradient()}),
-     E('div',{'class':'wc-radar-ticks'},[0,1,2,3].map(function(n){return E('span',{},(n?elapsedLabel(n*radarHalf):_('Detection'))+' / '+[100,50,25,12.5][n]+'%');}))
+     E('div',{'class':'wc-radar-ticks'},[100,75,50,25,0].map(function(n){return E('span',{},n+'%');}))
     ])
    ]);
    var nodes=[E('p',{'class':'wc-caption'},_('Local time: ')+timefmt.zone()),E('h3',{},_('Where each radio spent its time')),
