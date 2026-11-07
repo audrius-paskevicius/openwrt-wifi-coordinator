@@ -15,7 +15,9 @@ function historyKey(k,x){
 var archiveCache=new Map();
 async function readHistory(){
  var errors=[],directory='/etc/wifi-coordinator/';
- async function read(path){try{var raw=await fs.read(path),h=JSON.parse(raw);h.file_bytes=new TextEncoder().encode(raw).length;return h;}catch(e){if(e.name!='NotFoundError'&&!/No such file/i.test(e.message||''))errors.push('Cannot read history: '+(e.message||e));return {};}}
+ // History can exceed the ubus file-read limit before its six-hour offload.
+ // LuCI's streaming reader uses the same session and file ACLs without that cap.
+ async function read(path){try{var raw=await fs.read_direct(path,'text'),h=JSON.parse(raw);h.file_bytes=new TextEncoder().encode(raw).length;return h;}catch(e){if(e.name!='NotFoundError'&&!/No such file/i.test(e.message||''))errors.push('Cannot read '+path+': '+(e.message||e));return {};}}
  var files=await fs.list(directory).catch(function(e){if(e.name!='NotFoundError'&&!/No such file/i.test(e.message||''))errors.push('Cannot list history: '+(e.message||e));return [];});
  files=files.filter(function(f){return f.type=='file'&&/^batch-[0-9]+\.json$/.test(f.name);}).sort(function(a,b){return a.name.localeCompare(b.name);});
  var names=new Set(files.map(function(f){return f.name;}));archiveCache.forEach(function(v,k){if(!names.has(k))archiveCache.delete(k);});
@@ -96,7 +98,8 @@ return view.extend({
    var samples=(h.samples||[]).filter(function(s){return s.end>=cutoff;});
    var surveys=(h.surveys||[]).slice().sort(function(a,b){return a.time-b.time;});
    var radioNames=Array.from(new Set(periods.map(function(p){return p.radio;}).concat(samples.map(function(s){return s.radio;})))).sort();
-   if(!radioNames.length){display.replaceChildren(E('p',{'class':'wc-status'},'History is collecting, or has been disabled. Recent history is in RAM; archived history survives reboot.'));return;}
+   var warnings=(h.read_errors||[]).map(function(e){return E('p',{'class':'alert-message warning'},'History is incomplete. '+e);});
+   if(!radioNames.length){display.replaceChildren.apply(display,warnings.concat([E('p',{'class':'wc-status'},'History is collecting, or has been disabled. Recent history is in RAM; archived history survives reboot.')]));return;}
    var start=Math.min(now-1,Math.max(cutoff,Math.min.apply(null,periods.map(function(p){return p.start;}).concat(samples.map(function(s){return s.time;}),surveys.map(function(s){return s.time;})))));
    var channelCanvas=E('canvas',{'role':'img','aria-label':'Channel and width of each radio over time'});
    var trafficCanvas=E('canvas',{'role':'img','aria-label':'Observed radio traffic over time'});
@@ -143,7 +146,7 @@ return view.extend({
    nodes.push(E('small',{'class':'wc-caption'},'RAM buffer: '+Math.round(h.ram_bytes/1024)+' / 1024 KiB. Flash history: '+(h.archive_bytes/1048576).toFixed(2)+' MiB in '+h.archive_files+' batch file(s). Offload every 6 hours; the most recent hour stays cached in RAM. '+(h.archive_saved?'Last offload: '+stamp(h.archive_saved)+'. ':'First offload has not happened yet. ')+(h.archive_next?'Next eligible offload: '+stamp(h.archive_next)+'. ':'')+'Refreshes every minute. An orderly reboot saves pending history to flash. Unexpected power loss can lose recent data since the last successful offload.'));
    if(h.archive_error)nodes.push(E('p',{'class':'alert-message warning'},h.archive_error));
    if(h.dropped_records)nodes.push(E('p',{'class':'alert-message warning'},h.dropped_records+' records were dropped because the recent RAM buffer filled before a successful offload.'));
-   (h.read_errors||[]).forEach(function(e){nodes.push(E('p',{'class':'alert-message warning'},e));});
+   nodes=warnings.concat(nodes);
    display.replaceChildren.apply(display,nodes);
    var attempts=0;
    function draw(){

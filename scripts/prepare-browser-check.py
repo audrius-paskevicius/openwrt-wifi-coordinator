@@ -127,6 +127,9 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  assert(unsaved.value==='unsaved edit','polling must preserve unsaved input');
  const map=maps[0],fresh=await map.render();document.getElementById('pages').appendChild(fresh);
  const after=fresh.querySelector('.wc-setting-help');tooltip(after);after.click();assert(tooltipDiv.style.opacity==='1','delegation must survive form rerender');
+ const failedHistory=await page('history').render([null,{read_errors:['Synthetic unreadable recent history']}]);
+ assert(failedHistory.querySelector('.alert-message.warning').textContent.includes('History is incomplete'),'failed reads must stay visible even without any radio records');
+ assert(failedHistory.textContent.indexOf('History is incomplete')<failedHistory.textContent.indexOf('History is collecting'),'read failure must precede the empty-history message');
  result.textContent='PASS: '+explanations.length+' setting descriptions rendered through actual LuCI Value/NamedSection methods; native hover, icon hover, focus, tap, Escape, status polling and form rerender passed.';
  result.dataset.status='pass';
  // Leave one useful example visible in the screenshot.

@@ -1,6 +1,12 @@
 # Validation
 
-Source release: **0.6.0-r20**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r21**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r21 large-history reads
+
+A live RAM history file exceeded 256 KiB: ordinary ubus file reads returned `Operation not supported`, leaving only archived radio ribbons visible. The data was intact. History now uses LuCI `fs.read_direct()` for both RAM and closed batches, with CGI download permission and the existing path-specific file ACLs. Read errors appear above the graphs, including when no radio records can be loaded. Storage limits, offload frequency and the planner are unchanged.
+
+The history/cache regression covers RAM and archive files over 300 kB, newest-period merging, immutable-batch caching, retrying failed reads and identifying unreadable sources. The actual installed CGI download helper successfully returned the live history over 272 kB using a temporary session restricted to that file; parsed radio periods extended to within seconds of the test. The temporary session was destroyed afterward.
 
 ## r20 service-based joint planning
 

@@ -9,7 +9,7 @@
  data[path+'batch-210.json']=JSON.stringify(archive);data[ramPath]=JSON.stringify(ram);
  data[path+'history.json']=JSON.stringify({...archive,samples:[{...sample,time:1}]});
  listing=[{name:'history.json',type:'file'},{name:'batch-210.json',type:'file'},{name:'unrelated.txt',type:'file'},{name:'batch-211.json.new',type:'file'}];
- const fs={list:async()=>listing,read:async p=>{calls.push(p);if(!(p in data))throw Object.assign(Error('No such file'),{name:'NotFoundError'});return data[p];}};
+ const fs={list:async()=>listing,read:async()=>{throw Error('History must bypass size-limited ubus reads');},read_direct:async(p,type)=>{check(type==='text','streamed reads preserve byte accounting');calls.push(p);if(!(p in data))throw Object.assign(Error('No such file'),{name:'NotFoundError'});return data[p];}};
  const read=new Function('fs',prefix+';return readHistory;')(fs);
  data['/tmp/channel-coordinator-state.json']=JSON.stringify({declared_bands:['5g']});
  let h=await read();check(h.declared_bands.join(' ')==='5g','band declaration comes from PHY status, independent of history');check(h.samples.length===1&&h.samples[0].n===2,'boundary sample dedup and obsolete archive ignored');
@@ -24,5 +24,10 @@
  h=await read();check(h.read_errors.length===1,'corrupt batch shown as error');
  data[path+'batch-400.json']=JSON.stringify({...archive,saved:400});h=await read();check(h.read_errors.length===0&&h.samples.length===2,'failed read retried');
  listing=[];h=await read();check(h.samples.length===0&&h.archive_bytes===0,'clear removes cached records');
+ data[ramPath]=JSON.stringify({...ram,padding:'r'.repeat(300000)});
+ data[path+'batch-500.json']=JSON.stringify({...archive,padding:'a'.repeat(300000)});
+ listing=[{name:'batch-500.json',type:'file'}];
+ h=await read();check(h.ram_bytes>262144&&h.archive_bytes>262144&&h.periods[0].end===250,'large RAM and archive preserve newest radio history');
+ data[ramPath]='invalid';h=await read();check(h.read_errors.some(e=>e.includes(ramPath)),'failed recent-history read identifies the missing source');
  return {passed:checks};
 })().then(r=>console.log('PASS: '+r.passed+' history/cache cases')).catch(e=>{console.error(e);process.exitCode=1;});
