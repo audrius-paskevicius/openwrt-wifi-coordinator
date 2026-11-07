@@ -23,4 +23,5 @@ ucode wifi-coordinator/test-comparison-snapshot.uc
 ucode wifi-coordinator/test-width-limit.uc
 ucode wifi-coordinator/test-radar-storage.uc
 ucode wifi-coordinator/test-history.uc
+ucode wifi-coordinator/test-history-export.uc
 ucode wifi-coordinator/test-history-storage.uc

@@ -1,0 +1,59 @@
+#!/usr/bin/ucode
+'use strict';
+import * as fs from 'fs';
+import * as ubus from 'ubus';
+import * as uci from 'uci';
+import { urldecode, DECODE_PLUS } from 'lucihttp';
+import { stream, DATASETS } from '/usr/share/channel-coordinator/history-export.uc';
+
+function fail(status,message){
+ print('Status: '+status+'\r\nContent-Type: text/plain; charset=utf-8\r\nCache-Control: no-store\r\n\r\n'+message+'\n');exit(0);
+}
+if(getenv('REQUEST_METHOD')!='POST')fail('405 Method Not Allowed','Use the History page export controls.');
+if(split(getenv('CONTENT_TYPE') ?? '',';')[0]!='application/x-www-form-urlencoded')fail('415 Unsupported Media Type','Invalid request encoding.');
+let size=getenv('CONTENT_LENGTH') ?? '';
+if(!match(size,/^[0-9]+$/)||int(size)<1||int(size)>1024)fail('400 Bad Request','Invalid request size.');
+let raw=fs.stdin.read(int(size));
+if(length(raw)!=int(size))fail('400 Bad Request','Incomplete request.');
+let args={};
+for(let pair in split(raw,'&')){
+ let p=split(pair,'=');if(length(p)!=2)fail('400 Bad Request','Invalid form.');
+ let k=urldecode(p[0],DECODE_PLUS),v=urldecode(p[1],DECODE_PLUS);
+ if(index(['sessionid','format','dataset','hours'],k)<0||exists(args,k))fail('400 Bad Request','Invalid field.');
+ args[k]=v;
+}
+if(!match(args.sessionid ?? '',/^[a-f0-9]{32}$/)||args.sessionid=='00000000000000000000000000000000')fail('403 Forbidden','Log in to LuCI before exporting history.');
+if(index(['json','csv'],args.format)<0||!match(args.hours ?? '',/^(0|[1-9][0-9]{0,2})$/)||int(args.hours)>200||
+ (args.format=='csv'&&index(DATASETS,args.dataset)<0))fail('400 Bad Request','Invalid export choice.');
+let bus=ubus.connect();
+function allowed(scope,object,method){return bus?.call('session','access',{ubus_rpc_session:args.sessionid,scope,object,function:method})?.access==true;}
+let dir='/etc/wifi-coordinator/',ram='/tmp/wifi-coordinator-history.json',state='/tmp/channel-coordinator-state.json';
+if(!allowed('file',dir,'list')||!allowed('file',ram,'read')||!allowed('file',state,'read')||
+ !allowed('uci','channel_coordinator','read'))fail('403 Forbidden','This session cannot export coordinator history.');
+let warnings=[],names=fs.lsdir(dir);
+if(!names){if(fs.stat(dir))push(warnings,'Cannot list history archive');names=[];}
+names=sort(filter(names,n=>match(n,/^batch-[0-9]+\.json$/)));
+for(let n in names)if(!allowed('file',dir+n,'read'))fail('403 Forbidden','This session cannot read an archive batch.');
+let cursor=uci.cursor(),hours=max(1,min(200,int(cursor.get('channel_coordinator','main','history_hours') ?? 24))),now=time();
+function read(path){
+ // A bounded read also protects against a file growing after stat().
+ let s=fs.lstat(path);if(!s||s.type!='file'||s.size>2097152)return null;
+ let f=fs.open(path,'r');if(!f)return null;
+ let data=f.read(2097153);f.close();if(data==null||length(data)>2097152)return null;
+ try{return json(data);}catch(e){return null;}
+}
+let snapshot=read(ram),controller=read(state);
+if(!snapshot){if(fs.stat(ram))push(warnings,'Cannot read RAM history');snapshot={periods:[],samples:[],events:[],surveys:[]};}
+if(!controller){push(warnings,'Cannot read radar memory and declared bands');controller={};}
+let sources=[...names,'RAM'],selected=int(args.hours)||hours;
+let options={format:args.format,dataset:args.dataset,now,start:now-min(selected,hours)*3600,retained:now-hours*3600,
+ hours,sources,warnings,version:'@WIFI_COORDINATOR_VERSION@',bands:controller.declared_bands,
+ radar:controller.radar,dropped:snapshot.dropped_records};
+// Drop unrelated live state, which may identify clients or contain recovery data.
+controller=null;
+let filename='wifi-history-'+now+(args.format=='csv'?'-'+args.dataset:'')+'.'+args.format;
+print('Content-Type: '+(args.format=='json'?'application/json':'text/csv')+'; charset=utf-8\r\nContent-Disposition: attachment; filename="'+filename+'"\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\r\n');
+if(!fs.stdout.flush())exit(1);
+stream(options,i=>i==length(names)?snapshot:read(dir+names[i]),chunk=>{
+ if(fs.stdout.write(chunk)!=length(chunk)||!fs.stdout.flush())die('Download closed');
+});

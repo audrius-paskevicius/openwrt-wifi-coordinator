@@ -167,8 +167,28 @@ return view.extend({
   o.onchange=function(ev,section,value){setRetention(value);redraw(history);};
   o=s.option(form.Flag,'clear_history',_('Clear recorded history'),_('Delete recorded graphs, surveys and actions from RAM and flash when settings are applied. This switch resets itself. Recording follows the setting above; radar-avoidance memory is preserved.'));o.default='0';o.rmempty=false;
   help.compact(m);
+  var exportPeriod=E('select',{'class':'cbi-input-select','id':'wc-export-period'},[
+   E('option',{value:'display'},_('Currently displayed window')),E('option',{value:'all'},_('All retained history'))
+  ]);
+  var exportDataset=E('select',{'class':'cbi-input-select','id':'wc-export-dataset'},[
+   ['periods','Channel placements'],['traffic','Traffic summaries'],['surveys','Spectrum surveys'],['radar','Radar detections'],['actions','Recent actions']
+  ].map(function(pair){return E('option',{value:pair[0]},_(pair[1]));}));
+  function download(format){
+   // A native POST download streams to the browser download manager. No Blob,
+   // complete JS response buffer, or export file on the router is involved.
+   var f=E('form',{method:'POST',action:'/cgi-bin/wifi-coordinator-export',target:'wc-history-download',style:'display:none'},
+    Object.entries({sessionid:L.env.sessionid,format:format,dataset:exportDataset.value,hours:exportPeriod.value=='all'?0:hours}).map(function(pair){return E('input',{type:'hidden',name:pair[0],value:String(pair[1])});}));
+   document.body.appendChild(f);f.submit();f.remove();
+  }
+  var exportSection=E('section',{'class':'wc-export'},[
+   E('h3',{},_('Export history')),
+   E('p',{'class':'wc-caption','title':'Read-only download: no temporary export file or flash writes. The file includes UTC timestamps, units and a final completeness report. Survey context and radar memory may start before the selected window. Original interval boundaries are preserved.'},_('Download graph data and actions directly. Times use ISO 8601 UTC.')),
+   E('p',{},[E('label',{'for':'wc-export-period'},_('Period: ')),exportPeriod,' ',E('button',{type:'button','class':'cbi-button cbi-button-action',click:function(){download('json');}},_('Download all data (JSON)'))]),
+   E('p',{},[E('label',{'for':'wc-export-dataset'},_('CSV data: ')),exportDataset,' ',E('button',{type:'button','class':'cbi-button cbi-button-action',click:function(){download('csv');}},_('Download CSV'))]),
+   E('iframe',{name:'wc-history-download',title:_('Export download status'),'class':'wc-export-status'})
+  ]);
   return m.render().then(function(node){redraw(history);return E('div',{'class':'wifi-coordinator'},[
-   E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),E('h2',{},_('Wi-Fi Coordinator: history')),E('p',{},[_('Show: '),selector]),display,node
+   E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),E('h2',{},_('Wi-Fi Coordinator: history')),E('p',{},[_('Show: '),selector]),display,node,exportSection
   ]);});
  }
 });

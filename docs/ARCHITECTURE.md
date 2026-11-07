@@ -99,6 +99,8 @@ Storage diagnostics are collapsed by default and retain their open state across 
 
 History UI reads use the authenticated LuCI CGI download transport (`fs.read_direct`), because RAM and archive batches can exceed the ordinary ubus file-read limit. The ACL grants CGI download access in addition to the existing path-specific file read permissions; neither is bypassed. Immutable batches remain cached in the browser; failures are shown above the graphs rather than looking like valid gaps.
 
+History exports use a read-only ucode CGI and `history-export.uc`, with the existing LuCI session and path-specific read permissions. They stream JSON or dataset-specific CSV directly to the download manager, without a temporary export file, full-archive buffer or flash writes. One batch is parsed at a time; one dataset's deduplication index grows with record count. The request fixes its RAM snapshot, cutoff and archive listing. Missing sources are reported in a final completeness result. See [export schema and snapshot semantics](EXPORT.md).
+
 ## Process supervision
 
 Both services use procd respawn with a 30-second delay and no retry-count limit. Steering preparation runs inside the supervised process, so a transient preparation failure is retried too. Disabled services remain disabled; invalid configuration or competing controllers are still reported, not silently overridden. This does not guarantee recovery from hardware faults or certify years of unattended uptime. The retry-limit semantics follow [OpenWrt procd](https://lxr.openwrt.org/source/procd/service/instance.c).

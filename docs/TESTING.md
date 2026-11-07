@@ -1,12 +1,22 @@
 # Validation
 
-Source release: **0.6.0-r35**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.6.0-r36**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 35 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r36 streamed history exports
+
+The isolated export engine passed 26 checks covering newest-record deduplication, survey context at the window boundary, radar context, time filtering, field whitelists, ISO UTC timestamps, CSV escaping/formula protection, missing sources before and during export, cancellation and a lazily generated 10,000-record export emitted in bounded chunks. The CGI integration check passed 14 checks against retained history, using a temporary session: denied permissions, per-archive access, invalid fields/windows/formats, download headers and all six download choices. The session was destroyed afterward; neither test changes live radio configuration.
+
+Portable source/UI checks passed. The actual LuCI browser fixture additionally checked control placement after retention, selected/all-retained windows, JSON/CSV selection, native POST submission and session tokens excluded from the URL. No new RF throughput experiment was performed for this feature.
+
+The signed APK installed without additional dependencies. The installed CGI passed the same authorization checks; archive checksums remained unchanged. An authenticated headless Chrome session rendered the installed controls and downloaded a selected-window JSON file and all-retained actions CSV through the native download manager. Both files parsed successfully with complete final results. These downloads were kept outside the source/release tree. The export itself creates no router files; validation artifacts are separate development files.
+
+Run `ucode wifi-coordinator/test-history-export.uc` for isolated engine checks. On a configured router, `ucode wifi-coordinator/test-export-cgi.uc` checks the installed CGI with a short-lived permission-limited session and reads existing history without printing its contents. An optional first argument selects an isolated copy of the CGI; its module import must point to the matching test source. This integration check requires root and a valid controller state; it is intentionally separate from the isolated runtime suite.
 
 ## r35 unattended recovery audit
 

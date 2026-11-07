@@ -29,6 +29,7 @@ The package combines channel planning, Radio Preference, and a LuCI interface un
 - Coordinates DFS preparation without bypassing kernel radar restrictions. Recent radar detections add a planning penalty with a one-hour default half-life, separate from mandatory DFS restrictions.
 - Records channel placement, spectrum surveys, traffic summaries, and actions. Recent history stays in RAM; older history moves to flash in six-hour batches. Orderly shutdown saves pending records.
 - Draws history locally with bundled Chart.js; no CDN is required.
+- Streams authenticated JSON and CSV [history downloads](docs/EXPORT.md) without creating export files or writing flash.
 - Shows short help beside every setting, with full explanations on hover, focus or click/tap.
 
 **This is an experimental third-party package, not an official OpenWrt package.** Spectrum scores are estimates, not measured throughput. Brief reconnects can interrupt calls, streams, or other traffic. The live validation is specific to the hardware above; other routers need validation.

@@ -21,6 +21,9 @@ cp "$RP/files/radio-prefer.init" "$ROOT/etc/init.d/radio-prefer"
 cp "$CC/files/main.uc" "$CC/files/policy.uc" "$CC/files/planner.uc" "$CC/files/radar.uc" "$CC/files/executor.uc" "$CC/files/survey.uc" "$CC/files/country.uc" "$CC/files/defaults.uc" "$CC/files/history.uc" "$CC/files/history-shutdown.uc" "$CC/files/history-storage.uc" "$CC/LICENSE" "$ROOT/usr/share/channel-coordinator/"
 cp "$RP/files/main.uc" "$RP/files/coordination.uc" "$RP/files/integration-version" "$RP/LICENSE" "$ROOT/usr/share/radio-prefer/"
 cp "$CC/files/recovery.uc" "$ROOT/usr/share/channel-coordinator/"
+cp "$CC/files/history-export.uc" "$ROOT/usr/share/channel-coordinator/"
+mkdir -p "$ROOT/www/cgi-bin"
+sed "s/@WIFI_COORDINATOR_VERSION@/$VERSION/g" "$CC/files/wifi-coordinator-export" > "$ROOT/www/cgi-bin/wifi-coordinator-export"
 cp "$CC/files/wifi-channels.js" "$CC/files/wifi-history.js" "$CC/files/wifi-disclaimer.js" "$RP/files/wifi-clients.js" "$ROOT/www/luci-static/resources/view/"
 for view in "$ROOT/www/luci-static/resources/view/"*.js; do
  sed -i "s/@WIFI_COORDINATOR_VERSION@/$VERSION/g" "$view"
@@ -51,6 +54,7 @@ cat > "$ROOT/lib/upgrade/keep.d/wifi-coordinator" <<'EOF'
 /etc/rc.d/K10radio-prefer
 /usr/share/channel-coordinator/
 /usr/share/radio-prefer/
+/www/cgi-bin/wifi-coordinator-export
 /www/luci-static/resources/view/wifi-channels.js
 /www/luci-static/resources/view/wifi-clients.js
 /www/luci-static/resources/view/wifi-history.js
@@ -67,6 +71,7 @@ EOF
 find "$ROOT" -type d -exec chmod 755 {} \;
 find "$ROOT" -type f -exec chmod 644 {} \;
 chmod 755 "$ROOT/etc/init.d/channel-coordinator" "$ROOT/etc/init.d/radio-prefer"
+chmod 755 "$ROOT/www/cgi-bin/wifi-coordinator-export"
 "$APK_TOOL" mkpkg --files "$ROOT" --sign-key "$SIGN_KEY" \
  --info name:luci-app-wifi-coordinator --info version:"$VERSION" --info arch:noarch \
  --info license:MIT --info description:'AI-generated Wi-Fi channel planning and steering; use at your own risk' \

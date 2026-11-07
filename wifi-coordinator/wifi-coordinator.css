@@ -75,3 +75,4 @@
 .wc-disclaimer-full p:last-child{font-weight:700}
 .wc-disclaimer-host:has(.wc-disclaimer-gate) ~ .cbi-page-actions{display:none}
 a[href*="/wifi_coordinator/disclaimer"]{font-weight:700;white-space:normal;overflow-wrap:break-word}
+.wifi-coordinator .wc-export-status { width:100%; height:2.5em; border:0; }

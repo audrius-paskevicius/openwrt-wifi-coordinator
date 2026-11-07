@@ -101,3 +101,7 @@ After an interrupted operation, the coordinator restores its recovery journal an
 ## Upgrades
 
 Use matching OpenWrt dependencies. The package supplies preservation entries for configuration, runtime code, its public key, and retained flash history, but full sysupgrade testing remains outstanding. An ordinary package/service restart does not force extra history flash writes. Upgrade hooks stop the services and run recovery as needed. The supplied keep-list names the published key `/etc/apk/keys/radio-prefer-public.pem`; if you build with a differently named signing key, arrange preservation of that key separately. After updating the package, hard-refresh LuCI (Ctrl+F5) so cached JavaScript does not mix old and new views.
+
+## WRT3200ACM LED-control caution
+
+On firmware that exposes `rango:white:wlan_2g` and `rango:white:wlan_5g` as LEDs, do not assign triggers or turn those controls on. OpenWrt identified these GPIOs as Wi-Fi card reset lines; using them as LEDs can disable a card and cause driver errors. Remove such LED configurations before restarting to recover. The underlying fix is in the firmware device tree, not this coordinator. See [OpenWrt issue 9517 and its linked fix](https://github.com/openwrt/openwrt/issues/9517).
