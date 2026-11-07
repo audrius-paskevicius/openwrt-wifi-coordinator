@@ -1,8 +1,10 @@
 #!/usr/bin/ucode
-// Fill only missing choices. Existing administrator settings always win.
+// Fill missing choices and remove retired internal tuning options.
 import * as uci from 'uci';
 import * as fs from 'fs';
 let c=uci.cursor(getenv('WIFI_COORDINATOR_CONFIG_DIR') ?? '/etc/config');
+for(let key in ['retry_delay','scan_wait','scan_batch','cac_timeout','csa_count','ban_seconds'])
+    c.delete('channel_coordinator','main',key);
 let board=trim(fs.readfile('/tmp/sysinfo/board_name') ?? '');
 let wrt=index(['linksys,wrt3200acm','linksys,wrt32x'],board)>=0;
 let radios=[];c.foreach('wireless','wifi-device',r=>push(radios,r));
@@ -10,12 +12,11 @@ let preferred=filter(radios,r=>r.band=='5g')[0] ?? radios[0];
 if(wrt)preferred=filter(radios,r=>r['.name']=='radio0')[0] ?? preferred;
 if(!c.get('radio_prefer','main','preferred_radio')&&preferred)c.set('radio_prefer','main','preferred_radio',preferred['.name']);
 for(let r in radios){
-    let name=r['.name'],two=r.band=='2g';
+    let name=r['.name'];
     if(!c.get_all('channel_coordinator',name))c.set('channel_coordinator',name,'radio');
-    let defaults={managed:'1',occupied_policy:'handoff',method:wrt&&name=='radio2'?'idle_reconfigure':'csa',
+    let defaults={managed:'1',occupied_policy:'handoff',method:'auto',width_method:'auto',
         channels:'auto',
         widths:'auto'};
-    if(wrt&&!two)defaults.width_method='idle_reconfigure';
     for(let key,value in defaults)if(c.get('channel_coordinator',name,key)==null)c.set('channel_coordinator',name,key,value);
 }
 if(ARGV[0]=='--apply'){

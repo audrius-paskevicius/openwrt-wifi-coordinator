@@ -80,7 +80,7 @@ The automated controller tests mock hardware operations; they do not switch live
 | `radio-prefer/files/` | Preferred-radio steering and coordination protocol |
 | `wifi-coordinator/` | APK builder, package hooks, shared UI files, ucode tests |
 | `scripts/`, `tests/` | Portable validation and test preparation |
-| `docs/` | [Installation](docs/INSTALL.md), [current architecture](docs/ARCHITECTURE.md), [validation](docs/TESTING.md) |
+| `docs/` | [Installation](docs/INSTALL.md), [current architecture](docs/ARCHITECTURE.md), [settings audit](docs/SETTINGS.md), [validation](docs/TESTING.md) |
 
 This source distribution contains no router passwords, Wi-Fi credentials, private signing keys, browser automation, client inventories, or router backups. Test addresses and Wi-Fi names are synthetic fixtures.
 

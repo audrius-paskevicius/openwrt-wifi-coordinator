@@ -1,6 +1,16 @@
 # Validation
 
-Source release: **0.6.0-r10**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r11**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r11 settings behavior audit
+
+- All 109 channel/policy cases passed, including Auto resolution, WRT execution requirements, driver capability, failure expiry, independent width methods, explicit method preservation and strict integer validation. All 32 preferred-radio checks passed, including Strong with missing measurements and measured Strong eligibility.
+- The complete runtime suite passed again: three usteer-restoration scenarios, 97 planner/radar/survey cases, 40 executor cases, five actual recovery-helper cases, 11 radar-persistence cases, 19 history cases and 668 storage cases. Storage tests retained 200 hours of original summaries/surveys without touching the live archive.
+- JavaScript syntax, native-help interactions and nine history/cache cases passed. A settings-form harness checks actual option registration, Auto defaults, explicit choices, numeric-list validation, conditional controls, preservation of hidden values, Advanced placement and refreshed method/exclusion status. These use stubs, not a full browser rendering test.
+- An isolated UCI fixture confirmed retired timing keys are removed, missing methods become Auto, and explicit CSA/channel lists remain unchanged. Entry-point compilation, package signature and extracted-file comparisons passed.
+- The simulated and actual upgrade changed only this package. The installed configuration uses Auto for channels, widths and both switching methods on all three radios, with Automatic occupied-client handling. All six retired keys were removed. Existing failed-destination evidence was retained.
+- After installation, both controllers and usteer were running, all four clients remained associated, all six checked UI resources returned HTTP 200, and three router internet probes succeeded. Auto resolved to CSA on radio0, restart on radio2, and restart on radio1 because of its remembered CSA failure. A subsequent paced survey covered all 41 requested frequencies and completed evaluation without a safety stop.
+- This release validates policy behavior and live deployment; it does not establish seamless traffic during every future channel change or repeat all historical RF experiments.
 
 ## r10 automatic channel discovery and compact help
 

@@ -56,7 +56,7 @@ Manual lists restrict primary channels only. Width is selected separately: for e
 
 Both channel and width settings are plain text fields accepting `auto` or space-separated numbers. Widths default to `auto`, comparing all coordinator-supported widths: 20 MHz on 2.4 GHz and 20/40/80 MHz on 5 GHz, further constrained by the driver and regulatory rules. Existing explicit widths remain unchanged during upgrades unless the administrator selects `auto`.
 
-On the tested WRT3200ACM, default occupied-client handling is Automatic on all radios. Channel changes use CSA on radio0/radio1 and a per-radio restart on radio2. Width changes use a restart on both 5 GHz radios; radio1 inherits its channel-change method. Temporary failure recovery can override these configured methods. Other hardware uses generic CSA defaults and requires validation.
+Both switching-method settings default to Auto. On the tested WRT3200ACM, Auto selects CSA on radio0/radio1 and restart on radio2; it selects restart for 5 GHz width changes. A recent CSA failure makes Auto temporarily choose restart. Explicit CSA/restart choices are never substituted for planned moves, though recovery can restore service after failure. Other hardware uses capability-based Auto and requires validation. Applied methods, reasons and timed destination exclusions appear beside each radio's settings. Existing explicit choices survive upgrades; select Auto to enable adaptation.
 
 ## Client handling
 
@@ -73,7 +73,7 @@ The shared setting **Change channel even if handoff cannot finish** is under **P
 
 Configuration lives in `/etc/config/channel_coordinator` and `/etc/config/radio_prefer`. Use LuCI for explanations of each setting. Fresh normal Radio Preference uses gentle recommendations; strong mode is an administrator choice and still does not set an AP disconnect timer.
 
-Every setting uses the same native LuCI help behavior: a short explanation is always visible; hover or focus that text for full details, or click/tap to open them. Click again or press Escape to close. The existing LuCI styling and help icon are retained.
+Every setting uses the same native LuCI help behavior: a short explanation is always visible; hover or focus that text for full details, or click/tap to open them. Click again or press Escape to close. The existing LuCI styling and help icon are retained. Specialist controls are under Advanced; conditional controls appear in their applicable modes. See the [complete settings audit](SETTINGS.md) for the purpose and exact scope of every retained control and the six retired implementation-timing knobs.
 
 History retention ranges from 1 to 200 hours. Recent records use a 1 MiB RAM buffer; immutable flash batches are written at most once every six hours during normal operation, keeping at least 4 MiB of flash free. There is no fixed archive-size cap. Heavy activity or failed offloads can shorten retained history when the RAM buffer fills. Orderly shutdown checkpoints pending history and radar memory. Unexpected power loss can lose unsaved recent data. Disabling recording pauses new history; **Clear recorded history** explicitly deletes recorded graphs, surveys, and actions while preserving radar-avoidance memory. Only current `batch-*.json` history archives are supported; legacy `history.json` archives are not imported. See [architecture](ARCHITECTURE.md) for scoring, timing and storage details.
 

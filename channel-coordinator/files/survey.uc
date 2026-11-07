@@ -199,7 +199,7 @@ function tick(radios){if(!pending)return;let t=now();if(scan_recovery(radios))re
         if(!pipe)die('Cannot invoke iw scan trigger');
         let output=pipe.read('all'),result=pipe.close();
         if(result!=0)die('Scan trigger failed: '+output);
-        state.status=(active?'Active':'Passive')+' scan in progress on '+r.name;save();
+        state.status=(active?'Active':'Passive')+' scan in progress on '+r.name+(!active&&cfg.scan_type=='active'?' (passive required on restricted spectrum)':'');save();
     }else if(pending.kind=='scan'&&t-pending.started>45){
         try{request(N.NL80211_CMD_ABORT_SCAN,0,{dev:pending.scanner.ifname});}catch(e){}
         die('Scan timeout; no channel change performed');

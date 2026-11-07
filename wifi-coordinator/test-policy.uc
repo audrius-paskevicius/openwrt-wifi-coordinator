@@ -1,7 +1,25 @@
-import {overlap,group,delta_busy,permitted,neighbor,pressure,reconfigure_text,dfs_ready,uses_dfs,preparation_text,quiet_ready,same_network,force_signal_ok,configured_channels,configured_widths,channel,frequency} from '../channel-coordinator/files/policy.uc';
+import {overlap,group,delta_busy,permitted,neighbor,pressure,reconfigure_text,dfs_ready,uses_dfs,preparation_text,quiet_ready,same_network,force_signal_ok,configured_channels,configured_widths,channel,frequency,switch_methods,setting_integer} from '../channel-coordinator/files/policy.uc';
 function tests() {
     let n = 0;
     function eq(a, b) { if (a != b) die(sprintf('FAIL %J != %J\n',a,b)); n++; }
+    eq(switch_methods('auto','auto',true,'radio0','5g',true,0,100).method,'csa');
+    eq(switch_methods('auto','auto',true,'radio0','5g',true,0,100).width_method,'idle_reconfigure');
+    eq(switch_methods('auto','auto',true,'radio2','5g',true,0,100).method,'idle_reconfigure');
+    eq(switch_methods('auto','auto',false,'radio0','5g',false,0,100).method,'idle_reconfigure');
+    eq(switch_methods('auto','auto',false,'radio0','5g',true,200,100).method,'idle_reconfigure');
+    eq(switch_methods('auto','auto',false,'radio0','5g',true,200,201).method,'csa');
+    eq(switch_methods('auto','auto',true,'radio1','2g',true,0,100).width_method,'csa');
+    let explicit=switch_methods('csa','csa',true,'radio2','5g',false,200,100);
+    eq(explicit.method,'csa');eq(explicit.width_method,'csa');eq(explicit.csa_recovery_left,100);
+    eq(switch_methods('idle_reconfigure','inherit',false,'radio0','5g',true,0,100).width_method,'idle_reconfigure');
+    eq(switch_methods('csa','auto',false,'radio0','5g',true,200,100).width_method,'idle_reconfigure');
+    for(let choices in [['bad','auto'],['auto','bad']]){
+        let failed=false;try{switch_methods(choices[0],choices[1],false,'r','5g',true,0,0);}catch(e){failed=true;}eq(failed,true);
+    }
+    eq(setting_integer('30',1,100),30);eq(setting_integer('-67',-90,-30),-67);
+    for(let value in ['1.5','2oops','NaN','',101,0]){
+        let failed=false;try{setting_integer(value,1,100);}catch(e){failed=true;}eq(failed,true);
+    }
     let live={};for(let ch=1;ch<=13;ch++)live[frequency(ch,'2g')]={};
     live[2484]={disabled:true};live[5180]={};live[5260]={radar:true,no_ir:true,dfs_state:0};
     live[5745]={disabled:true};live[5825]={};live[5845]={no_ir:true};live[5955]={};

@@ -32,7 +32,7 @@ function decision(c, s, now, target, cfg) {
     }
     if (s.last_scan != null && now - s.last_scan < 60) return 'await-measurement';
     let modes = c['beacon-measurement-modes'] ?? [];
-    return index(modes, 'ACTIVE') >= 0 || index(modes, 'PASSIVE') >= 0 ? 'measure' : 'recommend-unmeasured';
+    return index(modes, 'ACTIVE') >= 0 || index(modes, 'PASSIVE') >= 0 ? 'measure' : cfg.mode=='strong'?'no-measurement-support':'recommend-unmeasured';
 }
 
 function request(mac, nr, token, mode) {
@@ -95,6 +95,9 @@ function selftest() {
     s.last_btm=100;eq(choose(),'recommend');
     s.attempts=0;c.measurements=[];delete s.last_scan;delete s.last_btm;
     c['beacon-measurement-modes']=[];eq(choose(),'recommend-unmeasured');
+    cfg.mode='strong';eq(choose(),'no-measurement-support');
+    c.measurements=[{node:'preferred',age:1000,rcpi:120,rssi:-50}];eq(choose(),'recommend');
+    c.measurements=[];cfg.mode='advisory';
     eq(request('02:00:00:00:00:02','020000000001ef190000802409',1,'advisory').disassociation_imminent,false);
     s.attempts = 0; c['bss-transition-management'] = false; eq(choose(), 'unsupported');
     let nr = '020000000001ef1900008024090603022a00';
@@ -125,6 +128,9 @@ function call(node, method, args) {
 
 let cursor = uci.cursor();
 let raw = cursor.get_all('radio_prefer', 'main') ?? {};
+if(raw.enabled!=null&&index(['0','1'],raw.enabled)<0)die('Invalid enabled setting\n');
+for(let key in ['min_rssi','cooldown','settle_time','max_attempts'])
+    if(raw[key]!=null&&!match(raw[key],/^-?[0-9]+$/))die('Expected an integer for '+key+'\n');
 let cfg = {
     enabled: raw.enabled == '1', preferred_radio: raw.preferred_radio ?? '',
     mode: raw.mode ?? 'advisory', min_rssi: int(raw.min_rssi ?? '-67'),
@@ -249,9 +255,10 @@ function tick() {
             let t = aps[target].info;
             let status = call(target, 'get_status');
             let op = operating_class(status.freq, status.channel);
-            if (status.status != 'ENABLED' || !op || t.load >= 80 || (t.max_assoc > 0 && t.n_assoc >= t.max_assoc)) continue;
+            if (status.status != 'ENABLED' || !op) {s.decision='target-unavailable';continue;}
+            if (t.load >= 80 || (t.max_assoc > 0 && t.n_assoc >= t.max_assoc)) {s.decision='target-busy';continue;}
             let nr = t.rrm_nr?.[2];
-            if (type(nr) != 'string') continue;
+            if (type(nr) != 'string') {s.decision='target-unavailable';continue;}
             s.decision = decision(client, s, now, target, cfg);
             if (s.decision == 'measure') {
                 s.last_scan = now;
@@ -260,7 +267,7 @@ function tick() {
                     op_class: op, channel: status.channel, duration: 50,
                     bssid: t.bssid, ssid: t.ssid, reporting_detail: 0 });
             } else if (s.decision == 'recommend'||s.decision=='recommend-unmeasured') {
-                let mode=s.decision=='recommend-unmeasured'?'advisory':cfg.mode;
+                let mode=cfg.mode;
                 if(now-(s.last_btm ?? now)>=cfg.cooldown*cfg.max_attempts)s.attempts=0;
                 let message = request(mac, nr, ((s.dialog ?? 0) % 255) + 1, mode);
                 s.last_btm = now; s.attempts++; s.dialog = message.dialog_token;

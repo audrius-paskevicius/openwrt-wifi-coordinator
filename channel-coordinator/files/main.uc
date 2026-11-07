@@ -6,7 +6,7 @@ import * as uci from 'uci';
 import * as uloop from 'uloop';
 import {open_history} from './history.uc';
 import {channel, group, same, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample} from './policy.uc';
-import {survey_covers,move_method,configured_channels,configured_widths,frequency} from './policy.uc';
+import {survey_covers,move_method,configured_channels,configured_widths,frequency,switch_methods,setting_integer} from './policy.uc';
 import {assess,choose,decide} from './planner.uc';
 import {open_memory} from './radar.uc';
 import {create_survey} from './survey.uc';
@@ -36,9 +36,13 @@ function readjson(path,otherwise) { try { return json(fs.readfile(path) ?? 'null
 function atomic(path,data) { if(!fs.writefile(path+'.new',sprintf('%J\n',data)) || !fs.rename(path+'.new',path)) die(`Cannot save ${path}`); }
 function log(s) { printf('%s\n',s); fs.stdout.flush(); }
 let raw=cursor.get_all('channel_coordinator','main') ?? {};
-function number(k,d,lo,hi) { let v=int(raw[k] ?? d); if(v<lo||v>hi) die(`Invalid ${k}\n`); return v; }
+for(let key in ['enabled','separate_radios','allow_reconnect','persist','history_enabled','clear_history','clear_stop'])
+    if(raw[key]!=null&&index(['0','1'],raw[key])<0)die('Invalid boolean setting '+key+'\n');
+function number(k,d,lo,hi) { try{return setting_integer(raw[k] ?? d,lo,hi);}catch(e){die(`Invalid ${k}: ${e}\n`);} }
+let board=trim(fs.readfile('/tmp/sysinfo/board_name') ?? '');
+let wrt=index(['linksys,wrt3200acm','linksys,wrt32x'],board)>=0;
 let cfg={enabled:raw.enabled=='1',mode:raw.mode ?? 'observe',interval:number('interval',60,30,86400),
-    cooldown:number('min_dwell',180,30,86400),retry_delay:number('retry_delay',30,10,3600),
+    cooldown:number('min_dwell',180,30,86400),retry_delay:30,
     improvement:number('improvement',3,1,200),
     overlap_penalty:number('overlap_penalty',25,0,500),max_mbps:+(raw.max_mbps ?? '0.05'),
     separate:raw.separate_radios!='0',
@@ -49,11 +53,11 @@ let cfg={enabled:raw.enabled=='1',mode:raw.mode ?? 'observe',interval:number('in
     protected_clients:map(type(raw.protected_clients)=='array'?raw.protected_clients:split(raw.protected_clients ?? '',/\s+/),x=>lc(x)),
     scan_policy:raw.scan_policy ?? 'paced',scanner:raw.scanner ?? '',max_age:number('max_age',900,60,7200),
     scan_duty:number('scan_duty',10,1,30),radar_half_life:number('radar_half_life',21600,900,604800),
-    scan_gap:number('scan_gap',3,1,30),scan_wait:number('scan_wait',60,5,300),
-    persist:raw.persist!='0',csa_count:number('csa_count',15,5,100),scan_batch:number('scan_batch',5,1,16),scan_type:raw.scan_type ?? 'passive',
-    dfs_mode:raw.dfs_mode ?? 'off',dfs_helper:raw.dfs_helper ?? '',cac_timeout:number('cac_timeout',720,120,1200),
+    scan_gap:number('scan_gap',3,1,30),scan_wait:60,
+    persist:raw.persist!='0',csa_count:15,scan_batch:5,scan_type:raw.scan_type ?? 'passive',
+    dfs_mode:raw.dfs_mode ?? 'off',dfs_helper:raw.dfs_helper ?? '',cac_timeout:720,
     quiet_seconds:number('quiet_seconds',60,10,600),handoff_wait:number('handoff_wait',90,60,300),
-    escalation:raw.handoff_escalation ?? 'decisive',ban_seconds:number('ban_seconds',20,5,30),
+    escalation:raw.handoff_escalation ?? 'decisive',ban_seconds:20,
     target_min:number('handoff_target_min',-72,-90,-30),source_min:number('handoff_source_min',-65,-90,-30)};
 if(index(['observe','automatic'],cfg.mode)<0||index(['idle','low_traffic','paced'],cfg.scan_policy)<0||index(['passive','active'],cfg.scan_type)<0) die('Invalid mode\n');
 if(index(['off','available','prepare'],cfg.dfs_mode)<0)die('Invalid DFS mode\n');
@@ -61,7 +65,7 @@ if(index(['gentle','strong','decisive'],cfg.escalation)<0)die('Invalid handoff e
 if(!(cfg.max_mbps>=0.01&&cfg.max_mbps<=1000))die('Invalid traffic threshold\n');
 for(let mac in cfg.protected_clients)if(length(mac)&&!match(mac,/^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/))die('Invalid protected client address\n');
 let boot=trim(fs.readfile('/proc/sys/kernel/random/boot_id'));
-let history_store=open_history(boot,raw.history_enabled!='0',int(raw.history_hours ?? 24));
+let history_store=open_history(boot,raw.history_enabled!='0',number('history_hours',24,1,200));
 if(raw.clear_history=='1'&&!length(ARGV)){history_store.clear();cursor.set('channel_coordinator','main','clear_history','0');cursor.commit('channel_coordinator');}
 function private_json(path,data) {
     let f=fs.open(path+'.new','w',0600); if(!f)die('Cannot save CAC recovery journal');
@@ -154,17 +158,15 @@ function coordination_ready() {
             if(c[k])die(`usteer ${k} is active; use passive usteer with Radio Preference or disable that policy first`);
     }
 }
-function rcfg(name,band,caps) {
+function rcfg(name,band,caps,csa) {
     let r=cursor.get_all('channel_coordinator',name) ?? {};
+    if(r.managed!=null&&index(['0','1'],r.managed)<0)die('Invalid managed setting for '+name);
     let ch=configured_channels(r.channels,band,caps);
     let widths=configured_widths(r.widths,band);
-    let method=r.method ?? 'csa';
-    if(index(['csa','idle_reconfigure'],method)<0)die(`Invalid switch method for ${name}`);
-    let width_method=r.width_method ?? method;
-    if(index(['csa','idle_reconfigure'],width_method)<0)die(`Invalid width-change method for ${name}`);
+    let methods=switch_methods(r.method,r.width_method,wrt,name,band,csa,state.radios[name]?.csa_failed_until,now());
     let occupied=r.occupied_policy ?? 'handoff';
     if(index(['empty','quiet','handoff'],occupied)<0)die('Invalid occupied-radio policy');
-    return {managed:r.managed!='0',occupied,method,width_method,channels:ch,widths};
+    return {managed:r.managed!='0',occupied,...methods,channels:ch,widths};
 }
 function inventory() {
     let ws=call('network.wireless','status'), interfaces=request(N.NL80211_CMD_GET_INTERFACE,N.NLM_F_DUMP,{});
@@ -214,8 +216,7 @@ function inventory() {
         rates[name]=reading.rate;quiet_since[name]=reading.quiet;traffic[name]=reading.sample;
         let band=live.wiphy_freq<3000?'2g':'5g', g=group(live.wiphy_freq,width) ?? {freq:live.wiphy_freq,center:live.center_freq1,width,members:[live.wiphy_freq],sec:0};
         g.center=live.center_freq1 ?? g.center;
-        let p=phyinfo[live.wiphy] ?? {caps:{},csa:false},config=rcfg(name,band,p.caps);
-        if((state.radios[name]?.csa_failed_until ?? 0)>now())config.method='idle_reconfigure';
+        let p=phyinfo[live.wiphy] ?? {caps:{},csa:false},config=rcfg(name,band,p.caps,p.csa);
         let reg=request(N.NL80211_CMD_GET_REG,0,{wiphy:live.wiphy});
         if(length(filter(interfaces,i=>i.wiphy==live.wiphy))!=length(aps))unsafe=true;
         push(out,{name,band,aps,ifname:aps[0].ifname,phy:live.wiphy,caps:p.caps,csa:p.csa,
@@ -236,7 +237,9 @@ function phy_caps(phy) {
 }
 function dfs_mode(r) {
     let reg=request(N.NL80211_CMD_GET_REG,0,{});
-    return reg.dfs_region==2 && r.dfs_region==2 ? cfg.dfs_mode : 'off';
+    let effective=reg.dfs_region==2 && r.dfs_region==2 ? cfg.dfs_mode : 'off';
+    if(state.radios[r.name])state.radios[r.name].dfs_constraint=cfg.dfs_mode!='off'&&effective=='off'?'DFS blocked: global and radio ETSI regions must match':null;
+    return effective;
 }
 function sample(radios) {
     let t=now(),pending=executor?.pending();
@@ -258,6 +261,9 @@ function sample(radios) {
         let s=state.radios[r.name] ?? {}; state.radios[r.name]=s;
         s.channel=channel(r.current.freq); s.width=r.current.width;s.center=r.current.center;
         s.clients=length(r.clients);s.mbps=r.mbps;s.csa=r.csa;s.managed=r.config.managed;s.method=r.config.method;
+        s.width_method=r.config.width_method;s.requested_method=r.config.requested_method;s.requested_width_method=r.config.requested_width_method;
+        s.method_reason=r.config.method_reason;s.width_reason=r.config.width_reason;s.csa_recovery_left=r.config.csa_recovery_left;
+        delete s.method_note;
         s.dfs_region=r.dfs_region;s.dfs=uses_dfs(r.current,r.caps);s.dfs_ready=dfs_ready(r.current,r.caps);
         s.quiet_seconds=quiet_since[r.name]==null?0:t-quiet_since[r.name];s.occupied_policy=r.config.occupied;
         s.cooldown_left=max(0,cfg.cooldown-(t-(s.last_move ?? -100000)));
@@ -329,7 +335,7 @@ evaluate=function(radios){
         scan_age:now()-scan_result.at,neighbors:length(scan_result.observations)};
     state.status=decision.reason;
     if(decision.action=='hold')intent=null;
-    if(decision.action=='measure')next_eval=now()+min(30,cfg.interval);
+    // A close comparison collects evidence on the configured schedule, never earlier.
     if(!state.halted&&cfg.mode=='automatic'&&decision.action=='move'){
         intent={signature:decision.signature,until:now()+cfg.max_age};
         history({event:'plan-start',radio:models[decision.next.index].name,to:channel(decision.next.target.freq),width:decision.next.target.width,reason:decision.reason});

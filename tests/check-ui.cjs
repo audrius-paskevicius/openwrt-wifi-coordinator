@@ -14,3 +14,4 @@ for (const file of files) new Function(fs.readFileSync(path.join(root, file), 'u
 console.log(`PASS: ${files.length} LuCI/graph JavaScript syntax checks`);
 require('./history-cache.cjs');
 require('./help.cjs');
+require('./settings.cjs');

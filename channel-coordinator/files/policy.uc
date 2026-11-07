@@ -41,6 +41,28 @@ export function same(a, b) { return a.center == b.center && a.width == b.width; 
 export function quiet_ready(since, now, seconds) {
     return since != null && now >= since && now-since >= seconds;
 };
+// Only Auto can substitute a planned operation. Recovery may still restore service.
+export function switch_methods(method,width_method,wrt,name,band,csa,failed_until,t) {
+    method=method ?? 'auto';width_method=width_method ?? 'auto';
+    if(index(['auto','csa','idle_reconfigure'],method)<0)die('Invalid switch method');
+    if(index(['auto','inherit','csa','idle_reconfigure'],width_method)<0)die('Invalid width-change method');
+    let automatic=!csa||wrt&&name=='radio2'?'idle_reconfigure':'csa';
+    let reason=!csa?'Driver does not advertise CSA':wrt&&name=='radio2'?'Tested radio2 restart requirement':'Driver advertises CSA';
+    let remaining=max(0,(failed_until ?? 0)-t);
+    if(remaining>0){automatic='idle_reconfigure';reason='Recent CSA connectivity failure';}
+    let effective=method=='auto'?automatic:method;
+    let width=width_method=='inherit'?effective:width_method=='auto'?(wrt&&band=='5g'?'idle_reconfigure':automatic):width_method;
+    return {method:effective,width_method:width,requested_method:method,requested_width_method:width_method,
+        method_reason:method=='auto'?reason:!csa&&method=='csa'?'Explicit CSA unavailable: driver does not advertise it':'Explicit choice',
+        width_reason:width_method=='auto'?(wrt&&band=='5g'?'Tested width changes require restart':reason):width_method=='inherit'?'Follows selected channel method':!csa&&width_method=='csa'?'Explicit CSA unavailable: driver does not advertise it':'Explicit choice',
+        csa_recovery_left:remaining};
+};
+
+export function setting_integer(value,lo,hi) {
+    if(!match(''+value,/^-?[0-9]+$/))die('Expected an integer setting');
+    let v=int(value);if(v<lo||v>hi)die('Integer setting outside allowed range');return v;
+};
+
 export function move_method(config,source,target) {
     return source.width!=target.width?(config.width_method ?? config.method):config.method;
 };
