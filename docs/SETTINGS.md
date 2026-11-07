@@ -52,7 +52,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `handoff_wait` | Time to give compatible clients a chance to roam before restart. Skipped if no compatible target exists. |
 | `handoff_escalation` | Gentle, Strong or Decisive handoff requests. Does not disable the separately selected restart fallback. |
 | `allow_reconnect` | Allows occupied restart after handoff fails. Protected clients and explicit quiet/empty policies still restrict it. |
-| `protected_clients` | Protects selected clients from both preference and channel handoffs, and blocks occupied restart of their AP. Does not prohibit CSA, scans or kernel radar evacuation. |
+| `protected_clients` | Enter one Wi-Fi MAC address and click + to add it to the list; empty means none. Hover help explains where to find the address, private Wi-Fi addresses, adding/removing entries and Save & Apply. Protects selected clients from both preference and channel handoffs, and blocks occupied restart of their AP. Does not prohibit CSA, scans or kernel radar evacuation. |
 | `max_mbps` | Advanced: shared traffic threshold for quiet-only moves and low-traffic scanning. Irrelevant to paced scanning and Automatic CSA. |
 | `quiet_seconds` | Advanced: sustained duration below that threshold. Distinct from the threshold itself. |
 | `verify_unprobed` | Advanced: observation time for clients without usable ICMP probes (150–600 seconds). Handles differing client sleep/probe behavior. |

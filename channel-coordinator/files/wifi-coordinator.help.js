@@ -15,7 +15,7 @@ var summaries={
  handoff_wait:'Time to try moving clients before a required restart.',
  handoff_escalation:'Choose how firmly to move clients to another radio.',
  allow_reconnect:'Allow a brief radio restart if handoff cannot finish.',
- protected_clients:'Keep these clients out of automatic handoffs and occupied restarts.',
+ protected_clients:'Enter a Wi-Fi MAC address, then click + to add it. Empty means none.',
  verify_unprobed:'How long to watch clients that cannot answer reachability probes.',
  handoff_target_min:'Minimum measured destination signal for a forced handoff.',
  handoff_source_min:'Required nearby signal when the destination cannot be measured.',
