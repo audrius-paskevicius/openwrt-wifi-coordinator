@@ -1,6 +1,10 @@
 # Validation
 
-Source release: **0.6.0-r13**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r14**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r14 retained channel comparison
+
+The last completed comparison remains available during surveys, moves and temporarily absent radios. Sampling marks changed placements instead of deleting evidence. Evaluation time, age and current progress distinguish the snapshot from live state; channel pools, widths and exclusions belong to that comparison. Six extracted production-sampling cases cover retention and placement changes. The native LuCI browser fixture checks retained rows, advancing age, progress/placement notices, replacement by a new comparison, and preserved expansion/unsaved edits.
 
 ## r13 tooltip readability
 

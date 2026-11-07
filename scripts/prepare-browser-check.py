@@ -84,6 +84,7 @@ class FormMap{
 const form={Map:FormMap,NamedSection:Section,Value:'text',ListValue:'select',Flag:'flag',DynamicList:'list'};
 const radios=[{'.name':'radio0',band:'5g'},{'.name':'radio1',band:'2g'},{'.name':'radio2',band:'5g'}];
 const state={updated:100,radios:{radio0:{requested_method:'auto',method:'csa',requested_width_method:'auto',width_method:'idle_reconfigure',method_reason:'Driver advertises CSA',width_reason:'Width changes require restart',rejected:[{until:700,target:{freq:5500,width:80},reason:'Synthetic connectivity failure'}]},radio1:{},radio2:{}}};
+state.proposal={evaluated_at:1700000000,evaluated_uptime:90,neighbors:12,alternatives:[{radio:'radio0',channels:[36,100],widths:[80,40,20],candidates:[{channel:36,width:80,current:true,cost:7,occupancy:7,capacity:74,shared:0}]}]};
 const uci={sections:()=>radios,get:(c,s,k)=>k==='history_hours'?'200':true};
 const rpc={declare:()=>()=>Promise.resolve({})};
 const fs={read:()=>Promise.resolve(JSON.stringify(state))};
@@ -112,7 +113,13 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  assert(statuses[0].textContent.includes('Synthetic connectivity failure'),'temporary exclusions must be visible');
  const comparison=document.querySelector('details');comparison.open=true;
  const unsaved=document.querySelector('input[type="text"]');unsaved.value='unsaved edit';
+ state.pending='scan';state.status='Paced survey in progress';state.updated=150;state.proposal.placements_changed=true;
  await polls[0]();assert(statuses[0].isConnected,'status must remain attached after polling');
+ assert(comparison.querySelector('tbody').textContent.includes('36 / 80 MHz (used then)'),'previous comparison rows must remain during a survey');
+ assert(comparison.textContent.includes('60 seconds')||comparison.textContent.includes('1 minutes'),'comparison age must advance');
+ assert(comparison.textContent.includes('Paced survey in progress')&&comparison.textContent.includes('Radio placements have changed'),'current progress and changed placement must be explicit');
+ state.proposal={...state.proposal,evaluated_uptime:150,evaluated_at:1700000060,placements_changed:false,alternatives:[{radio:'radio0',channels:[149],widths:[80],candidates:[{channel:149,width:80,current:true,cost:2,occupancy:2,capacity:78,shared:0}]}]};
+ await polls[0]();assert(comparison.querySelector('tbody').textContent.includes('149 / 80 MHz'),'completed evaluation replaces previous rows');
  assert(comparison.open,'comparison panel must stay expanded during refresh');
  assert(unsaved.value==='unsaved edit','polling must preserve unsaved input');
  const map=maps[0],fresh=await map.render();document.getElementById('pages').appendChild(fresh);

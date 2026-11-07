@@ -14,6 +14,12 @@ function statusText(st, services) {
  var running=Object.values(((services||{})['channel-coordinator']||{}).instances||{}).some(function(i){return i.running;});
  return (running?'Running. ':'Stopped. ')+(st.halted?'Safety stop: '+st.halted:(st.status||'No evaluation yet.'));
 }
+function comparisonTime(p,st) {
+ if(!p.evaluated_at)return _('Last completed comparison.');
+ var age=Math.max(0,(st.updated||p.evaluated_uptime)-p.evaluated_uptime);
+ return _('Last comparison: ')+new Date(p.evaluated_at*1000).toLocaleString()+
+  (Number.isFinite(age)?' ('+(age<60?Math.floor(age)+' seconds':Math.floor(age/60)+' minutes')+' ago).':'.');
+}
 return view.extend({
  load:function(){return Promise.all([uci.load('channel_coordinator'),uci.load('wireless'),readState(),service('channel-coordinator')]);},
  render:function(data){
@@ -52,9 +58,10 @@ return view.extend({
     E('p',{},'Completed at '+new Date(st.scan_coverage.at*1000).toLocaleTimeString()+'. Only radios with complete fresh coverage may move; missing coverage on another band does not block them.')
    ]));
    if(p)cards.push(E('div',{'class':'wc-summary'},[
-    E('h4',{},_('Latest survey')),E('p',{},p.neighbors+' nearby networks.'),
+    E('h4',{},_('Last completed comparison')),E('p',{},comparisonTime(p,st)),E('p',{},p.neighbors+' nearby networks.'),
     E('p',{},'Capacity-score improvement: '+Number(p.improvement||0).toFixed(1)+' points. Spectrum separation and the wider-channel preference take priority; this is not a speed prediction.'),
-    (p.changes||[]).length?E('ul',{},p.changes.map(function(c){return E('li',{},'Target '+c.radio+': channel '+c.from+' to '+c.to+' ('+c.width+' MHz)');})):E('p',{},_('Current channel placement retained.')),
+    (p.changes||[]).length?E('ul',{},p.changes.map(function(c){return E('li',{},'Compared target '+c.radio+': channel '+c.from+' to '+c.to+' ('+c.width+' MHz)');})):E('p',{},_('Placement at comparison retained.')),
+    p.placements_changed?E('p',{},_('Radio placements have changed since this comparison.')):null,
     p.separate?E('p',{},_('Separate spectrum takes priority. Each intermediate move must also avoid increasing overlap.')):null,
     p.decision?E('p',{},p.decision.reason+(p.decision.margin!=null?' (required benefit '+Number(p.decision.margin).toFixed(1)+' points; '+Object.keys(p.decision.comparisons||{}).map(function(name){return name+': '+p.decision.comparisons[name]+' supporting surveys';}).join(', ')+')':'')):null,
     p.steps?E('ol',{},p.steps.map(function(c){return E('li',{},c.radio+' to '+c.to+' / '+c.width+' MHz'+(c.staging?' (staging step)':''));})):null,   ]));
@@ -65,23 +72,27 @@ return view.extend({
    ]));}
    if(cards.length)items.push(E('div',{'class':'wc-summaries'},cards));
    if(p&&p.alternatives)comparisonContent.replaceChildren.apply(comparisonContent,[
+    E('p',{'class':'wc-caption'},comparisonTime(p,st)+' '+
+     (st.halted?'Safety stop: '+st.halted:'Now: '+(st.status||'No operation reported.'))+
+     (p.placements_changed?' Radio placements have changed; the tables retain the previous comparison.':'')+
+     ' Results stay visible until replaced by a completed comparison.'),
     E('p',{},_('The planner compares spectrum separation first, preferred width second, then cost. Estimated usable width combines channel width and congestion evidence; it is not Mbps. Grey history and planning share the same neighbour-pressure calculation. Fresh external busy counters can add evidence. Counters on channels carrying our clients are excluded because they include our own traffic. Missing airtime counters raise baseline uncertainty rather than inventing congestion. Variation between surveys and changes of scanner can raise uncertainty further, up to 15 points. A zero neighbour estimate does not prove zero interference.')),
     E('p',{},_('Every eligible alternative keeps its own count of consecutive completed surveys in which it beats the current channel cost, even when another alternative ranks first. Repeated support reduces the uncertainty margin. A changed current channel, contrary evidence, missing candidate or stale comparison resets that support. The latest survey selects the destination. Cost-only improvements must meet the evidence margin; improved separation or usable width can act without that cost margin.')),
-    E('p',{},_('Sharing shows overlap with the other radios where they are now. The final plan can differ, but an immediate move cannot increase sharing when separation is enabled. The table sorts by current sharing, then cost; the joint plan also prioritizes usable width. Legal transmit power breaks otherwise equal choices. Unmeasured or prohibited channels are not candidates.')),
+    E('p',{},_('Sharing shows overlap with the other radios at the time of this comparison. The final plan can differ, but an immediate move cannot increase sharing when separation is enabled. The table sorts by that sharing, then cost; the joint plan also prioritizes usable width. Legal transmit power breaks otherwise equal choices. Unmeasured or prohibited channels are not candidates.')),
     E('div',{},p.alternatives.map(function(a){return E('div',{},[
-     E('h4',{},a.radio+(a.hold?' — '+a.hold:'')),
-     E('p',{},_('Current channel pool: ')+(((st.radios||{})[a.radio]||{}).candidate_channels||[]).join(' ')),
-     E('p',{},_('Widths to compare: ')+(((st.radios||{})[a.radio]||{}).candidate_widths||[]).join(' / ')+' MHz'),
-     ...((a.rejected||[]).length?[E('p',{},'Temporarily excluded placements: '+a.rejected.map(function(x){return (x.target.freq<3000?(x.target.freq-2407)/5:(x.target.freq-5000)/5)+' / '+x.target.width+' MHz — '+(x.reason||'Connectivity check failed')+' ('+Math.max(0,Math.ceil((x.until-st.updated)/60))+' minutes remaining)';}).join('; ')+'.')]:[]),
+     E('h4',{},a.radio+(a.hold?' — at comparison: '+a.hold:'')),
+     E('p',{},_('Channel pool at comparison: ')+(a.channels||[]).join(' ')),
+     E('p',{},_('Widths at comparison: ')+(a.widths||[]).join(' / ')+' MHz'),
+     ...((a.rejected||[]).length?[E('p',{},'Excluded at comparison: '+a.rejected.map(function(x){return (x.target.freq<3000?(x.target.freq-2407)/5:(x.target.freq-5000)/5)+' / '+x.target.width+' MHz — '+(x.reason||'Connectivity check failed');}).join('; ')+'.')]:[]),
      E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[
       E('thead',{},E('tr',{},['Channel / width','Cost','Estimated congestion','Estimated usable width','Sharing','Radar memory','Evidence uncertainty'].map(function(x){return E('th',{},x);}))),
       E('tbody',{},a.candidates.slice().sort(function(x,y){return (p.separate?x.shared-y.shared:0)||x.cost-y.cost;}).map(function(c){return E('tr',{},[
-       c.channel+' / '+c.width+' MHz'+(c.current?' (current)':''),Number(c.cost).toFixed(1),Number(c.occupancy).toFixed(0)+' / 100',Number(c.capacity).toFixed(1)+' MHz',Number(c.shared*100).toFixed(0)+'%',Math.round((c.radar_risk||0)*100)+'%',Number(c.uncertainty||0).toFixed(1)
+       c.channel+' / '+c.width+' MHz'+(c.current?' (used then)':''),Number(c.cost).toFixed(1),Number(c.occupancy).toFixed(0)+' / 100',Number(c.capacity).toFixed(1)+' MHz',Number(c.shared*100).toFixed(0)+'%',Math.round((c.radar_risk||0)*100)+'%',Number(c.uncertainty||0).toFixed(1)
       ].map(function(x){return E('td',{},x);}));}))
      ]))
     ]);}))
    ]);
-   else comparisonContent.replaceChildren(E('p',{},_('Waiting for the next channel comparison.')));
+   else comparisonContent.replaceChildren(E('p',{},_('No completed comparison yet. ')+(st.halted?'Safety stop: '+st.halted:(st.status||'The first survey has not completed.'))));
    items.push(comparison);
    if(st.updated)items.push(E('small',{'class':'wc-caption'},'Updates every 5 seconds. Traffic is measured between samples; it is not a speed-test result.'));
    details.replaceChildren.apply(details,items);

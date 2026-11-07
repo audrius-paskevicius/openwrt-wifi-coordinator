@@ -32,4 +32,9 @@ start = main.index("function restore_preparation()")
 end = main.index("if(ARGV[0]=='--recover')", start)
 write("test-reconnect-recovery.uc", read(root / "tests/recovery-header.uc") + "\n" +
       main[start:end] + "\n" + read(root / "tests/recovery-cases.uc"))
-print("Prepared isolated history and actual recovery-helper test modules.")
+start = main.index("function sample(radios)")
+end = main.index("    for(let mac,at in state.forced", start)
+write("test-comparison-snapshot.uc", "import {same,group} from '../channel-coordinator/files/policy.uc';\n" +
+      "let state={},executor=null;function now(){return 100;}\n" + main[start:end] + "}\n" +
+      read(root / "tests/comparison-cases.uc"))
+print("Prepared isolated history, recovery and comparison-snapshot test modules.")

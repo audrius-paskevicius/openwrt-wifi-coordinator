@@ -31,7 +31,9 @@ If separation is disabled, overlap instead competes through its cost penalty. Na
 
 Evidence uncertainty starts at one point with complete measured airtime, otherwise three. Changes between surveys can raise it to 15; a changed scanner imposes a floor of six. Each alternative retains its own consecutive supporting-survey count, even if another alternative ranks first. For cost-only changes, the required benefit is the greater of the configured minimum (default three points) and uncertainty reduced by the square root of supporting comparisons. Missing, stale or contrary evidence resets support. Improved separation or usable width can bypass this cost margin; admitted multi-step plans do not repeatedly pay the admission margin while their remaining benefit stays positive.
 
-The comparison table shows individual alternatives sorted by sharing with current peer placements, then cost. It is not the joint-plan ranking: the joint plan can also move peers and prioritizes usable width.
+The last completed comparison is retained in the RAM state file across surveys, moves and service restarts within the same boot. It is explanatory evidence, never an execution queue. Sampling marks placement changes; the UI shows evaluation time, age and current progress, and labels all placement, pool and exclusion data as belonging to that snapshot. A completed evaluation replaces it.
+
+The comparison table shows individual alternatives sorted by sharing with peer placements at comparison time, then cost. It is not the joint-plan ranking: the joint plan can also move peers and prioritizes usable width.
 
 ## Execution, clients and timing
 

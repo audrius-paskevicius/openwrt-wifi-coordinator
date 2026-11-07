@@ -251,12 +251,15 @@ function dfs_mode(r) {
 }
 function sample(radios) {
     let t=now(),pending=executor?.pending();
-    // A channel move (including automatic radar evacuation) invalidates the
-    // displayed joint plan. Do not show destinations based on old placements.
-    if(state.proposal?.alternatives&&length(filter(radios,r=>{
-        let old=filter(state.proposal.alternatives,x=>x.radio==r.name)[0];
-        return !old||!same(old.current,r.current);
-    })))delete state.proposal;
+    // Keep the last completed comparison as an explanatory snapshot. Execution
+    // uses its own target and rechecks eligibility; this is never a work queue.
+    if(state.proposal?.alternatives){
+        let old=state.proposal.alternatives;
+        state.proposal.placements_changed=length(old)!=length(radios)||!!length(filter(radios,r=>{
+            let previous=filter(old,x=>x.radio==r.name)[0];
+            return !previous||!same(previous.current,r.current);
+        }));
+    }
     for(let mac,at in state.forced ?? {})if(t-at>max(cfg.cooldown,300))delete state.forced[mac];
     for(let r in radios) {
         let rows=request(N.NL80211_CMD_GET_SURVEY,N.NLM_F_DUMP,{dev:r.ifname});
@@ -336,11 +339,13 @@ evaluate=function(radios){
     let result=choose(models,cfg),decision=decide(result,models,admission,scan_result.at,cfg,intent?.until>now()?intent.signature:null);
     admission=decision.signature?decision:null;
     let changes=[];for(let i,r in radios)if(!same(r.current,result.choices[i]))push(changes,{radio:r.name,from:channel(r.current.freq),to:channel(result.choices[i].freq),width:result.choices[i].width});
-    state.proposal={current_cost:result.base.cost,best_cost:result.cost,improvement:result.gain,changes,
+    state.proposal={evaluated_at:time(),evaluated_uptime:now(),placements_changed:false,
+        current_cost:result.base.cost,best_cost:result.cost,improvement:result.gain,changes,
         current_overlap:result.base.overlap,target_overlap:result.overlap,separate:cfg.separate,
         decision:{action:decision.action,reason:decision.reason,margin:decision.required,observations:decision.count,comparisons:decision.comparisons},
         steps:map(result.path,s=>({radio:models[s.index].name,to:channel(s.target.freq),width:s.target.width,staging:s.staging})),
-        alternatives:map(models,m=>({radio:m.name,current:m.current,hold:state.radios[m.name].planning_hold,rejected:state.radios[m.name].rejected,
+        alternatives:map(models,m=>({radio:m.name,current:m.current,hold:state.radios[m.name].planning_hold,rejected:json(sprintf('%J',state.radios[m.name].rejected ?? [])),
+            channels:state.radios[m.name].candidate_channels,widths:state.radios[m.name].candidate_widths,
             candidates:map(m.candidates,g=>({...g,channel:channel(g.freq),shared:sum_overlap(g,models,m.name),current:same(g,m.current)}))})),
         scan_age:now()-scan_result.at,neighbors:length(scan_result.observations)};
     state.status=decision.reason;

@@ -3,6 +3,7 @@ wifi-coordinator/dist/
 wifi-coordinator/history-test-module.uc
 wifi-coordinator/history-storage-test.uc
 wifi-coordinator/test-reconnect-recovery.uc
+wifi-coordinator/test-comparison-snapshot.uc
 __pycache__/
 *.pyc
 *.log
