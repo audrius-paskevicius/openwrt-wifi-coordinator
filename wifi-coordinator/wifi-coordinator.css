@@ -46,7 +46,6 @@
 .wifi-coordinator .wc-radar-ramp { width: 380px; max-width: 100%; }
 .wifi-coordinator .wc-grey-scale, .wifi-coordinator .wc-amber-scale { height: 12px; }
 .wifi-coordinator .wc-grey-scale { background: linear-gradient(to right, rgba(30,30,30,.02), rgba(30,30,30,.17) 6.25%, rgba(30,30,30,.32) 25%, rgba(30,30,30,.47) 56.25%, rgba(30,30,30,.62)), #fff; }
-.wifi-coordinator .wc-amber-scale { background: linear-gradient(to right, rgba(185,125,0,.22), rgba(185,125,0,.11) 33.33%, rgba(185,125,0,.055) 66.67%, rgba(185,125,0,.0275)), #fff; }
 .wifi-coordinator .wc-radar-ticks, .wifi-coordinator .wc-scale-ticks { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wifi-coordinator .wc-log-wrap { max-height: 340px; }
 .wifi-coordinator .cbi-section-node-tabbed > [data-tab-active="false"] { display: none; }

@@ -7,6 +7,7 @@
 'require poll';
 'require wifi-coordinator.help as help';
 'require wifi-coordinator.graphs as graphs';
+'require wifi-coordinator.time as timefmt';
 function historyKey(k,x){
  if(k=='periods')return JSON.stringify([x.radio,x.start,x.channel,x.center,x.width,x.role]);
  if(k=='samples')return JSON.stringify([x.radio,x.time,x.channel,x.width,x.role,x.source]);
@@ -36,7 +37,7 @@ async function readHistory(){
  var controller=await read('/tmp/channel-coordinator-state.json');out.radar=controller.radar||{events:[]};out.declared_bands=controller.declared_bands||[];
  out.archive_saved=ram.archive_saved||saved;return out;
 }
-function stamp(t){return new Date(t*1000).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+function stamp(t){return timefmt.stamp(t);}
 function surveyPressure(sample,surveys){
  var g=graphs.geometry(sample),bins={};
  if(!g||!Number.isFinite(g.center)||!(sample.width>0))return null;
@@ -111,11 +112,11 @@ return view.extend({
    var radarKey=E('div',{'class':'wc-radar-key','title':'Amber marks radar detections. Memory halves every '+elapsedLabel(radarHalf)+'. Percentages describe avoidance strength, not probability. Radar clearance rules still apply.'},[
     E('span',{},_('Radar memory')),
     E('div',{'class':'wc-radar-ramp'},[
-     E('div',{'class':'wc-amber-scale','aria-hidden':'true'}),
+     E('div',{'class':'wc-amber-scale','aria-hidden':'true','style':'background:'+graphs.radarGradient()}),
      E('div',{'class':'wc-radar-ticks'},[0,1,2,3].map(function(n){return E('span',{},(n?elapsedLabel(n*radarHalf):_('Detection'))+' / '+[100,50,25,12.5][n]+'%');}))
     ])
    ]);
-   var nodes=[E('h3',{},_('Where each radio spent its time')),
+   var nodes=[E('p',{'class':'wc-caption'},_('Local time: ')+timefmt.zone()),E('h3',{},_('Where each radio spent its time')),
     E('p',{'class':'wc-caption','title':'Each declared band shows its standard channel plan. Displayed channels may not be permitted locally or supported by your radio. Dashed outlines indicate radar listening.'},_('Ribbons show each radio’s channel and width. // marks gaps in spectrum. Hover or tap for details.')),
     E('div',{'class':'wc-chart wc-spectrum-chart'},channelCanvas),legend(true),
     E('div',{'class':'wc-spectrum-keys'},[E('div',{'class':'wc-survey-key','title':'Estimated congestion ranges from 0 (lowest) to 100 (highest estimated congestion). Darker grey means more or stronger overlapping networks, adjusted for advertised load. This is an estimate, not measured airtime or a percentage. Hover over the graph for measurement times.'},[E('span',{},_('Estimated congestion')),E('div',{'class':'wc-survey-ramp'},[E('div',{'class':'wc-grey-scale','aria-hidden':'true'}),E('div',{'class':'wc-scale-ticks'},[0,25,50,75,100].map(function(n){return E('span',{},String(n));}))])]),radarKey]),

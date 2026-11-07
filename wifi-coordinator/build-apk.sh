@@ -28,6 +28,7 @@ done
 mkdir -p "$ROOT/www/luci-static/resources/wifi-coordinator"
 cp "$CC/files/wifi-coordinator.chart.js" "$ROOT/www/luci-static/resources/wifi-coordinator/chart.js"
 cp "$CC/files/wifi-coordinator.graphs.js" "$ROOT/www/luci-static/resources/wifi-coordinator/graphs.js"
+cp "$CC/files/wifi-coordinator.time.js" "$ROOT/www/luci-static/resources/wifi-coordinator/time.js"
 cp "$CC/files/wifi-coordinator.help.js" "$ROOT/www/luci-static/resources/wifi-coordinator/help.js"
 cp "$BASE/../DISCLAIMER.txt" "$ROOT/usr/share/channel-coordinator/DISCLAIMER.txt"
 ucode -e 'import * as fs from "fs"; let source=fs.readfile(ARGV[0]),text=fs.readfile(ARGV[1]); if(!source||!text)die("Missing disclaimer source"); print(replace(replace(source,"@WIFI_COORDINATOR_DISCLAIMER_JSON@",sprintf("%J",text)),"@WIFI_COORDINATOR_VERSION@",ARGV[2]));' "$CC/files/wifi-coordinator.disclaimer.js" "$BASE/../DISCLAIMER.txt" "$VERSION" > "$ROOT/www/luci-static/resources/wifi-coordinator/disclaimer.js"

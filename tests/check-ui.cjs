@@ -7,6 +7,7 @@ const files = [
   'channel-coordinator/files/wifi-history.js',
   'channel-coordinator/files/wifi-disclaimer.js',
   'channel-coordinator/files/wifi-coordinator.graphs.js',
+  'channel-coordinator/files/wifi-coordinator.time.js',
   'channel-coordinator/files/wifi-coordinator.help.js',
   'channel-coordinator/files/wifi-coordinator.chart.js',
   'radio-prefer/files/wifi-clients.js'
@@ -17,4 +18,5 @@ require('./history-cache.cjs');
 require('./help.cjs');
 require('./settings.cjs');
 require('./graph-widths.cjs');
+require('./time.cjs');
 require('./disclaimer.cjs');

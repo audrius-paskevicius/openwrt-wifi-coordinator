@@ -28,6 +28,7 @@ methods = {
     'hide': portion(ui, 'hideTooltip(ev){', ',addNotification(')
 }
 sources = {name: (root / file).read_text(encoding='utf-8') for name, file in [
+    ('time', 'channel-coordinator/files/wifi-coordinator.time.js'),
     ('help', 'channel-coordinator/files/wifi-coordinator.help.js'),
     ('channels', 'channel-coordinator/files/wifi-channels.js'),
     ('clients', 'radio-prefer/files/wifi-clients.js'),
@@ -92,7 +93,8 @@ const fs={read:()=>Promise.resolve(JSON.stringify(state))};
 const poll={add:fn=>polls.push(fn)};
 const view={extend:x=>x};
 const graphs={};
-function page(name){return new Function('view','form','uci','rpc','fs','poll','help','E','_','L','graphs',payload.sources[name])(view,form,uci,rpc,fs,poll,help,E,_,L,graphs);}
+const timefmt=new Function('baseclass',payload.sources.time)({extend:x=>x});
+function page(name){return new Function('view','form','uci','rpc','fs','poll','help','E','_','L','graphs','timefmt',payload.sources[name])(view,form,uci,rpc,fs,poll,help,E,_,L,graphs,timefmt);}
 function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));assert(tooltipDiv.style.opacity==='1','hover must open native tooltip');assert(tooltipDiv.textContent.includes(node.dataset.tooltip),'hover must expose full explanation');assert(tooltipDiv.getBoundingClientRect().right<=innerWidth+1,'tooltip must fit viewport');}
 (async()=>{
  for(const name of ['channels','clients','history']){
@@ -133,7 +135,7 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  const recent=Math.floor(Date.now()/1000);
  const historyData={periods:[{radio:'radio0',channel:36,width:80,start:recent-60,end:recent}],samples:[],events:[],surveys:[],ram_bytes:100,archive_bytes:0,archive_files:0};
  graphs.channelChart=graphs.trafficChart=()=>({destroy(){}});
- graphs.colour=()=>'#005dff';graphs.patternStyle=()=>'';graphs.patternName=()=>'diagonal lines';
+ graphs.colour=()=>'#005dff';graphs.patternStyle=()=>'';graphs.patternName=()=>'diagonal lines';graphs.radarGradient=()=> '#fff';
  fs.list=async()=>[];fs.read_direct=async path=>JSON.stringify(path.includes('state')?state:historyData);
  const historyPane=await page('history').renderPage([null,historyData]);
  historyPane.querySelectorAll('link').forEach(n=>n.remove());document.getElementById('pages').appendChild(historyPane);

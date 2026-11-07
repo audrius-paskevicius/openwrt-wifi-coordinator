@@ -1,6 +1,7 @@
 'use strict';
 'require baseclass';
 'require wifi-coordinator.chart as chartlib';
+'require wifi-coordinator.time as timefmt';
 
 const palette=['#d900b5','#f05a00','#005dff','#008f9c'];
 function colour(r,i){var n=/^radio(\d+)$/.exec(r);return palette[(n?Number(n[1]):i)%palette.length];}
@@ -21,8 +22,7 @@ function hatch(r,i){
 }
 function patternStyle(r,i){return 'border-color:'+colour(r,i)+';background-image:url("'+hatch(r,i).url+'")';}
 function patternName(r,i){return ['left-leaning lines','vertical lines','right-leaning lines','crossed lines'][radioIndex(r,i)%4];}
-function clock(t){return new Date(t*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
-function dated(t){return new Date(t*1000).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}
+function dated(t){return timefmt.stamp(t);}
 function frequency(ch){return ch<=14?(ch==14?2484:2407+5*ch):5000+5*ch;}
 // Fixed WLAN channel plans. PHY band declarations select whole plans, never
 // individual frequencies. See docs/ARCHITECTURE.md for the plan references.
@@ -64,7 +64,9 @@ function baseOptions(start,end){return {
  interaction:{mode:'nearest',intersect:false},
  plugins:{legend:{display:false},tooltip:{displayColors:true}},
  scales:{x:{type:'linear',min:start,max:end,grid:{color:'#e5e5e5'},border:{color:'#999'},
-  ticks:{color:'#444',maxTicksLimit:7,maxRotation:0,callback:end-start>=86400?dated:clock},title:{display:true,text:'Time',color:'#444'}},
+  afterBuildTicks:function(s){s.ticks=timefmt.ticks(start,end,s.chart.width-120).map(v=>({value:v}));},
+  ticks:{color:'#444',autoSkip:false,maxRotation:0,callback:function(v,i,ticks){return timefmt.label(v,start,end,ticks.map(t=>t.value));}},
+  title:{display:timefmt.sameDay(start,end),text:timefmt.date(start),color:'#444'}},
  y:{type:'linear',grid:{color:'#e5e5e5'},border:{color:'#999'},ticks:{color:'#444'},afterFit:function(s){s.width=100;}}}
 };}
 function line(label,data,color,extra){return Object.assign({label:label,data:data,borderColor:color,backgroundColor:color,fill:false,pointRadius:0,pointHoverRadius:3,borderWidth:2.5,tension:0,spanGaps:false},extra||{});}
@@ -127,6 +129,8 @@ function surveyData(surveys,start,end,axis){
   barThickness:function(c){var y=c.chart.scales.y;return Math.abs(y.getPixelForValue(axis.position(bin.high))-y.getPixelForValue(axis.position(bin.low)));}
  };});
 }
+function radarColour(level){return 'rgba(90,60,0,'+(0.74*Math.sqrt(Math.max(0,Math.min(1,level))))+')';}
+function radarGradient(){return 'linear-gradient(to right,'+Array.from({length:25},(_,i)=>radarColour(Math.pow(2,-3*i/24))+' '+(100*i/24)+'%').join(',')+'), #fff';}
 function radarData(records,start,end,halfLife,axis){
  axis=axis||defaultAxis;
  var bins={},half=Math.max(60,halfLife||3600),step=Math.max(60,(end-start)/160,half/12);
@@ -153,9 +157,9 @@ function radarData(records,start,end,halfLife,axis){
    order:8,borderWidth:0,borderSkipped:false,inflateAmount:0,
    backgroundColor:function(c){var p=c.raw,x=c.chart.scales.x;if(!p||!x)return 'transparent';
     var a=x.getPixelForValue(p.x[0]),b=x.getPixelForValue(p.x[1]);
-    if(!Number.isFinite(a)||!Number.isFinite(b)||a==b)return 'rgba(185,125,0,'+(0.22*p.level)+')';
+    if(!Number.isFinite(a)||!Number.isFinite(b)||a==b)return radarColour(p.level);
     var gradient=c.chart.ctx.createLinearGradient(a,0,b,0);
-    gradient.addColorStop(0,'rgba(185,125,0,'+(0.22*p.level)+')');gradient.addColorStop(1,'rgba(185,125,0,'+(0.22*p.endLevel)+')');return gradient;},
+    gradient.addColorStop(0,radarColour(p.level));gradient.addColorStop(1,radarColour(p.endLevel));return gradient;},
    barThickness:function(c){var y=c.chart.scales.y;return Math.abs(y.getPixelForValue(span.yHigh)-y.getPixelForValue(span.yLow));}
   };
  });
@@ -181,4 +185,4 @@ function trafficChart(canvas,samples,names,start,end){
   label:function(c){return c.dataset.label+': '+c.raw.y.toFixed(3)+' Mbit/s average; '+c.raw.peak.toFixed(3)+' peak (5-minute summary)';}};
  return new chartlib.Chart(canvas,{type:'line',data:{datasets:trafficData(samples,names)},options:options});
 }
-return baseclass.extend({spectrumAxis:spectrumAxis,channelChart:channelChart,trafficChart:trafficChart,colour:colour,keyStyle:keyStyle,patternStyle:patternStyle,patternName:patternName,geometry:geometry,channelData:channelData,trafficData:trafficData,surveyData:surveyData,radarData:radarData});
+return baseclass.extend({spectrumAxis:spectrumAxis,channelChart:channelChart,trafficChart:trafficChart,colour:colour,keyStyle:keyStyle,patternStyle:patternStyle,patternName:patternName,geometry:geometry,channelData:channelData,trafficData:trafficData,surveyData:surveyData,radarData:radarData,radarColour:radarColour,radarGradient:radarGradient});

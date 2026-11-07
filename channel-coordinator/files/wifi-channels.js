@@ -7,6 +7,7 @@
 'require fs';
 'require poll';
 'require wifi-coordinator.help as help';
+'require wifi-coordinator.time as timefmt';
 
 var service = rpc.declare({object:'service',method:'list',params:['name'],expect:{'':{}}});
 function radioName(r) { return r['.name']+' ('+(r.band=='2g'?'2.4':'5')+' GHz)'; }
@@ -22,7 +23,7 @@ function statusText(st, services) {
 function comparisonTime(p,st) {
  if(!p.evaluated_at)return _('Last completed comparison.');
  var age=Math.max(0,(st.updated||p.evaluated_uptime)-p.evaluated_uptime);
- return _('Last comparison: ')+new Date(p.evaluated_at*1000).toLocaleString()+
+ return _('Last comparison: ')+timefmt.stamp(p.evaluated_at)+
   (Number.isFinite(age)?' ('+(age<60?Math.floor(age)+' seconds':Math.floor(age/60)+' minutes')+' ago).':'.');
 }
 return view.extend({
@@ -63,7 +64,7 @@ return view.extend({
    var items=[E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[header,E('tbody',{},rows)]))],cards=[];
    if(st.scan_coverage)cards.push(E('div',{'class':'wc-summary'},[
     E('h4',{},_('Last survey coverage')),E('p',{},st.scan_coverage.completed+' of '+st.scan_coverage.requested+' frequencies measured ('+st.scan_coverage.policy+').'),
-    E('p',{},'Completed at '+new Date(st.scan_coverage.at*1000).toLocaleTimeString()+'. Only radios with complete fresh coverage may move; missing coverage on another band does not block them.')
+    E('p',{},'Completed at '+timefmt.stamp(st.scan_coverage.at)+'. Only radios with complete fresh coverage may move; missing coverage on another band does not block them.')
    ]));
    if(p)cards.push(E('div',{'class':'wc-summary'},[
     E('h4',{},_('Last completed comparison')),E('p',{},comparisonTime(p,st)),E('p',{},p.neighbors+' nearby networks.'),

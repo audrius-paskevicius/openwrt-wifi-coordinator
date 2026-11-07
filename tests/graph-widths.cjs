@@ -1,6 +1,9 @@
 'use strict';
 const fs=require('fs'),path=require('path'),assert=require('assert');
 const graph=new Function('baseclass','chartlib',fs.readFileSync(path.join(__dirname,'../channel-coordinator/files/wifi-coordinator.graphs.js'),'utf8'))({extend:x=>x},{});
+assert.equal(graph.radarColour(1),'rgba(90,60,0,0.74)');
+assert.equal(graph.radarColour(0),'rgba(90,60,0,0)');
+for(const n of [0,1,2,3])assert(graph.radarGradient().includes(graph.radarColour(Math.pow(2,-n))));
 assert.equal(graph.geometry({channel:100,width:160}).center,5570);
 assert.equal(graph.geometry({channel:36,width:160}).center,5250);
 assert.equal(graph.geometry({channel:5,width:40,center:2422}).center,2422);

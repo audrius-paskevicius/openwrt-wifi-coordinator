@@ -66,6 +66,10 @@ Capability interpretation follows [Linux HT/VHT definitions](https://github.com/
 
 ## History, persistence and privacy
 
+Both history charts share adaptive, aligned 24-hour time ticks in the browser's local timezone, identified once above the graphs. A same-day view shows `HH:mm` ticks and the `YYYY-MM-DD` date below each axis. Views crossing local midnight show date and time on separate tick lines. There is no redundant "Time" axis label. Tooltips, action records and comparison timestamps use `YYYY-MM-DD HH:mm:ss`. Repeated tick labels during the autumn clock change include their UTC offset. Stored epoch timestamps are unchanged.
+
+Radar shading uses dark amber with a contrast range comparable to the grey congestion scale. Its opacity follows the square root of remembered strength; this improves visibility without changing the radar-memory half-life or planner scores. The amber legend and graph share the same colour function. The two scales still represent different quantities: congestion estimates and remembered radar avoidance strength.
+
 `history.uc` records channel residence, five-minute traffic summaries, compact spectrum surveys and recent actions. They share the selected retention window of up to 200 hours. The graph's Show selector limits the visible window; it does not change stored retention. Recent actions have no separate count cap. The daemon's 30-entry operational event list is distinct from retained history.
 
 Recent history is bounded to 1 MiB in RAM. `history-storage.uc` offloads immutable batches every six hours during normal operation, keeping the most recent hour cached in RAM. Batches retain original summary detail; no new two-hour aggregation is performed. Flash has no fixed archive-size cap, but writes must leave at least 4 MiB free. Heavy activity or failed offloads can fill RAM and discard oldest buffered records. Expired archive batches are deleted at scheduled maintenance rather than rewritten on each refresh.

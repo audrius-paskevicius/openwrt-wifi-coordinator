@@ -7,11 +7,12 @@ from pathlib import Path
 root = Path(__file__).resolve().parent.parent
 files = root / 'channel-coordinator/files'
 payload = {name: (files / filename).read_text(encoding='utf-8') for name, filename in [
-    ('chart', 'wifi-coordinator.chart.js'), ('graph', 'wifi-coordinator.graphs.js')]}
+    ('chart', 'wifi-coordinator.chart.js'), ('graph', 'wifi-coordinator.graphs.js'), ('time', 'wifi-coordinator.time.js')]}
 script = r'''
 const baseclass={extend:x=>x};
 const chart=new Function('baseclass',payload.chart)(baseclass);
-const graph=new Function('baseclass','chartlib',payload.graph)(baseclass,chart);
+const timefmt=new Function('baseclass',payload.time)(baseclass);
+const graph=new Function('baseclass','chartlib','timefmt',payload.graph)(baseclass,chart,timefmt);
 const start=1700000000,end=start+21600;
 const periods=[
  {radio:'radio0',start,end:start+10800,channel:36,center:5250,width:160},
@@ -55,8 +56,22 @@ try{
  assert(Math.min(...alphas)>=90,'dense survey remains visible between readings');
  assert(smooth.data.datasets.filter(d=>d.wcSurvey).every(d=>d.inflateAmount===0),'survey cells have no inflated edges');
  assert(full.data.datasets.filter(d=>d.wcRadar).every(d=>d.inflateAmount===0),'radar cells have no inflated edges');
+ const traffic=graph.trafficChart(document.getElementById('traffic'),[],names,start,end);
+ const localStart=new Date(2026,10,7,9,0).getTime()/1000;
+ [300,950].forEach(width=>[ [localStart,localStart+21600], [localStart,localStart+200*3600], [localStart+14*3600,localStart+16*3600] ].forEach(([a,b])=>{
+  const c=graph.channelChart(document.getElementById('dates'),[],[],a,b,[],{},['2g','5g']);
+  const t=graph.trafficChart(document.getElementById('times'),[],names,a,b);
+  [c,t].forEach(g=>g.resize(width,400));
+  const tickData=g=>g.scales.x.ticks.map(t=>({value:t.value,label:t.label}));
+  assert(JSON.stringify(tickData(c))===JSON.stringify(tickData(t)),'both graphs share time ticks');
+  assert(c.scales.x.ticks.length<=7,'bounded tick count');
+  assert(c.options.scales.x.title.text!=='Time','no redundant Time label');
+  assert(c.options.scales.x.title.display===timefmt.sameDay(a,b),'date caption only for same-day view');
+  assert(c.scales.x.ticks.every(t=>timefmt.sameDay(a,b)?typeof t.label==='string':Array.isArray(t.label)&&/^\d{4}-\d{2}-\d{2}$/.test(t.label[0])),'local dates across midnight');
+  c.destroy();t.destroy();
+ }));
  document.getElementById('legend').innerHTML=names.map((r,i)=>'<span style="color:'+graph.colour(r,i)+';margin-right:24px"><i style="display:inline-block;width:25px;height:12px;border:2px solid;'+graph.patternStyle(r,i)+'"></i> '+r+'</span>').join('');
- document.getElementById('result').textContent='PASS: actual Chart.js render, complete plans, band isolation, gap clipping, patterned legend and dense survey without dark seams';
+ document.getElementById('result').textContent='PASS: actual Chart.js render, spectrum geometry, dense surveys, shared ISO ticks at narrow/wide sizes, same-day, midnight and 200-hour views';
  document.getElementById('result').dataset.status='pass';
 }catch(e){document.getElementById('result').textContent='FAIL: '+e.stack;document.getElementById('result').dataset.status='fail';}
 '''
@@ -67,6 +82,8 @@ html = '''<!doctype html><meta charset="utf-8"><title>Standard spectrum axis che
 <section><canvas id="full"></canvas></section><p id="legend"></p>
 <h2>5 GHz declaration only (same history)</h2><section><canvas id="five"></canvas></section>
 <h2>Dense survey boundaries</h2><section><canvas id="smooth"></canvas></section>
+<h2>Traffic</h2><section><canvas id="traffic"></canvas></section>
+<section><canvas id="dates"></canvas></section><section><canvas id="times"></canvas></section>
 <script>const payload=''' + json.dumps(payload) + ';\n' + script + '</script>'
 Path(sys.argv[1]).write_text(html, encoding='utf-8')
 print('Prepared offline Chart.js spectrum fixture: ' + sys.argv[1])

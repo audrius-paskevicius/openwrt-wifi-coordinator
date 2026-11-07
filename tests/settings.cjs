@@ -24,9 +24,9 @@ const radios=[{'.name':'radio0',band:'5g'},{'.name':'radio1',band:'2g'},{'.name'
 const uci={sections:()=>radios,get:()=>true};
 const state={updated:100,radios:{radio0:{requested_method:'auto',method:'csa',requested_width_method:'auto',width_method:'idle_reconfigure',method_reason:'Driver advertises CSA',width_reason:'Tested width changes require restart'},radio1:{requested_method:'csa',method:'csa',csa_recovery_left:120,rejected:[{until:220,target:{freq:2472,width:20},reason:'Client connectivity did not verify'}]}}};
 const source=fs.readFileSync(path.join(root,'channel-coordinator/files/wifi-channels.js'),'utf8');
-const page=new Function('view','form','uci','rpc','fs','poll','help','E','_','L',source)(
+const page=new Function('view','form','uci','rpc','fs','poll','help','E','_','L','timefmt',source)(
  {extend:x=>x},form,uci,{declare:()=>()=>Promise.resolve({})},{read:()=>Promise.resolve(JSON.stringify(state))},
- {add:fn=>polls.push(fn)},{compact:()=>{},sectionStatus:(s,n)=>{s.statusNode=n;}},E,x=>x,{resource:x=>x});
+ {add:fn=>polls.push(fn)},{compact:()=>{},sectionStatus:(s,n)=>{s.statusNode=n;}},E,x=>x,{resource:x=>x},require('./time.cjs'));
 function option(name,section='main'){const o=options.find(x=>x.option===name&&x.section===section);assert(o,'Missing '+section+'.'+name);return o;}
 module.exports=page.renderPage([null,null,state,{}]).then(async()=>{
  for(const name of ['retry_delay','scan_wait','scan_batch','cac_timeout','csa_count','ban_seconds','wide_threshold'])assert(!options.some(x=>x.option===name));
