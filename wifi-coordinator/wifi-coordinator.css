@@ -38,17 +38,14 @@
 .wifi-coordinator .wc-traffic-chart { height: 300px; }
 .wifi-coordinator .wc-line-key { display: inline-block; width: 24px; border-top: 2.5px solid; vertical-align: middle; margin-right: 7px; }
 .wifi-coordinator .wc-legend { margin: 10px 0 16px; }
-.wifi-coordinator .wc-grey-scale { display: inline-block; width: 120px; height: 12px; margin: 0 8px; vertical-align: middle; background: linear-gradient(to right, #fafafa, #747474); border: 1px solid #aaa; }
-.wifi-coordinator .wc-spectrum-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 32px; margin: 12px 0; }
-.wifi-coordinator .wc-survey-key { line-height: 1.8; white-space: nowrap; }
-.wifi-coordinator .wc-radar-key { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
-.wifi-coordinator .wc-radar-ramp { width: 300px; max-width: 100%; }
-.wifi-coordinator .wc-amber-scale { height: 12px; background: linear-gradient(to right, rgba(185,125,0,.22), rgba(185,125,0,.11) 33.33%, rgba(185,125,0,.055) 66.67%, rgba(185,125,0,.0275)), #fff; }
-.wifi-coordinator .wc-radar-ticks { display: flex; justify-content: space-between; margin-top: 4px; font-variant-numeric: tabular-nums; }
-.wifi-coordinator .wc-radar-ticks > span { text-align: center; }
-.wifi-coordinator .wc-radar-ticks > span:first-child { text-align: left; }
-.wifi-coordinator .wc-radar-ticks > span:last-child { text-align: right; }
-.wifi-coordinator .wc-radar-ticks small { display: block; }
+.wifi-coordinator .wc-spectrum-keys { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 32px; margin: 12px 0; }
+.wifi-coordinator .wc-survey-key, .wifi-coordinator .wc-radar-key { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 18px; line-height: 18px; }
+.wifi-coordinator .wc-survey-ramp { width: 180px; max-width: 100%; }
+.wifi-coordinator .wc-radar-ramp { width: 380px; max-width: 100%; }
+.wifi-coordinator .wc-grey-scale, .wifi-coordinator .wc-amber-scale { height: 12px; }
+.wifi-coordinator .wc-grey-scale { background: linear-gradient(to right, rgba(30,30,30,.02), rgba(30,30,30,.17) 6.25%, rgba(30,30,30,.32) 25%, rgba(30,30,30,.47) 56.25%, rgba(30,30,30,.62)), #fff; }
+.wifi-coordinator .wc-amber-scale { background: linear-gradient(to right, rgba(185,125,0,.22), rgba(185,125,0,.11) 33.33%, rgba(185,125,0,.055) 66.67%, rgba(185,125,0,.0275)), #fff; }
+.wifi-coordinator .wc-radar-ticks, .wifi-coordinator .wc-scale-ticks { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wifi-coordinator .wc-log-wrap { max-height: 340px; }
 .wifi-coordinator .cbi-section-node-tabbed > [data-tab-active="false"] { display: none; }
 .wifi-coordinator .cbi-value-description { max-width: 65em; line-height: 1.5; }
