@@ -29,6 +29,8 @@ mkdir -p "$ROOT/www/luci-static/resources/wifi-coordinator"
 cp "$CC/files/wifi-coordinator.chart.js" "$ROOT/www/luci-static/resources/wifi-coordinator/chart.js"
 cp "$CC/files/wifi-coordinator.graphs.js" "$ROOT/www/luci-static/resources/wifi-coordinator/graphs.js"
 cp "$CC/files/wifi-coordinator.help.js" "$ROOT/www/luci-static/resources/wifi-coordinator/help.js"
+cp "$BASE/../DISCLAIMER.txt" "$ROOT/usr/share/channel-coordinator/DISCLAIMER.txt"
+ucode -e 'import * as fs from "fs"; let source=fs.readfile(ARGV[0]),text=fs.readfile(ARGV[1]); if(!source||!text)die("Missing disclaimer source"); print(replace(replace(source,"@WIFI_COORDINATOR_DISCLAIMER_JSON@",sprintf("%J",text)),"@WIFI_COORDINATOR_VERSION@",ARGV[2]));' "$CC/files/wifi-coordinator.disclaimer.js" "$BASE/../DISCLAIMER.txt" "$VERSION" > "$ROOT/www/luci-static/resources/wifi-coordinator/disclaimer.js"
 cp "$CC/files/Chart.js-LICENSE.txt" "$ROOT/usr/share/channel-coordinator/"
 cp "$BASE/wifi-coordinator.css" "$ROOT/www/luci-static/resources/view/"
 cp "$BASE/menu.json" "$ROOT/usr/share/luci/menu.d/luci-app-wifi-coordinator.json"
@@ -65,7 +67,7 @@ find "$ROOT" -type f -exec chmod 644 {} \;
 chmod 755 "$ROOT/etc/init.d/channel-coordinator" "$ROOT/etc/init.d/radio-prefer"
 "$APK_TOOL" mkpkg --files "$ROOT" --sign-key "$SIGN_KEY" \
  --info name:luci-app-wifi-coordinator --info version:"$VERSION" --info arch:noarch \
- --info license:MIT --info description:'Coordinated channel planning, DFS preparation and client steering' \
+ --info license:MIT --info description:'AI-generated Wi-Fi channel planning and steering; use at your own risk' \
  --info 'depends:luci-base iw usteer ucode ucode-mod-fs ucode-mod-ubus ucode-mod-uci ucode-mod-uloop ucode-mod-nl80211 !luci-app-radio-prefer !luci-app-channel-coordinator' \
  --script "post-install:$BASE/post-install" --script "pre-upgrade:$BASE/pre-upgrade" \
  --script "post-upgrade:$BASE/post-install" --script "pre-deinstall:$BASE/pre-deinstall" \

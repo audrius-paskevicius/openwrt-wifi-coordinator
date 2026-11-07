@@ -1,12 +1,18 @@
 # Validation
 
-Source release: **0.6.0-r28**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release.
+Source release: **0.6.0-r29**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 35 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r29 visible software disclaimer
+
+The canonical `DISCLAIMER.txt` appears at the top of the README and release descriptions, inside the APK, and during installation. The LuCI notice gates first use in each browser and remains visible on all three pages after acknowledgement. Browser storage records the exact text, not the package version; it does not write to router flash or change running services. Tests cover acknowledgement, changed text, blocked storage, repeated module loads, full-text access, and coverage of all three views.
+
+Validation: portable source/UI checks and the native LuCI fixture (55 descriptions) passed. The signed APK verified. On the installed router, all three views displayed the warning; first use withheld controls until acknowledgement, subsequent pages remembered it, and the full-text button opened the notice. The install log printed the canonical text. Existing radio recovery state was inspected separately before coordination resumed. No planner or steering code changed in this release.
 
 ## r28 interrupted-operation recovery
 

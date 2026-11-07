@@ -1,5 +1,11 @@
 # Installation and operation
 
+## Software disclaimer
+
+Read [the full disclaimer](../DISCLAIMER.txt) before installing. The package prints it during installation and includes it at `/usr/share/channel-coordinator/DISCLAIMER.txt`.
+
+Channels, Clients and History each show a permanent warning with access to the full text. First use in a browser requires acknowledgement before displaying that page's controls. The browser remembers the exact text for this router; unchanged notices stay acknowledged across package upgrades. Clearing browser storage, using another browser or router address, or changing the disclaimer requires acknowledgement again. If browser storage is unavailable, acknowledgement lasts only while the loaded page module remains active. This does not change running services or write acknowledgement data to router flash.
+
 ## Requirements
 
 - OpenWrt 25.12 and APK v3. Live development used 25.12.6 on a Linksys WRT3200ACM.

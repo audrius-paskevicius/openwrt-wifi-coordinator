@@ -1,5 +1,6 @@
 'use strict';
 'require view';
+'require wifi-coordinator.disclaimer as disclaimer';
 'require form';
 'require uci';
 'require fs';
@@ -81,7 +82,8 @@ var actionNames={
 };
 return view.extend({
  load:function(){return Promise.all([uci.load('channel_coordinator'),readHistory()]);},
- render:function(data){
+ render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));},
+ renderPage:function(data){
   var instances=[],frame=null,storageOpen=false;
   var history=data[1],retain=Math.max(1,Math.min(200,Number(uci.get('channel_coordinator','main','history_hours'))||24)),hours=Math.min(6,retain),display=E('div'),selector=E('select',{'class':'cbi-input-select'});
   function setRetention(value){retain=Math.max(1,Math.min(200,Number(value)||24));hours=Math.min(hours,retain);

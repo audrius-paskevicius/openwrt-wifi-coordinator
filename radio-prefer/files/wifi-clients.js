@@ -1,5 +1,6 @@
 'use strict';
 'require view';
+'require wifi-coordinator.disclaimer as disclaimer';
 'require form';
 'require uci';
 'require rpc';
@@ -28,7 +29,8 @@ var reasons={
 };
 return view.extend({
  load:function(){return Promise.all([uci.load('radio_prefer'),uci.load('wireless'),readState(),services('radio-prefer')]);},
- render:function(data){
+ render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));},
+ renderPage:function(data){
   var status=E('p',{'class':'wc-status'}),clients=E('div');
   function refresh(st,svc){
    var running=Object.values(((svc||{})['radio-prefer']||{}).instances||{}).some(function(i){return i.running;});

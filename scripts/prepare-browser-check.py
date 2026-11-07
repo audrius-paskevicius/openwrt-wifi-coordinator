@@ -96,7 +96,7 @@ function page(name){return new Function('view','form','uci','rpc','fs','poll','h
 function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));assert(tooltipDiv.style.opacity==='1','hover must open native tooltip');assert(tooltipDiv.textContent.includes(node.dataset.tooltip),'hover must expose full explanation');assert(tooltipDiv.getBoundingClientRect().right<=innerWidth+1,'tooltip must fit viewport');}
 (async()=>{
  for(const name of ['channels','clients','history']){
-  const pane=await page(name).render(name==='history'?[null,{}]:[null,null,state,{}]);
+  const pane=await page(name).renderPage(name==='history'?[null,{}]:[null,null,state,{}]);
   // Fixture uses locally embedded style, never navigates to the router.
   pane.querySelectorAll('link').forEach(n=>n.remove());
   document.getElementById('pages').appendChild(pane);
@@ -127,7 +127,7 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  assert(unsaved.value==='unsaved edit','polling must preserve unsaved input');
  const map=maps[0],fresh=await map.render();document.getElementById('pages').appendChild(fresh);
  const after=fresh.querySelector('.wc-setting-help');tooltip(after);after.click();assert(tooltipDiv.style.opacity==='1','delegation must survive form rerender');
- const failedHistory=await page('history').render([null,{read_errors:['Synthetic unreadable recent history']}]);
+ const failedHistory=await page('history').renderPage([null,{read_errors:['Synthetic unreadable recent history']}]);
  assert(failedHistory.querySelector('.alert-message.warning').textContent.includes('History is incomplete'),'failed reads must stay visible even without any radio records');
  assert(failedHistory.textContent.indexOf('History is incomplete')<failedHistory.textContent.indexOf('History is collecting'),'read failure must precede the empty-history message');
  const recent=Math.floor(Date.now()/1000);
@@ -135,7 +135,7 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  graphs.channelChart=graphs.trafficChart=()=>({destroy(){}});
  graphs.colour=()=>'#005dff';graphs.patternStyle=()=>'';graphs.patternName=()=>'diagonal lines';
  fs.list=async()=>[];fs.read_direct=async path=>JSON.stringify(path.includes('state')?state:historyData);
- const historyPane=await page('history').render([null,historyData]);
+ const historyPane=await page('history').renderPage([null,historyData]);
  historyPane.querySelectorAll('link').forEach(n=>n.remove());document.getElementById('pages').appendChild(historyPane);
  const storage=historyPane.querySelector('.wc-history-storage');assert(!storage.open,'storage diagnostics start collapsed');
  storage.open=true;storage.dispatchEvent(new Event('toggle'));

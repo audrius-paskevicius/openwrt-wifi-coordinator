@@ -1,5 +1,6 @@
 'use strict';
 'require view';
+'require wifi-coordinator.disclaimer as disclaimer';
 'require form';
 'require uci';
 'require rpc';
@@ -26,7 +27,8 @@ function comparisonTime(p,st) {
 }
 return view.extend({
  load:function(){return Promise.all([uci.load('channel_coordinator'),uci.load('wireless'),readState(),service('channel-coordinator')]);},
- render:function(data){
+ render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));},
+ renderPage:function(data){
   var state=data[2], radios=uci.sections('wireless','wifi-device'),methodStatus={};
   var status=E('p',{'class':'wc-status','data-level':state.halted&&!state.restart_check?'warning':'normal'},statusText(state,data[3]));
   var details=E('div');

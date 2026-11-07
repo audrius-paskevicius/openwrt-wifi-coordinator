@@ -16,3 +16,4 @@ require('./history-cache.cjs');
 require('./help.cjs');
 require('./settings.cjs');
 require('./graph-widths.cjs');
+require('./disclaimer.cjs');
