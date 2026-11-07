@@ -1,4 +1,14 @@
 // Shared channel geometry, regulatory checks and execution helpers.
+// Display bands come from PHY declarations, including disabled frequencies.
+// They deliberately do not depend on active APs, configured pools or history.
+export function declared_bands(phys) {
+    let found={};
+    for(let p in phys ?? [])for(let index,b in p.wiphy_bands ?? [])if(b){
+        let key=index==0?'2g':index==1?'5g':index==4?'6g':null;
+        if(key)found[key]=true;
+    }
+    return filter(['2g','5g','6g'],b=>found[b]);
+};
 export function channel(f) { return f==2484?14:f < 3000 ? int((f - 2407) / 5) : int((f - 5000) / 5); };
 export function frequency(ch,band) { return band=='2g'?(ch==14?2484:2407+5*ch):5000+5*ch; };
 export function hardware_widths(band,capabilities) {

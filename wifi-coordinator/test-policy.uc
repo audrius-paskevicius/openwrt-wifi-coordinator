@@ -1,7 +1,12 @@
-import {overlap,group,delta_busy,permitted,neighbor,pressure,reconfigure_text,dfs_ready,uses_dfs,preparation_text,quiet_ready,same_network,force_signal_ok,configured_channels,configured_widths,channel,frequency,switch_methods,setting_integer} from '../channel-coordinator/files/policy.uc';
+import {declared_bands,overlap,group,delta_busy,permitted,neighbor,pressure,reconfigure_text,dfs_ready,uses_dfs,preparation_text,quiet_ready,same_network,force_signal_ok,configured_channels,configured_widths,channel,frequency,switch_methods,setting_integer} from '../channel-coordinator/files/policy.uc';
 function tests() {
     let n = 0;
     function eq(a, b) { if (a != b) die(sprintf('FAIL %J != %J\n',a,b)); n++; }
+    eq(join(' ',declared_bands([{wiphy_bands:[null,{freqs:[{freq:5180,disabled:true}]}]}])),'5g');
+    eq(join(' ',declared_bands([{wiphy_bands:[{freqs:[{freq:2412}]},null]},{wiphy_bands:[null,{freqs:[{freq:5180}]}]}])),'2g 5g');
+    eq(join(' ',declared_bands([{wiphy_bands:[null,{vht_capa:0}]},{wiphy_bands:[null,{freqs:[{freq:5745}]}]}])),'5g');
+    eq(join(' ',declared_bands([{wiphy_bands:[null,null,null,null,{freqs:[{freq:5955}]}]}])),'6g');
+    eq(length(declared_bands([])),0);
     eq(switch_methods('auto','auto',true,'radio0','5g',true,0,100).method,'csa');
     eq(switch_methods('auto','auto',true,'radio0','5g',true,0,100).width_method,'idle_reconfigure');
     eq(switch_methods('auto','auto',true,'radio2','5g',true,0,100).method,'idle_reconfigure');

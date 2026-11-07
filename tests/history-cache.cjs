@@ -11,7 +11,8 @@
  listing=[{name:'history.json',type:'file'},{name:'batch-210.json',type:'file'},{name:'unrelated.txt',type:'file'},{name:'batch-211.json.new',type:'file'}];
  const fs={list:async()=>listing,read:async p=>{calls.push(p);if(!(p in data))throw Object.assign(Error('No such file'),{name:'NotFoundError'});return data[p];}};
  const read=new Function('fs',prefix+';return readHistory;')(fs);
- let h=await read();check(h.samples.length===1&&h.samples[0].n===2,'boundary sample dedup and obsolete archive ignored');
+ data['/tmp/channel-coordinator-state.json']=JSON.stringify({declared_bands:['5g']});
+ let h=await read();check(h.declared_bands.join(' ')==='5g','band declaration comes from PHY status, independent of history');check(h.samples.length===1&&h.samples[0].n===2,'boundary sample dedup and obsolete archive ignored');
  check(h.periods.length===1&&h.periods[0].end===250,'residence extension dedup');
  check(h.archive_files===1&&h.archive_bytes===data[path+'batch-210.json'].length,'owned batch bytes only');
  calls=[];await read();check(calls.length===2&&calls[0]===ramPath,'closed batch cache avoids repeated reads');

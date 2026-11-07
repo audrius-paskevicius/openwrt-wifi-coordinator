@@ -5,7 +5,7 @@ import * as ubus from 'ubus';
 import * as uci from 'uci';
 import * as uloop from 'uloop';
 import {open_history} from './history.uc';
-import {channel, group, same, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample} from './policy.uc';
+import {channel, group, same, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample,declared_bands} from './policy.uc';
 import {survey_covers,move_method,configured_channels,configured_widths,frequency,switch_methods,setting_integer,hardware_widths,placements,live_width} from './policy.uc';
 import {assess,choose,decide} from './planner.uc';
 import {open_memory} from './radar.uc';
@@ -194,6 +194,7 @@ function rcfg(name,band,caps,csa,band_caps) {
 function inventory() {
     let ws=call('network.wireless','status'), interfaces=request(N.NL80211_CMD_GET_INTERFACE,N.NLM_F_DUMP,{});
     let phys=request(N.NL80211_CMD_GET_WIPHY,N.NLM_F_DUMP,{split_wiphy_dump:true});
+    state.declared_bands=declared_bands(phys);
     let phyinfo={};
     for(let p in phys ?? []) {
         let info=phyinfo[p.wiphy] ?? {caps:{},csa:false,bands:{}}; phyinfo[p.wiphy]=info;

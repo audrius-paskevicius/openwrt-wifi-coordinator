@@ -1,6 +1,12 @@
 # Validation
 
-Source release: **0.6.0-r17**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r18**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r18 standard band axes
+
+The axis now uses PHY band declarations to select full standard band layouts. Portable tests cover a 5 GHz-only declaration, the full upper 5 GHz range, retained channel 14, 6 GHz display geometry, compressed gaps, unchanged channel widths, and shared survey/radar clipping. An offline fixture renders actual bundled Chart.js with mixed-band and 5 GHz-only plots, verifies gap pixels and full rectangular outlines, and displays the existing pattern legend. Run `python3 scripts/prepare-graph-check.py OUTPUT.html` and open that HTML in a browser to repeat the render check without router data.
+
+r18 validation passed: 114 policy/band-declaration checks, 40 hardware-width checks, 6 retained-comparison checks, portable UI/geometry/history-cache checks and the actual Chart.js browser render fixture. The signed APK verified and its contents matched source. After installation, the controller reported `2g 5g`, both services ran without a safety stop, and router internet probes succeeded (3/3).
 
 ## r17 scoped client recovery
 

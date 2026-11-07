@@ -30,7 +30,7 @@ async function readHistory(){
   out[k]=Array.from(records.values()).sort(function(a,b){return (a.start||a.time)-(b.start||b.time);});
  });
  out.ram_bytes=ram.file_bytes||0;out.archive_bytes=archiveBytes;out.archive_files=files.length;out.read_errors=errors;
- var controller=await read('/tmp/channel-coordinator-state.json');out.radar=controller.radar||{events:[]};
+ var controller=await read('/tmp/channel-coordinator-state.json');out.radar=controller.radar||{events:[]};out.declared_bands=controller.declared_bands||[];
  out.archive_saved=ram.archive_saved||saved;return out;
 }
 function stamp(t){return new Date(t*1000).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});}
@@ -111,7 +111,7 @@ return view.extend({
     ])
    ]);
    var nodes=[E('h3',{},_('Where each radio spent its time')),
-    E('p',{'class':'wc-caption'},_('Time runs left to right; channel position runs bottom to top. Each outline spans the radio’s channel width. The // mark removes the unused gap between 2.4 and 5 GHz; MHz spacing is preserved within each band.')),
+    E('p',{'class':'wc-caption'},_('Time runs left to right; channel position runs bottom to top. Each outline spans the radio’s channel width. Each declared radio band shows its full standard channel plan. // marks compressed gaps between channel blocks; MHz spacing is preserved inside each block. Displayed channels are not a statement of local permission or hardware support.')),
     E('div',{'class':'wc-chart wc-spectrum-chart'},channelCanvas),legend(true),
     E('div',{'class':'wc-survey-key'},['Survey background ',E('span',{'class':'wc-grey-scale','aria-hidden':'true'}),' fewer/weaker networks → more/stronger networks']),
     E('p',{'class':'wc-caption'},surveys.length?_('Grey shows the survey results between measurements. Hover for the measurement time and congestion estimate. Darker means more or stronger overlapping networks, adjusted for advertised load where available; it is not measured airtime.'):_('Survey background starts with the next completed scan. Only compact channel-level summaries are stored; no network names or addresses.')),
@@ -149,7 +149,7 @@ return view.extend({
    function draw(){
     if(!display.isConnected){if(++attempts<60)frame=requestAnimationFrame(draw);return;}
     frame=null;
-    instances=[graphs.channelChart(channelCanvas,periods,radioNames,start,now,surveys,h.radar),graphs.trafficChart(trafficCanvas,samples,radioNames,start,now)];
+    instances=[graphs.channelChart(channelCanvas,periods,radioNames,start,now,surveys,h.radar,h.declared_bands),graphs.trafficChart(trafficCanvas,samples,radioNames,start,now)];
    }
    frame=requestAnimationFrame(draw);
   }

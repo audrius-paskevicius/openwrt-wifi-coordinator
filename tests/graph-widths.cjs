@@ -9,3 +9,37 @@ assert.equal(graph.geometry({channel:5,width:40,center:2442}).high-graph.geometr
 assert.equal(graph.colour('radio1',1),'#f05a00');assert.equal(graph.patternName('radio1',1),'vertical lines');
 assert.equal(graph.colour('radio2',2),'#005dff');
 console.log('PASS: 160/40 MHz chart geometry and retained radio colours/pattern legend');
+
+const only5=graph.spectrumAxis(['5g']),both=graph.spectrumAxis(['2g','5g']);
+assert.equal(only5.sections.length,2);
+assert.equal(only5.breaks.length,1);
+assert.equal(both.breaks.length,2);
+assert.equal(only5.position(2450),null);
+assert.equal(only5.position(5400),null);
+assert.equal(only5.position(5490)-only5.position(5330),16);
+assert.equal(only5.position(5885)-only5.position(5745),140);
+assert(only5.ticks.some(t=>t.label==='5G \u00b7 177'));
+assert(both.ticks.some(t=>t.label==='2.4G \u00b7 14'));
+assert.equal(only5.position(5735)-only5.position(5730),5);
+assert.equal(graph.spectrumAxis(['2g']).breaks.length,0);
+assert.equal(graph.spectrumAxis([]).sections.length,0);
+const six=graph.spectrumAxis(['6g']);
+assert(six.ticks.some(t=>t.label==='6G \u00b7 233'));
+assert.equal(six.position(5955),30);
+assert.equal(six.position(7115)-six.position(5955),1160);
+for(const channel of [36,100]){
+ const g=graph.geometry({channel,width:160},only5);
+ assert.equal(g.high-g.low,160);
+}
+const surveys=[{time:100,bands:[{start:5310,step:20,levels:[90,90,90]},{start:5480,step:20,levels:[70]},{start:2400,step:5,levels:[40]}]}];
+const sets=graph.surveyData(surveys,0,200,only5);
+assert.equal(sets.length,2);
+assert.equal(sets[1].data[0].low,5490);
+assert.equal(sets[1].data[0].high,5500);
+for(const set of sets)for(const p of set.data)assert.equal(p.y,(only5.position(p.low)+only5.position(p.high))/2);
+const radar=graph.radarData([{time:100,center:5340,width:40}],0,200,21600,only5);
+assert.equal(radar.length,1);
+assert.equal(radar[0].data[0].high,5330);
+assert.equal(radar[0].data[0].low,5320);
+assert.equal(radar[0].barThickness({chart:{scales:{y:{getPixelForValue:x=>x}}}}),10);
+console.log('PASS: complete declared-band plans, standard breaks, width geometry and shared survey/radar clipping');
