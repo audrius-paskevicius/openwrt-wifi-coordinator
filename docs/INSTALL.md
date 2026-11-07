@@ -15,7 +15,7 @@ The APK builder declares these dependencies in the package metadata:
 
 | Dependency | Purpose |
 | --- | --- |
-| `luci-base` | LuCI views, forms, RPC and filesystem client libraries |
+| `luci-base` | LuCI views, forms, RPC, filesystem client libraries and the authenticated CGI download path used for large history files |
 | `iw` | Wireless information and driver interactions |
 | `usteer` | Client measurements and neighbor information |
 | `ucode` | Controller runtime |
@@ -36,7 +36,7 @@ The local APK is checked against its installed signing key. Dependencies use the
 
 ## Trust and install
 
-Obtain the APK, public key and `SHA256SUMS` from [GitHub Releases](https://github.com/audrius-paskevicius/openwrt-wifi-coordinator/releases/latest). In a directory containing the downloaded assets, run `sha256sum -c SHA256SUMS` to check them. Copy `radio-prefer-public.pem` into `/etc/apk/keys/`, then install the APK with `apk add` or the LuCI software page. Keep normal OpenWrt feeds enabled to resolve dependencies.
+Obtain all four assets: the APK, `packages.adb`, public key and `SHA256SUMS` from [GitHub Releases](https://github.com/audrius-paskevicius/openwrt-wifi-coordinator/releases/latest). In a directory containing all four assets, run `sha256sum -c SHA256SUMS` to check them. The manifest covers the APK, index and key; omitting the index makes this full check report a missing file. The index is not required for direct APK installation. Copy `radio-prefer-public.pem` into `/etc/apk/keys/`, then install the APK with `apk add` or the LuCI software page. Keep normal OpenWrt feeds enabled to resolve dependencies.
 
 The public key authenticates future packages signed with the same private key; verify that you trust the repository owner before installing it. Neither a checksum nor a public key obtained from an untrusted source establishes authenticity by itself.
 
@@ -46,7 +46,9 @@ This merged package conflicts with the earlier standalone `luci-app-radio-prefer
 
 The package enables and starts the channel coordinator and Radio Preference according to their configuration. **Fresh installations use Automatic mode**, with paced scans and the shared reconnect fallback enabled. It fills missing radio roles without overwriting existing administrator choices.
 
-Radio Preference keeps usteer's competing steering rules passive while using its measurements and neighbor information. Stopping Radio Preference restores the saved rules while preserving administrator edits. The coordinator detects known competing services rather than silently running alongside them.
+Radio Preference keeps usteer's competing steering rules passive while using its measurements and neighbor information. Stopping Radio Preference restores the saved rules while preserving administrator edits. The coordinator refuses to operate alongside running `wifi-auto-channel`, `dawn` or `linksys-steering` services, and checks selected usteer steering policies before scanning or moving. This is a check for known conflicts, not detection of every possible external controller. If Radio Preference is disabled while channel coordination stays enabled, keep usteer's competing policies passive yourself.
+
+Fresh installation also enables DFS preparation and uses a one-hour radar-memory half-life. Package upgrades preserve existing configured values; installing a new default does not change an administrator's saved half-life. The radar-memory setting is independent of six-hour failure exclusions and flash checkpoints.
 
 The package does not create networks, replace Wi-Fi credentials, or change the LAN/WAN topology. WRT3200ACM/WRT32X-specific defaults select the known restart paths and synchronize the auxiliary driver's country hint with an already consistent configured country.
 
@@ -73,9 +75,11 @@ The shared setting **Change channel even if handoff cannot finish** is under **P
 
 Configuration lives in `/etc/config/channel_coordinator` and `/etc/config/radio_prefer`. Use LuCI for explanations of each setting. Fresh normal Radio Preference uses gentle recommendations; strong mode is an administrator choice and still does not set an AP disconnect timer.
 
-Every setting uses the same native LuCI help behavior: a short explanation is always visible; hover or focus that text for full details, or click/tap to open them. Click again or press Escape to close. The existing LuCI styling and help icon are retained. Specialist controls are under Advanced; conditional controls appear in their applicable modes. See the [complete settings audit](SETTINGS.md) for the purpose and exact scope of every retained control and the six retired implementation-timing knobs.
+Every setting uses the same native LuCI help behavior: a short explanation is always visible; hover or focus that text for full details, or click/tap to open them. Click again or press Escape to close. The existing LuCI styling and help icon are retained. Specialist controls are under Advanced; conditional controls appear in their applicable modes. See the [complete settings reference](SETTINGS.md) for the purpose and exact scope of every retained control including the six retired timing controls and the removed width-selection threshold.
 
 History retention ranges from 1 to 200 hours. Recent records use a 1 MiB RAM buffer; immutable flash batches are written at most once every six hours during normal operation, keeping at least 4 MiB of flash free. There is no fixed archive-size cap. Heavy activity or failed offloads can shorten retained history when the RAM buffer fills. Orderly shutdown checkpoints pending history and radar memory. Unexpected power loss can lose unsaved recent data. Disabling recording pauses new history; **Clear recorded history** explicitly deletes recorded graphs, surveys, and actions while preserving radar-avoidance memory. Only current `batch-*.json` history archives are supported; legacy `history.json` archives are not imported. See [architecture](ARCHITECTURE.md) for scoring, timing and storage details.
+
+History loading uses LuCI's authenticated streaming reader for RAM and archive files larger than the ordinary ubus read limit. Read errors appear above the graphs. Detailed storage statistics are under **History storage**; opening that section survives refreshes. The survey background carries each last observation forward until another measurement replaces it; hover for its actual measurement time.
 
 ## Stop or remove
 
@@ -90,4 +94,4 @@ Stopping the coordinator during an active operation can restore a recovery journ
 
 ## Upgrades
 
-Use matching OpenWrt dependencies. The package supplies preservation entries for configuration, runtime code, its public key, and retained flash history, but full sysupgrade testing remains outstanding. An ordinary package/service restart does not force extra history flash writes. Upgrade hooks stop the services and run recovery as needed.
+Use matching OpenWrt dependencies. The package supplies preservation entries for configuration, runtime code, its public key, and retained flash history, but full sysupgrade testing remains outstanding. An ordinary package/service restart does not force extra history flash writes. Upgrade hooks stop the services and run recovery as needed. The supplied keep-list names the published key `/etc/apk/keys/radio-prefer-public.pem`; if you build with a differently named signing key, arrange preservation of that key separately. After updating the package, hard-refresh LuCI (Ctrl+F5) so cached JavaScript does not mix old and new views.

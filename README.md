@@ -9,10 +9,11 @@ The package combines channel planning, Radio Preference, and a LuCI interface un
 - Surveys the surrounding spectrum with paced scans and serving gaps.
 - Plans channels and widths jointly, following each radio's HT/VHT capabilities: up to 40 MHz on 2.4 GHz and 160 MHz on 5 GHz, subject to regulatory and coexistence checks.
 - Defaults to live driver-derived channel lists for every radio; optional explicit lists restrict selection.
+- Ranks joint layouts by usable bandwidth and advertised radio spatial capacity, accounting for the primary channel and radar memory. Width alone does not outrank estimated service; the objective is independent of today's client mix.
 - Keeps evidence for each alternative even when different channels take turns ranking first.
 - Uses live channel-switch announcements where supported. Otherwise it tries a compatible client handoff, then briefly restarts only the changing radio if clients remain.
 - Checks reconnection and service after a change, with rollback and temporary exclusions after failures.
-- Coordinates DFS preparation without bypassing kernel radar restrictions. Recent radar detections add a decaying planning penalty.
+- Coordinates DFS preparation without bypassing kernel radar restrictions. Recent radar detections add a planning penalty with a one-hour default half-life, separate from mandatory DFS restrictions.
 - Records channel placement, spectrum surveys, traffic summaries, and actions. Recent history stays in RAM; older history moves to flash in six-hour batches. Orderly shutdown saves pending records.
 - Draws history locally with bundled Chart.js; no CDN is required.
 - Shows short help beside every setting, with full explanations on hover, focus or click/tap.
@@ -21,7 +22,7 @@ The package combines channel planning, Radio Preference, and a LuCI interface un
 
 ## Install the release
 
-Download the APK, public key, and `SHA256SUMS` from [GitHub Releases](https://github.com/audrius-paskevicius/openwrt-wifi-coordinator/releases/latest). Generated APKs and package indexes are kept there, separate from source. The [public signing key](radio-prefer/release/radio-prefer-public.pem) is also tracked here.
+Download the APK, `packages.adb`, public key, and `SHA256SUMS` from [GitHub Releases](https://github.com/audrius-paskevicius/openwrt-wifi-coordinator/releases/latest). Generated APKs and package indexes are kept there, separate from source. The index is included in the checksum manifest; it is not needed to install the APK directly. The [public signing key](radio-prefer/release/radio-prefer-public.pem) is also tracked here.
 
 1. Use OpenWrt 25.12 with `apk` v3, LuCI, and full hostapd/wpad support for 802.11k/v. This APK is not for older `opkg` firmware.
 2. Configure the real country, working APs, and the intended Wi-Fi networks first. The package does not create SSIDs or set passwords.
@@ -70,7 +71,7 @@ python3 scripts/prepare-tests.py
 sh scripts/test-ucode.sh
 ```
 
-The automated controller tests mock hardware operations; they do not switch live radios. History tests write only their dedicated `/tmp/wifi-history-test*` files and can take several minutes. Run one test suite at a time. See [validation](docs/TESTING.md) for what was and was not verified. GitHub Actions runs the portable project and UI checks; the ucode suite requires the OpenWrt runtime.
+The automated controller tests mock hardware operations; they do not switch live radios. Test state uses dedicated temporary files. The archive simulation can take several minutes; it does not modify the live history archive. Run one test suite at a time. See [validation](docs/TESTING.md) for what was and was not verified. GitHub Actions runs the portable project and UI checks; the ucode suite requires the OpenWrt runtime.
 
 ## Project layout
 
@@ -80,9 +81,9 @@ The automated controller tests mock hardware operations; they do not switch live
 | `radio-prefer/files/` | Preferred-radio steering and coordination protocol |
 | `wifi-coordinator/` | APK builder, package hooks, shared UI files, ucode tests |
 | `scripts/`, `tests/` | Portable validation and test preparation |
-| `docs/` | [Installation](docs/INSTALL.md), [current architecture](docs/ARCHITECTURE.md), [settings audit](docs/SETTINGS.md), [agreement review](docs/AGREEMENTS.md), [validation](docs/TESTING.md) |
+| `docs/` | [Installation](docs/INSTALL.md), [current architecture](docs/ARCHITECTURE.md), [settings reference](docs/SETTINGS.md), [behavior review](docs/AGREEMENTS.md), [validation](docs/TESTING.md) |
 
-This source distribution contains no router passwords, Wi-Fi credentials, private signing keys, browser automation, client inventories, or router backups. Test addresses and Wi-Fi names are synthetic fixtures.
+This source distribution contains no router passwords, Wi-Fi credentials, private signing keys, saved browser sessions, client inventories, or router backups. Test addresses and Wi-Fi names are synthetic fixtures.
 
 ## Scope and limitations
 

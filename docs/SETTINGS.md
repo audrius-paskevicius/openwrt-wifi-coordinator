@@ -1,14 +1,14 @@
-# Settings audit (r11)
+# Settings reference
 
-This is a source and behavior review, not a runtime system that rewrites preferences. Explicit policies remain explicit. Auto resolves capabilities and known hardware behavior. Mandatory radio regulations, configuration checks and recovery remain authoritative; they do not silently turn an explicit planned CSA into a planned restart. After a failed operation, recovery may restart the affected radio to restore service.
+This reference follows the current [package version](../VERSION) and its source. It describes behavior; it is not a runtime system that rewrites preferences. Explicit policies remain explicit. Auto resolves capabilities and known hardware behavior. Mandatory radio regulations, configuration checks and recovery remain authoritative; they do not silently turn an explicit planned CSA into a planned restart. After a failed operation, recovery may restart the affected radio to restore service.
 
 The applied channel and width-change methods appear beside each radio's settings, with reasons. Confirmed radio failures during CSA affect Auto for six hours; explicit methods remain fixed. Confirmed failed destinations and unresolved client compatibility receive six-hour deferrals, with the reason and remaining time displayed. Inconclusive client evidence initially uses the evidence-freshness interval; verified alternate service instead creates a client-specific six-hour steering restriction. See the recovery policy in ARCHITECTURE.md. Choosing a fixed method does not erase failed-destination evidence. Unsupported explicit methods prevent the corresponding moves. Status describes applied settings until Save & Apply.
 
 ## Removed controls
 
-These controls adjusted implementation timing rather than an administrator's Wi-Fi objective. They are no longer read as UCI settings and the defaults script removes the retired keys on installation. They are internal constants, not hidden advanced overrides.
+The defaults script removes these seven retired UCI keys when the services start, including during installation. Six timing controls became fixed implementation constants; the obsolete width-selection threshold has no replacement knob. None is a hidden advanced override.
 
-| Retired key | Fixed behavior |
+| Retired key | Current behavior |
 | --- | --- |
 | `retry_delay` | 30-second gate after an attempt or non-executor deferral; completed/aborted executor operations use the survey interval. |
 | `scan_wait` | 60-second extra scanner-wait budget per survey; normal serving gaps do not consume it. |
@@ -16,6 +16,25 @@ These controls adjusted implementation timing rather than an administrator's Wi-
 | `cac_timeout` | 720-second preparation timeout, accommodating ten-minute weather-radar clearance. Never shortens mandatory clearance. |
 | `csa_count` | 15 advance beacon announcements. |
 | `ban_seconds` | 20-second return restriction after a decisive handoff; cleared on failed relocation or before restart fallback. |
+| `wide_threshold` | Removed. Joint service scoring compares widths directly; there is no congestion cutoff that grants permission to narrow. |
+
+## Packaged defaults
+
+These are fresh-install defaults, not a migration that overwrites existing choices. See the [coordinator configuration](../channel-coordinator/files/channel-coordinator.config), [radio defaults](../channel-coordinator/files/defaults.uc) and [Radio Preference configuration](../radio-prefer/files/radio-prefer.config).
+
+| Area | Default |
+| --- | --- |
+| Operation | Channel coordination and Radio Preference enabled; automatic channel planning; gentle preferred-radio recommendations |
+| Channels and widths | Auto; separate radio spectrum preferred |
+| Survey | Paced, active where permitted; 10% scan duty; at least 3 seconds serving between occupied-radio visits |
+| Timing | 60 seconds between completed surveys/operations; 180-second minimum residence |
+| Admission | 3 service-index points, raised by evidence uncertainty when needed |
+| Client handoff | 90-second budget; decisive escalation; brief reconnect fallback enabled |
+| DFS | Preparation enabled; automatic helper; **3600-second radar-memory half-life** |
+| History | Recording enabled; retain up to 24 hours; six-hour flash offloads |
+| Verified placements | Persistence enabled; checkpoint at most every six hours |
+
+The one-hour radar half-life, six-hour compatibility exclusions and six-hour flash intervals are separate mechanisms. Missing configuration does not mean fresh defaults: for example, missing `enabled` stops the daemon; missing `mode`, `scan_type` and `dfs_mode` fall back to Observe, passive scans and DFS off.
 
 ## Channel coordination: retained controls
 
@@ -26,7 +45,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `enabled` | Stops this controller; distinct from observation, which still scans and proposes. Client steering has its own switch. |
 | `mode` | Observe versus automatic channel changes. Does not control preferred-radio steering. |
 | `interval` | Administrator's scan-overhead budget: minimum wait after completed surveys/operations, including close comparisons. Startup begins after 15 seconds. |
-| `improvement` | Minimum service-index gain for every capacity move, including widening. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
+| `improvement` | Minimum service-index gain to admit a new capacity plan, including widening. Admitted multi-step plans do not repay this margin while remaining benefit is positive. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
 | `min_dwell` | Avoids repeated moves after successful verification. Independent of survey frequency. |
 | `persist` | Whether verified wireless placements are checkpointed, at most every six hours. Separate from graph history and radar memory. |
 | `clear_stop` | One-shot recovery acknowledgement, reset after use. Does not erase remembered failed destinations. |
@@ -48,7 +67,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `scan_type` | Passive or active where legal. Restricted frequencies always use passive listening, with an explicit status reason. |
 | `scanner` | Advanced: Auto or a fixed scanner. A fixed scanner is never silently substituted; unreachable bands can therefore remain unmeasured. |
 | `max_age` | Advanced: freshness ceiling for evidence; also bounds the cross-primary retry pause after HT40 setup retains 20 MHz. The active width constraint and remaining time are shown. Too short for a full scan can prevent decisions; unknown spectrum is never assumed clear. |
-| `separate_radios` | Whether separation ranks before width/cost, or overlap is a cost term. Distinct priorities, not interchangeable thresholds. |
+| `separate_radios` | Whether separation ranks before total estimated service, or overlap becomes a cost penalty. Distinct priorities, not interchangeable thresholds. |
 | `overlap_penalty` | Shown only when strict separation is disabled: allows the administrator to trade overlap against other costs. |
 
 ## Per-radio controls
@@ -62,7 +81,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `channels` | Auto discovers allowed primary channels in the active band. A manual list restricts primaries only; secondary frequencies still require regulatory/driver permission. |
 | `widths` | Auto follows the radio's current-band HT/VHT capability bits, up to 40 MHz in 2.4 GHz and 160 MHz in 5 GHz. Regulatory/coexistence checks determine eligible blocks. Manual restrictions remain useful for client compatibility; unsupported requests are displayed and excluded. |
 
-On WRT3200ACM/WRT32X, Auto uses restart for radio2 frequency changes and width changes. HT40 requires restart for hostapd coexistence checks on all hardware. Other supported radios use capability-based Auto. This is execution knowledge, not a separate planning algorithm. HE/EHT, 6 GHz and noncontiguous 80+80 remain outside the supported HT/VHT scope; this router does not advertise them.
+On WRT3200ACM/WRT32X, frequency Auto uses advertised CSA on radio0/radio1 unless a recent failure calls for restart; radio2 uses restart. Width Auto uses restart on all three radios. HT40 requires restart for hostapd coexistence checks on all hardware. Other supported radios use capability-based Auto. This is execution knowledge, not a separate planning algorithm. HE/EHT, 6 GHz and noncontiguous 80+80 remain outside the supported HT/VHT scope; this router does not advertise them.
 
 ## Preferred-radio steering
 
