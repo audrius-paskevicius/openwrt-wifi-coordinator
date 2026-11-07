@@ -1,11 +1,9 @@
 'use strict';
 'require view';
 'require wifi-coordinator.disclaimer as disclaimer';
-'require form';
 'require uci';
 'require fs';
 'require poll';
-'require wifi-coordinator.help as help';
 'require wifi-coordinator.graphs as graphs';
 'require wifi-coordinator.time as timefmt';
 function historyKey(k,x){
@@ -86,7 +84,7 @@ return view.extend({
  load:function(){return Promise.all([uci.load('channel_coordinator'),readHistory()]);},
  render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));},
  renderPage:function(data){
-  var instances=[],frame=null,storageOpen=false;
+  var instances=[],frame=null;
   var history=data[1],retain=Math.max(1,Math.min(200,Number(uci.get('channel_coordinator','main','history_hours'))||24)),hours=Math.min(6,retain),display=E('div'),selector=E('select',{'class':'cbi-input-select'});
   function setRetention(value){retain=Math.max(1,Math.min(200,Number(value)||24));hours=Math.min(hours,retain);
    var choices=retentionChoices.filter(function(h){return h<=retain;});if(choices.indexOf(retain)<0)choices.push(retain);
@@ -143,8 +141,6 @@ return view.extend({
      e.radio,e.kind?'assessment: '+e.kind:'',e.affected!=null?e.affected+' affected clients':'',e.retry_seconds?Math.round(e.retry_seconds/60)+'-minute deferral':'',e.preflight?'before channel change':'',e.stage!=null?['gentle','strong','decisive'][e.stage]:'',e.helper?'helper '+e.helper:'',e.from!=null?'from '+e.from:'',e.to!=null?'to '+e.to:'',e.channel!=null?'channel '+e.channel:'',e.width?e.width+' MHz':'',e.clients!=null?e.clients+' clients':'',e.elapsed!=null?e.elapsed+' seconds':'',e.ban_seconds?e.ban_seconds+'-second return restriction':'',e.disconnect_events!=null?e.disconnect_events+' disconnect events':'',e.neighbors!=null?e.neighbors+' networks observed':'',e.missing_count!=null?e.missing_count+' clients missing':'',e.scanned_frequencies!=null?e.scanned_frequencies+' frequencies measured':'',e.missing_frequencies!=null?e.missing_frequencies+' deferred':''
     ].filter(Boolean).join('; ');return E('tr',{},[stamp(e.time),actionNames[e.event]||e.event,detail].map(function(x){return E('td',{},x);}));}))
    ])));
-   var storageDetails=E('details',{'class':'wc-history-storage'},[E('summary',{},_('History storage')),E('small',{'class':'wc-caption'},'RAM buffer: '+Math.round(h.ram_bytes/1024)+' / 1024 KiB. Flash history: '+(h.archive_bytes/1048576).toFixed(2)+' MiB in '+h.archive_files+' batch file(s). Offload every 6 hours; the most recent hour stays cached in RAM. '+(h.archive_saved?'Last offload: '+stamp(h.archive_saved)+'. ':'First offload has not happened yet. ')+(h.archive_next?'Next eligible offload: '+stamp(h.archive_next)+'. ':'')+'Refreshes every minute. An orderly reboot saves pending history to flash. Unexpected power loss can lose recent data since the last successful offload.')]);
-   storageDetails.open=storageOpen;storageDetails.addEventListener('toggle',function(){if(this.isConnected)storageOpen=this.open;});nodes.push(storageDetails);
    if(h.archive_error)nodes.push(E('p',{'class':'alert-message warning'},h.archive_error));
    if(h.dropped_records)nodes.push(E('p',{'class':'alert-message warning'},h.dropped_records+' records were dropped because the recent RAM buffer filled before a successful offload.'));
    nodes=warnings.concat(nodes);
@@ -159,36 +155,12 @@ return view.extend({
   }
   selector.addEventListener('change',function(){hours=Number(selector.value);redraw(history);});
   poll.add(function(){return readHistory().then(function(h){history=h;redraw(h);});},60);
-  var m=new form.Map('channel_coordinator',_('History retention'),_('Keep history for the selected duration. Recent records stay in RAM and are saved to flash every six hours and during an orderly shutdown.'));
-  var s=m.section(form.NamedSection,'main','coordinator');s.anonymous=true;
-  var o=s.option(form.Flag,'history_enabled',_('Record Wi-Fi history'),_('Turn off to pause new recording. Existing graphs and actions are kept until their retention period expires. Use Clear recorded history to delete them.'));o.default='1';o.rmempty=false;
-  o=s.option(form.ListValue,'history_hours',_('Retain up to this many hours'),_('Show follows this selection. Reducing retention hides older records immediately; the next scheduled offload prunes the archive without an extra flash rewrite.'));o.default='24';o.datatype='range(1,200)';o.rmempty=false;
-  var configured=retentionChoices.slice();if(configured.indexOf(retain)<0)configured.push(retain);configured.sort(function(a,b){return a-b;}).forEach(function(h){o.value(String(h),h+' hour'+(h==1?'':'s'));});
-  o.onchange=function(ev,section,value){setRetention(value);redraw(history);};
-  o=s.option(form.Flag,'clear_history',_('Clear recorded history'),_('Delete recorded graphs, surveys and actions from RAM and flash when settings are applied. This switch resets itself. Recording follows the setting above; radar-avoidance memory is preserved.'));o.default='0';o.rmempty=false;
-  help.compact(m);
-  var exportPeriod=E('select',{'class':'cbi-input-select','id':'wc-export-period'},[
-   E('option',{value:'display'},_('Currently displayed window')),E('option',{value:'all'},_('All retained history'))
-  ]);
-  var exportDataset=E('select',{'class':'cbi-input-select','id':'wc-export-dataset'},[
-   ['periods','Channel placements'],['traffic','Traffic summaries'],['surveys','Spectrum surveys'],['radar','Radar detections'],['actions','Recent actions']
-  ].map(function(pair){return E('option',{value:pair[0]},_(pair[1]));}));
-  function download(format){
-   // A native POST download streams to the browser download manager. No Blob,
-   // complete JS response buffer, or export file on the router is involved.
-   var f=E('form',{method:'POST',action:'/cgi-bin/wifi-coordinator-export',target:'wc-history-download',style:'display:none'},
-    Object.entries({sessionid:L.env.sessionid,format:format,dataset:exportDataset.value,hours:exportPeriod.value=='all'?0:hours}).map(function(pair){return E('input',{type:'hidden',name:pair[0],value:String(pair[1])});}));
-   document.body.appendChild(f);f.submit();f.remove();
-  }
-  var exportSection=E('section',{'class':'wc-export'},[
-   E('h3',{},_('Export history')),
-   E('p',{'class':'wc-caption','title':'Read-only download: no temporary export file or flash writes. The file includes UTC timestamps, units and a final completeness report. Survey context and radar memory may start before the selected window. Original interval boundaries are preserved.'},_('Download graph data and actions directly. Times use ISO 8601 UTC.')),
-   E('p',{},[E('label',{'for':'wc-export-period'},_('Period: ')),exportPeriod,' ',E('button',{type:'button','class':'cbi-button cbi-button-action',click:function(){download('json');}},_('Download all data (JSON)'))]),
-   E('p',{},[E('label',{'for':'wc-export-dataset'},_('CSV data: ')),exportDataset,' ',E('button',{type:'button','class':'cbi-button cbi-button-action',click:function(){download('csv');}},_('Download CSV'))]),
-   E('iframe',{name:'wc-history-download',title:_('Export download status'),'class':'wc-export-status'})
-  ]);
-  return m.render().then(function(node){redraw(history);return E('div',{'class':'wifi-coordinator'},[
-   E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),E('h2',{},_('Wi-Fi Coordinator: history')),E('p',{},[_('Show: '),selector]),display,node,exportSection
-  ]);});
- }
+  redraw(history);
+  return Promise.resolve(E('div',{'class':'wifi-coordinator'},[
+   E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),E('h2',{},_('Wi-Fi Coordinator: history')),E('p',{},[_('Show: '),selector]),display
+  ]));
+ },
+ handleSave:null,
+ handleSaveApply:null,
+ handleReset:null
 });

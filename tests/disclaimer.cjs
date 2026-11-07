@@ -35,7 +35,7 @@ module.exports=(async()=>{
  const blocked=fixture({getItem(){throw Error('blocked');},setItem(){throw Error('blocked');}});
  const blockedPage=await blocked.api.gate(render);await find(find(blockedPage,'section'),'button').attrs.click();
  await blocked.api.gate(render);assert.equal(rendered,4,'blocked storage still permits use after acknowledgement');
- for(const file of ['channel-coordinator/files/wifi-channels.js','channel-coordinator/files/wifi-history.js','radio-prefer/files/wifi-clients.js']){
+ for(const file of ['channel-coordinator/files/wifi-channels.js','channel-coordinator/files/wifi-history.js','channel-coordinator/files/wifi-storage.js','radio-prefer/files/wifi-clients.js']){
   const view=fs.readFileSync(path.join(root,file),'utf8');
   assert(view.includes("'require wifi-coordinator.disclaimer as disclaimer';"));
   assert(view.includes('render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));}'));

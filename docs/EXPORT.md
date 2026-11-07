@@ -1,6 +1,6 @@
 # History downloads
 
-Open **Network → Wi-Fi Coordinator → History**, then **Export history** below History retention. Choose the currently displayed window or all retained history. Downloads do not change recording, retention, radio settings or channel planning.
+Open **Network / Wi-Fi Coordinator / Storage & export**, then **Export history** below History retention. Its independent Period selector offers All retained history (the default) and durations up to the saved retention limit. Changing Show on the History tab does not change the export period. Downloads do not change recording, retention, radio settings or channel planning.
 
 - **JSON** downloads all five datasets in one structured file.
 - **CSV** downloads one selected dataset: channel placements, traffic summaries, spectrum surveys, radar detections or actions.

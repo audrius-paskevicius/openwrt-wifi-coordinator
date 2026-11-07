@@ -32,7 +32,8 @@ sources = {name: (root / file).read_text(encoding='utf-8') for name, file in [
     ('help', 'channel-coordinator/files/wifi-coordinator.help.js'),
     ('channels', 'channel-coordinator/files/wifi-channels.js'),
     ('clients', 'radio-prefer/files/wifi-clients.js'),
-    ('history', 'channel-coordinator/files/wifi-history.js')
+    ('history', 'channel-coordinator/files/wifi-history.js'),
+    ('storage', 'channel-coordinator/files/wifi-storage.js')
 ]}
 payload = json.dumps({'methods': methods, 'sources': sources}).replace('</', '<\\/')
 style = (resources / 'cascade.css').read_text(encoding='utf-8') + '\n' + (root / 'wifi-coordinator/wifi-coordinator.css').read_text(encoding='utf-8')
@@ -87,7 +88,8 @@ const form={Map:FormMap,NamedSection:Section,Value:'text',ListValue:'select',Fla
 const radios=[{'.name':'radio0',band:'5g'},{'.name':'radio1',band:'2g'},{'.name':'radio2',band:'5g'}];
 const state={updated:100,radios:{radio0:{requested_method:'auto',method:'csa',requested_width_method:'auto',width_method:'idle_reconfigure',method_reason:'Driver advertises CSA',width_reason:'Width changes require restart',rejected:[{until:700,target:{freq:5500,width:80},reason:'Synthetic connectivity failure'}]},radio1:{},radio2:{}}};
 state.proposal={evaluated_at:1700000000,evaluated_uptime:90,neighbors:12,alternatives:[{radio:'radio0',channels:[36,100],widths:[80,40,20],candidates:[{channel:36,width:80,current:true,cost:7,occupancy:7,capacity:74,shared:0}]}]};
-const uci={sections:()=>radios,get:(c,s,k)=>k==='history_hours'?'200':true};
+let retentionValue='200';
+const uci={sections:()=>radios,get:(c,s,k)=>k==='history_hours'?retentionValue:true};
 const rpc={declare:()=>()=>Promise.resolve({})};
 const fs={read:()=>Promise.resolve(JSON.stringify(state))};
 const poll={add:fn=>polls.push(fn)};
@@ -97,8 +99,8 @@ const timefmt=new Function('baseclass',payload.sources.time)({extend:x=>x});
 function page(name){return new Function('view','form','uci','rpc','fs','poll','help','E','_','L','graphs','timefmt',payload.sources[name])(view,form,uci,rpc,fs,poll,help,E,_,L,graphs,timefmt);}
 function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));assert(tooltipDiv.style.opacity==='1','hover must open native tooltip');assert(tooltipDiv.textContent.includes(node.dataset.tooltip),'hover must expose full explanation');assert(tooltipDiv.getBoundingClientRect().right<=innerWidth+1,'tooltip must fit viewport');}
 (async()=>{
- for(const name of ['channels','clients','history']){
-  const pane=await page(name).renderPage(name==='history'?[null,{}]:[null,null,state,{}]);
+ for(const name of ['channels','clients','history','storage']){
+  const pane=await page(name).renderPage(['history','storage'].includes(name)?[null,{}]:[null,null,state,{}]);
   // Fixture uses locally embedded style, never navigates to the router.
   pane.querySelectorAll('link').forEach(n=>n.remove());
   document.getElementById('pages').appendChild(pane);
@@ -106,7 +108,7 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  const downloads=[];HTMLFormElement.prototype.submit=function(){downloads.push({action:this.getAttribute('action'),method:this.method,target:this.target,fields:Object.fromEntries(new FormData(this))});};
  const exportSection=document.querySelector('.wc-export');
  assert(exportSection.previousElementSibling.classList.contains('cbi-map'),'export follows retention');
- exportSection.querySelectorAll('button')[0].click();
+ document.querySelector('#wc-export-period').value='6';exportSection.querySelectorAll('button')[0].click();
  assert(downloads[0].method==='post'&&downloads[0].fields.format==='json'&&downloads[0].fields.hours==='6','JSON uses selected window in native POST');
  assert(downloads[0].fields.sessionid==='synthetic-session'&&!downloads[0].action.includes('session'),'session is only in POST body');
  document.querySelector('#wc-export-period').value='all';document.querySelector('#wc-export-dataset').value='actions';
@@ -149,9 +151,21 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  fs.list=async()=>[];fs.read_direct=async path=>JSON.stringify(path.includes('state')?state:historyData);
  const historyPane=await page('history').renderPage([null,historyData]);
  historyPane.querySelectorAll('link').forEach(n=>n.remove());document.getElementById('pages').appendChild(historyPane);
- const storage=historyPane.querySelector('.wc-history-storage');assert(!storage.open,'storage diagnostics start collapsed');
- storage.open=true;storage.dispatchEvent(new Event('toggle'));
- await polls[polls.length-1]();assert(historyPane.querySelector('.wc-history-storage').open,'expanded storage diagnostics survive history refresh');
+ assert(!historyPane.querySelector('.wc-history-storage')&&!historyPane.querySelector('.wc-export')&&!historyPane.querySelector('.cbi-map'),'History contains graphs and actions only');
+ assert(page('history').handleSaveApply===null,'History has no save controls');
+ const show=historyPane.querySelector('select');show.value='24';show.dispatchEvent(new Event('change'));
+ const storagePane=await page('storage').renderPage([null,historyData]);
+ storagePane.querySelectorAll('link').forEach(n=>n.remove());document.getElementById('pages').appendChild(storagePane);
+ const storage=storagePane.querySelector('.wc-history-storage');assert(!storage.open,'storage diagnostics start collapsed');
+ storage.open=true;await polls[polls.length-1]();assert(storage.open,'expanded storage diagnostics survive refresh');
+ assert(storagePane.querySelector('#wc-export-period').value==='all','export defaults to all, independent of History');
+ storagePane.querySelector('#wc-export-period').value='12';
+ storagePane.querySelector('.wc-export button').click();assert(downloads[downloads.length-1].fields.hours==='12','export posts its own window independently');
+ retentionValue='12';
+ const cappedHistory=await page('history').renderPage([null,{}]);
+ const cappedStorage=await page('storage').renderPage([null,{}]);
+ assert(Math.max(...Array.from(cappedHistory.querySelector('select').options,o=>Number(o.value)))===12,'History Show capped by saved retention');
+ assert(Math.max(...Array.from(cappedStorage.querySelector('#wc-export-period').options,o=>Number(o.value)||0))===12,'Export Period capped by same retention independently');
  result.textContent='PASS: '+explanations.length+' setting descriptions rendered through actual LuCI Value/NamedSection methods; native hover, icon hover, focus, tap, Escape, status polling and form rerender passed.';
  result.dataset.status='pass';
  // Leave one useful example visible in the screenshot.

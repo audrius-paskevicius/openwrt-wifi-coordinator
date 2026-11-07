@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, '..');
 const files = [
   'channel-coordinator/files/wifi-channels.js',
   'channel-coordinator/files/wifi-history.js',
+  'channel-coordinator/files/wifi-storage.js',
   'channel-coordinator/files/wifi-disclaimer.js',
   'channel-coordinator/files/wifi-coordinator.graphs.js',
   'channel-coordinator/files/wifi-coordinator.time.js',
