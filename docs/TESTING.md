@@ -1,6 +1,10 @@
 # Validation
 
-Source release: **0.6.0-r22**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r23**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r23 one-hour radar memory
+
+The configured default, daemon fallback, shutdown reader, settings UI and graph fallbacks now use a 3600-second radar-memory half-life. The target router is explicitly updated to the same value; other installations retain their existing configured preference on upgrade. Mandatory kernel DFS restrictions and radar clearance are unchanged. Six-hour recovery exclusions and flash checkpoints are separate settings and are unchanged.
 
 ## r22 quieter history presentation
 

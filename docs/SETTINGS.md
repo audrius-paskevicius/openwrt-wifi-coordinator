@@ -41,7 +41,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `handoff_source_min` | Advanced: proximity requirement when destination cannot be measured. Co-located radio estimate, not a promised destination signal. |
 | `dfs_mode` | Exclude, use already cleared channels, or prepare using a spare. Requires matching global/per-radio ETSI regions; a conflict is reported. |
 | `dfs_helper` | Optional explicit helper for installations with unequal radio coverage. Only shown for Prepare. An unavailable explicit helper is waited for, not replaced. |
-| `radar_half_life` | How long interruption history influences planning. Independent of mandatory kernel non-occupancy time. |
+| `radar_half_life` | Default 3600 seconds (one hour): interruption-history weight halves each hour. Independent of mandatory kernel non-occupancy time. |
 | `scan_policy` | Paced, empty-only or sustained-quiet scanning: direct disruption/coverage tradeoff. |
 | `scan_duty` | Paced only: maximum off-channel duty calculated from measured visit duration. |
 | `scan_gap` | Paced only: minimum serving time between occupied-radio visits; duty may require a longer gap. |

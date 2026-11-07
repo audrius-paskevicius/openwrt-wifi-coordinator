@@ -129,7 +129,7 @@ function surveyData(surveys,start,end,axis){
 }
 function radarData(records,start,end,halfLife,axis){
  axis=axis||defaultAxis;
- var bins={},half=Math.max(60,halfLife||21600),step=Math.max(60,(end-start)/160,half/12);
+ var bins={},half=Math.max(60,halfLife||3600),step=Math.max(60,(end-start)/160,half/12);
  (records||[]).forEach(function(e){if(!(e.width>0)||!Number.isFinite(e.center)||e.time>end)return;
   for(var f=e.center-e.width/2;f<e.center+e.width/2;f+=20){
    axis.spans(f,Math.min(f+20,e.center+e.width/2)).forEach(function(span){

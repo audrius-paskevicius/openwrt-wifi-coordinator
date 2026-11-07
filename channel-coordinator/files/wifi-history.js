@@ -104,7 +104,7 @@ return view.extend({
    var channelCanvas=E('canvas',{'role':'img','aria-label':'Channel and width of each radio over time'});
    var trafficCanvas=E('canvas',{'role':'img','aria-label':'Observed radio traffic over time'});
    function legend(patterns){return E('p',{'class':'wc-legend'},radioNames.map(function(r,i){return E('span',{'style':'color:'+graphs.colour(r,i)+';margin-right:22px;font-weight:600;'},[E('span',{'class':patterns?'wc-pattern-key':'wc-line-key','style':patterns?graphs.patternStyle(r,i):'border-color:'+graphs.colour(r,i),'title':patterns?graphs.patternName(r,i):r}),r]);}));}
-   var radarHalf=Number(h.radar&&h.radar.half_life)||21600;
+   var radarHalf=Number(h.radar&&h.radar.half_life)||3600;
    function elapsedLabel(seconds){return seconds>=3600?+(seconds/3600).toFixed(1)+' h':+(seconds/60).toFixed(1)+' min';}
    var radarKey=E('div',{'class':'wc-radar-key','title':'Amber marks radar detections. Memory halves every '+elapsedLabel(radarHalf)+'. Percentages describe avoidance strength, not probability. Radar clearance rules still apply.'},[
     E('strong',{},_('Radar memory')),

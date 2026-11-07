@@ -62,7 +62,7 @@ HT40 setup retains hostapd coexistence checks (`noscan=0`) and periodic overlapp
 
 Capability interpretation follows [Linux HT/VHT definitions](https://github.com/torvalds/linux/blob/v6.12/include/linux/ieee80211.h), regulatory range handling follows [cfg80211 AUTO_BW behavior](https://github.com/torvalds/linux/blob/v6.12/net/wireless/reg.c), and hostapd performs [HT40 coexistence and VHT configuration checks](https://github.com/vanhoefm/hostap-wpa3/blob/master/hostapd/hostapd.conf). Kernel and hostapd enforcement remains authoritative.
 
-`radar.uc` remembers at most 128 recent incidents independently of optional graph history. Each detection's weight halves over the configured half-life (default six hours). Overlapping incidents accumulate, capped at a risk of one. This affects planning and the fading channel bands in history; it is not radar probability. Kernel non-occupancy periods and CAC requirements always remain authoritative.
+`radar.uc` remembers at most 128 recent incidents independently of optional graph history. Each detection's weight halves over the configured half-life (default one hour). Overlapping incidents accumulate, capped at a risk of one. This affects planning and the fading channel bands in history; it is not radar probability. Kernel non-occupancy periods and CAC requirements always remain authoritative.
 
 ## History, persistence and privacy
 

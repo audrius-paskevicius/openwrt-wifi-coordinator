@@ -52,7 +52,7 @@ let cfg={enabled:raw.enabled=='1',mode:raw.mode ?? 'observe',interval:number('in
     allow_reconnect:raw.allow_reconnect!='0',
     protected_clients:map(type(raw.protected_clients)=='array'?raw.protected_clients:split(raw.protected_clients ?? '',/\s+/),x=>lc(x)),
     scan_policy:raw.scan_policy ?? 'paced',scanner:raw.scanner ?? '',max_age:number('max_age',900,60,7200),
-    scan_duty:number('scan_duty',10,1,30),radar_half_life:number('radar_half_life',21600,900,604800),
+    scan_duty:number('scan_duty',10,1,30),radar_half_life:number('radar_half_life',3600,900,604800),
     scan_gap:number('scan_gap',3,1,30),scan_wait:60,
     persist:raw.persist!='0',csa_count:15,scan_batch:5,scan_type:raw.scan_type ?? 'passive',
     dfs_mode:raw.dfs_mode ?? 'off',dfs_helper:raw.dfs_helper ?? '',cac_timeout:720,
