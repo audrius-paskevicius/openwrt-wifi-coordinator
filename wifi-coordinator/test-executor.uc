@@ -1,4 +1,4 @@
-import {create_executor,data_flow} from '../channel-coordinator/files/executor.uc';
+import {create_executor,data_flow,client_health,failure_kind} from '../channel-coordinator/files/executor.uc';
 import {group} from '../channel-coordinator/files/policy.uc';
 import * as nl from 'nl80211';
 let checks=0;function check(v,s){if(!v)die('FAIL: '+s+'\n');checks++;}
@@ -67,7 +67,8 @@ check(ex.pending()?.repair_attempted&&st.radios.r.failed&&!st.halted,'sustained 
 T+=15;ex.tick([radio]);check(repairs==1&&radio.current.freq==5500,'empty-radio repair can run when the lost client is absent');
 radio.clients={client:true};radio.authorized={client:true};radio.client_data.client={rx:30000,tx:30000};T+=181;ex.tick([radio]);
 check(!ex.busy()&&!st.radios.r.failed&&!st.halted,'client data recovery clears affected-radio failure');
-check(st.radios.r.csa_failed_until>T&&length(st.radios.r.rejected)==1,'failed method and target remain temporarily quarantined');
+check(!st.radios.r.csa_failed_until&&length(st.radios.r.rejected)==1,'client loss does not blacklist the CSA method');
+check(st.radios.r.rejected[0].kind=='client'&&st.radios.r.rejected[0].until==T+21600,'positive recovery on old placement earns six-hour compatibility cooldown');
 // A single compatible AP can change channel by briefly reconnecting its clients.
 let opt=setup('idle_reconfigure');opt.cfg.allow_reconnect=true;radio.aps=[{}];
 ex.start(radio,group(5580,80),[radio]);T+=15;ex.tick([radio]);
@@ -132,4 +133,93 @@ check(st.radios.r.width_limit.actual==20&&st.radios.r.width_limit.requested==40&
 radio.config.width_method='csa';ex.start(radio,group(2412,40),[radio]);T+=15;denied=false;
 try{ex.tick([radio]);}catch(e){denied=index(''+e,'coexistence')>=0;ex.abort(e);}
 check(denied,'explicit CSA cannot bypass HT40 coexistence');
+// Fresh evidence, rather than a single client's behavior, determines scope.
+let live={samples:{a:{one:{rx:0,tx:0}}},good:{},probes:{one:'192.168.50.2'}};
+let a={name:'a',authorized:{one:true},client_data:{one:{rx:10000,tx:10000}},current:group(5580,80),aps:[{status:{status:'ENABLED'}}]};
+let b={name:'b',authorized:{one:true},client_data:{one:{rx:0,tx:0}}};
+let h=client_health({one:true},live,[a,b],100,()=>false);
+check(h.proven.a.one&&!h.proven.b.one,'data evidence belongs to the AP that carried it');
+check(failure_kind(a,a.current,h)=='client','positive AP service distinguishes an isolated client problem');
+h=client_health({one:true},{samples:{},good:{},probes:{one:'192.168.50.2'}},[a,b],100,()=>true);
+check(h.working.one&&!h.proven.a.one&&!h.proven.b.one,'ping with duplicate station records cannot prove destination AP');
+check(failure_kind(a,a.current,h)=='inconclusive','no AP proof remains inconclusive');
+check(failure_kind(null,a.current,h)=='radio','absent radio is a radio failure');
+a.authorized={};client_health({one:true},live,[a,b],105,()=>false);
+a.authorized={one:true};h=client_health({one:true},live,[a,b],110,()=>false);
+check(!h.proven.a.one,'reassociation cannot reuse proof from before observed departure');
+
+// Simulate selective recovery without changing any real network interface.
+let rescued=[],known=false,probe_ok=true;
+function recovery_setup(){
+ let io=setup();rescued=[];known=false;probe_ok=true;
+ radio.aps=[{config:net,status:{status:'ENABLED'}}];
+ radio.clients={client:true,healthy:true};radio.authorized={client:true,healthy:true};
+ radio.client_data={client:{rx:10000,tx:10000},healthy:{rx:10000,tx:10000}};
+ peer={...radio,name:'peer',phy:2,ifname:'peer0',current:group(5180,80),clients:{},authorized:{},client_data:{}};
+ pair=[radio,peer];let oldcall=io.call,oldread=io.fs.readfile;
+ io.call=(obj,method,args)=>method=='get_clients'&&obj=='hostapd.peer0'?{clients:peer.clients}:oldcall(obj,method,args);
+ io.fs.readfile=p=>p=='/tmp/dhcp.leases'?'999999 client 192.168.50.2 test *\n':oldread(p);
+ io.fs.popen=()=>({read:()=>'',close:()=>probe_ok?0:1});
+ io.avoid_client=(r,m,g,until)=>push(rescued,{r,m,g,until});
+ io.client_avoided=(r,m,g)=>known&&r=='r'&&m=='client'&&g.freq==5580;
+ ex=create_executor(io);return io;
+}
+function health_tick(seconds){T+=seconds;radio.client_data.healthy.rx+=10000;radio.client_data.healthy.tx+=10000;ex.tick(pair);}
+function fail_one(){ex.start(radio,group(5580,80),pair);health_tick(15);probe_ok=false;health_tick(5);health_tick(16);}
+opt=recovery_setup();fail_one();
+check(ex.pending().rescue&&radio.current.freq==5580,'healthy AP stays on new placement during targeted rescue');
+let btms=filter(calls,c=>c.method=='bss_transition_request');
+check(length(btms)==1&&btms[0].args.addr=='client','only failed client receives roaming request');
+delete radio.clients.client;delete radio.authorized.client;peer.clients.client=true;peer.authorized.client=true;
+peer.client_data.client={rx:10000,tx:10000};health_tick(5);
+check(ex.pending().rescue&&!length(rescued),'association and initial counters alone do not verify alternate service');
+peer.client_data.client={rx:30000,tx:30000};health_tick(5);
+check(!ex.pending().rescue&&length(rescued)==1&&rescued[0].m=='client'&&rescued[0].until==T+21600,'verified alternate service records six-hour client-specific avoidance');
+probe_ok=true;health_tick(46);
+check(!ex.busy()&&!st.radios.r.failed&&!length(st.radios.r.rejected)&&radio.current.freq==5580,'successful rescue preserves good placement without global exclusion');
+check(!length(filter(calls,c=>c.method=='del_client')),'voluntary recovery avoids disconnecting clients');
+
+opt=recovery_setup();fail_one();health_tick(31);health_tick(30);
+check(length(filter(calls,c=>c.method=='bss_transition_request'&&c.args.disassociation_imminent))==1,'selective rescue escalates through strong request');
+check(length(filter(calls,c=>c.method=='del_client'&&c.args.addr=='client'&&c.args.ban_time==20000))==1,'decisive rescue targets only failed client with bounded ban');
+check(!length(filter(calls,c=>c.method=='del_client'&&c.args.addr=='healthy')),'healthy client is never disconnected by rescue');
+health_tick(50);
+check(ex.pending().repair_attempted&&st.radios.r.rejected[0].kind=='client'&&st.radios.r.rejected[0].until==T+21600,'failed alternate service leads to scoped repair and six-hour compatibility deferral');
+check(!length(rescued),'failed rescue never records false success');
+
+opt=recovery_setup();opt.cfg.protected_clients=['client'];fail_one();
+check(!ex.pending().rescue&&!length(filter(calls,c=>c.method=='bss_transition_request'||c.method=='del_client')),'protected failed client is not forcibly steered');
+opt=recovery_setup();radio.signals.client=-90;fail_one();health_tick(61);
+check(!length(filter(calls,c=>c.method=='del_client')),'weak unmeasured fallback does not trigger forced disconnect');
+opt=recovery_setup();opt.cfg.escalation='gentle';fail_one();health_tick(61);
+check(!length(filter(calls,c=>c.method=='del_client'||c.method=='bss_transition_request'&&c.args.disassociation_imminent)),'gentle policy does not escalate rescue');
+opt=recovery_setup();st.forced={client:T};fail_one();health_tick(61);
+check(!length(filter(calls,c=>c.method=='del_client')),'shared five-minute forced-disconnect budget applies to rescue');
+opt=recovery_setup();peer.aps=[{config:{...net,network:'other'},status:{status:'ENABLED'}}];fail_one();
+check(!ex.pending().rescue,'a different LAN is not a compatible rescue target');
+
+opt=recovery_setup();known=true;ex.start(radio,group(5580,80),pair);health_tick(15);health_tick(5);
+check(ex.pending().kind=='client-handoff'&&!length(filter(calls,c=>c.method=='switch_chan')),'known conflict gets targeted handoff before channel move');
+delete radio.clients.client;delete radio.authorized.client;peer.clients.client=true;peer.authorized.client=true;
+health_tick(5);health_tick(5);
+check(radio.current.freq==5580&&length(filter(calls,c=>c.method=='switch_chan'))==1,'verified preflight recovery permits healthy AP to take placement');
+opt=recovery_setup();known=true;pair=[radio];ex.start(radio,group(5580,80),pair);denied=false;
+try{health_tick(15);}catch(e){denied=true;ex.abort(e);}
+check(denied&&!length(filter(calls,c=>c.method=='switch_chan'))&&!st.radios.r.failed&&st.radios.r.rejected[0].kind=='client','known conflict without fallback defers safely before moving');
+opt=recovery_setup();fail_one();health_tick(111);
+check(ex.pending().repair_attempted,'unresolved rescue starts one restoration');
+// Let the restoration path run directly, simulating completed handoff/restart.
+ex.pending().kind='verify';ex.pending().reconnect=true;ex.pending().started=T-181;
+radio.current=group(5500,80);delete radio.clients.client;delete radio.authorized.client;
+let restores_before=restores;health_tick(20);
+check(!ex.busy()&&radio.current.freq==5500&&restores==restores_before,'restoration never bounces back to failed destination for absent client');
+check(!st.radios.r.failed&&st.radios.r.recheck_until==T+900,'working restored AP with absent client gets bounded recheck instead of permanent failure');
+check(length(st.radios.r.rejected)==1&&events[-1].event=='recovery-client-unconfirmed','restored placement is not falsely blacklisted or reported fully recovered');
+opt=recovery_setup();opt.cfg.allow_reconnect=true;fail_one();health_tick(111);
+ex.pending().kind='verify';ex.pending().reconnect=true;ex.pending().started=T-181;radio.current=group(5500,80);
+health_tick(20);
+check(!ex.busy()&&radio.current.freq==5500&&st.radios.r.failed,'associated client still failing on restored AP requires attention without another channel bounce');
+opt=recovery_setup();ex.start(radio,group(5580,80),pair);health_tick(15);
+radio.clients={};radio.authorized={};probe_ok=false;T+=5;ex.tick(pair);T+=16;ex.tick(pair);
+check(st.radios.r.rejected[0].kind=='inconclusive'&&st.radios.r.rejected[0].until==T+900&&!st.radios.r.csa_failed_until,'absence without AP service evidence earns short deferral, not six-hour CSA blame');
 print('PASS: '+checks+' executor integration and failure cases\n');

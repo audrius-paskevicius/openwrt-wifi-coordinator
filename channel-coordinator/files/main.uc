@@ -13,6 +13,7 @@ import {create_survey} from './survey.uc';
 import {create_executor} from './executor.uc';
 
 const N=nl.const, STATE='/tmp/channel-coordinator-state.json', LEASE='/tmp/channel-coordinator-lease.json', JOURNAL='/tmp/channel-coordinator-cac.json';
+const CLIENT_AVOIDS='/tmp/wifi-coordinator-client-avoids.json';
 let bus=ubus.connect(), cursor=uci.cursor();
 if (!bus) die('ubus unavailable\n');
 function call(obj,method,args) {
@@ -68,9 +69,9 @@ let boot=trim(fs.readfile('/proc/sys/kernel/random/boot_id'));
 let history_store=open_history(boot,raw.history_enabled!='0',number('history_hours',24,1,200));
 if(raw.clear_history=='1'&&!length(ARGV)){history_store.clear();cursor.set('channel_coordinator','main','clear_history','0');cursor.commit('channel_coordinator');}
 function private_json(path,data) {
-    let f=fs.open(path+'.new','w',0600); if(!f)die('Cannot save CAC recovery journal');
+    let f=fs.open(path+'.new','w',0600); if(!f)die('Cannot save private runtime state');
     f.write(sprintf('%J',data));f.close();
-    if(!fs.rename(path+'.new',path))die('Cannot commit CAC recovery journal');
+    if(!fs.rename(path+'.new',path))die('Cannot commit private runtime state');
 }
 function empty_interface(ifname) {
     // config_set may otherwise optimize away a channel change against its
@@ -126,6 +127,26 @@ if(ARGV[0]=='--recover'){
 }
 let state=readjson(STATE,{});
 if(state.boot!=boot) state={boot,radios:{},history:[],last_move:0};
+let client_avoids=readjson(CLIENT_AVOIDS,{});
+if(client_avoids.boot!=boot||type(client_avoids.entries)!='array')client_avoids={boot,entries:[]};
+client_avoids.entries=slice(client_avoids.entries,-256);
+function prune_client_avoids(){
+    let active=filter(client_avoids.entries,e=>e.until>now()&&e.until<=now()+21600);
+    if(length(active)!=length(client_avoids.entries)){
+        client_avoids.entries=active;private_json(CLIENT_AVOIDS,client_avoids);
+    }
+}
+function client_avoided(radio,mac,g){
+    return length(filter(client_avoids.entries,e=>e.until>now()&&e.radio==radio&&e.mac==lc(mac)&&
+        e.freq==g.freq&&e.center==g.center&&e.width==g.width))>0;
+}
+function avoid_client(radio,mac,g,until){
+    client_avoids.entries=filter(client_avoids.entries,e=>e.until>now()&&!(e.radio==radio&&e.mac==lc(mac)&&e.freq==g.freq&&e.center==g.center&&e.width==g.width));
+    push(client_avoids.entries,{radio,mac:lc(mac),freq:g.freq,center:g.center,width:g.width,until});
+    client_avoids.entries=sort(client_avoids.entries,(a,b)=>a.until-b.until);
+    while(length(client_avoids.entries)>256)shift(client_avoids.entries);
+    private_json(CLIENT_AVOIDS,client_avoids);
+}
 if(state.pending&&state.pending!='scan') state.halted='Service restarted during an operation; inspect radios before clearing safety stop';
 if(fs.stat(JOURNAL)){restore_preparation();state.halted='Interrupted radio operation recovered; inspect radios before clearing safety stop';}
 if(!state.pending&&index(['listening','restoring'],state.dfs?.phase)>=0)state.dfs.phase='inactive';
@@ -250,6 +271,7 @@ function dfs_mode(r) {
     return effective;
 }
 function sample(radios) {
+    prune_client_avoids();
     let t=now(),pending=executor?.pending();
     // Keep the last completed comparison as an explanatory snapshot. Execution
     // uses its own target and rechecks eligibility; this is never a work queue.
@@ -282,6 +304,7 @@ function sample(radios) {
         s.candidate_widths=r.config.widths;
         s.hardware_widths=r.config.hardware_widths;s.unavailable_widths=r.config.unavailable_widths;
         if(s.width_limit?.until<=t)delete s.width_limit;
+        s.client_avoid_count=length(filter(client_avoids.entries,e=>e.radio==r.name&&e.until>t));
         s.ht40_constraint=r.band=='2g'&&r.config.width_method=='csa'?'HT40 requires restart for coexistence checks; explicit CSA cannot apply it':null;
     }
     let history_rows=map(radios,r=>{
@@ -313,6 +336,7 @@ function candidates(r,radios,rules) {
     let current=rated(r.current);
     s.rejected=filter(s.rejected ?? [],x=>x.until>t);
     s.planning_hold=!r.config.managed?'Excluded from planning':r.unsafe?'Unsupported or inactive configuration':s.failed?'Unresolved recovery on this radio':
+        s.recheck_until>t?'Previous service restored; waiting for fresh client evidence':
         !survey_covers(rules,r,scan_result.frequencies,dm)?'Incomplete fresh survey':
         t-(s.last_move ?? -100000)<cfg.cooldown?'Minimum residence after verified move':
         t-(s.last_attempt ?? -100000)<cfg.retry_delay?'Short retry delay':null;
@@ -385,6 +409,7 @@ function record_radar(e){
     executor.event(e,discovered);
 }
 let io={cfg,state,boot,now,precise,save,lease,release,history,history_store,call,request,inventory,
+    client_avoided,avoid_client,
     config_fingerprint,phy_caps,allclients,empty_interface,apply_empty_config,apply_radio_config,restore_preparation,private_json,
     coordination_ready,dfs_mode,log,rates,quiet_since,remember:remember_channel,completed};
 scanner=create_survey({...io,complete:(result,radios)=>{scan_result=result;evaluate(radios);if(one_shot)uloop.end();}});

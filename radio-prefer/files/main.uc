@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as ubus from 'ubus';
 import * as uci from 'uci';
 import * as uloop from 'uloop';
+import * as nl from 'nl80211';
 
 const STATE = '/tmp/radio-prefer-state.json';
 const PASSIVE = {
@@ -17,6 +18,12 @@ const PASSIVE = {
 function signed(n) { return n > 2147483647 ? n - 4294967296 : n; }
 function protected_client(mac,list) {
     return index(map(type(list)=='array'?list:split(list ?? '',/\s+/),x=>lc(x)),lc(mac))>=0;
+}
+function avoided_until(entries,mac,radio,g,t){
+    if(!g)return 0;
+    let times=map(filter(entries,e=>e.until>t&&e.until<=t+21600&&e.radio==radio&&e.mac==lc(mac)&&
+        e.freq==g.freq&&e.center==g.center&&e.width==g.width),e=>e.until);
+    return max(0,...times);
 }
 
 function decision(c, s, now, target, cfg) {
@@ -113,6 +120,12 @@ function selftest() {
     eq(operating_class(5180, 36), 115);
     eq(operating_class(2462, 11), 81);
     eq(operating_class(5975, 5), null);
+    let avoided=[{mac:'client',radio:'r',freq:5180,center:5250,width:160,until:2000}],g={freq:5180,center:5250,width:160};
+    eq(avoided_until(avoided,'CLIENT','r',g,1000),2000);
+    eq(avoided_until(avoided,'other','r',g,1000),0);
+    eq(avoided_until(avoided,'client','other',g,1000),0);
+    eq(avoided_until(avoided,'client','r',{...g,width:80},1000),0);
+    eq(avoided_until(avoided,'client','r',g,2001),0);
     printf('PASS: %d policy/protocol checks\n', count);
 }
 
@@ -144,6 +157,8 @@ if (index(['advisory', 'strong'], cfg.mode) < 0 || cfg.min_rssi < -90 || cfg.min
     cfg.max_attempts < 1 || cfg.max_attempts > 10) die('Invalid radio preference settings\n');
 
 function inventory() {
+    let interfaces=nl.request(nl.const.NL80211_CMD_GET_INTERFACE,nl.const.NLM_F_DUMP,{});
+    if(nl.error())die('Cannot read live radio placements');
     let wireless = call('network.wireless', 'status');
     let nodes = call('usteer', 'local_info');
     let aps = {};
@@ -155,7 +170,9 @@ function inventory() {
             let methods = bus.list(node, true)?.[0];
             if (!methods?.bss_transition_request || !methods?.rrm_beacon_req) continue;
             // Credentials are compared in memory only; never saved or logged.
-            aps[node] = { radio, config: c, info: nodes[node] };
+            let live=filter(interfaces ?? [],x=>x.ifname==iface.ifname)[0];
+            let placement=live?{freq:live.wiphy_freq,center:live.center_freq1 ?? live.wiphy_freq,width:[20,20,40,80,null,160][live.channel_width]}:null;
+            aps[node] = { radio, config: c, info: nodes[node],placement };
         }
     }
     return aps;
@@ -231,6 +248,8 @@ function tick() {
     state.integration_error = null;
     let aps = inventory();
     let clients = call('usteer', 'connected_clients');
+    let memory;try{memory=json(fs.readfile('/tmp/wifi-coordinator-client-avoids.json') ?? '{}');}catch(e){memory={};}
+    let avoids=memory.boot==boot&&type(memory.entries)=='array'?memory.entries:[];
     let protected_list=uci.cursor().get('channel_coordinator','main','protected_clients');
     if (!length(aps)) die('No compatible APs: full wpad/hostapd with BSS transition support is required');
     for (let source, stations in clients) {
@@ -251,6 +270,9 @@ function tick() {
                 s.decision = 'on-preferred-radio'; continue;
             }
             if (!target) { s.decision = 'no-matching-target'; continue; }
+            if (!aps[target].placement) {s.decision='target-unavailable';continue;}
+            s.compatibility_until=avoided_until(avoids,mac,aps[target].radio,aps[target].placement,now);
+            if(s.compatibility_until>now){s.decision='client-placement-cooldown';continue;}
             if(index(reserved,aps[source].radio)>=0||index(reserved,aps[target].radio)>=0){s.decision='coordinator-reservation';continue;}
             let t = aps[target].info;
             let status = call(target, 'get_status');

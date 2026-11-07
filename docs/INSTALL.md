@@ -65,7 +65,7 @@ Automatic channel changes follow one rule on every managed radio:
 1. Use live CSA when the selected method supports it.
 2. For a required restart, attempt a compatible same-network, same-band handoff.
 3. If handoff cannot finish, clear temporary return restrictions and briefly restart only the changing radio. If no compatible AP exists, skip the impossible handoff.
-4. Let clients reconnect and check recovery using available ping responses, bidirectional traffic and associations. If clients cannot be probed, a longer association check is used; this does not prove internet access. Restore the prior channel if recovery fails.
+4. Let clients reconnect and check recovery using available ping responses, bidirectional traffic and associations. If clients cannot be probed, a longer association check is used; this does not prove internet access. If the new AP serves other clients, first try selective recovery of affected clients through a compatible AP. Keep the new placement only after alternate service verifies; otherwise restore the prior channel. Six-hour restrictions apply to confirmed failures or client compatibility, while inconclusive evidence initially uses a shorter deferral. See the scoped recovery policy in [architecture](ARCHITECTURE.md).
 
 The shared setting **Change channel even if handoff cannot finish** is under **Protect playback**. Explicit protected clients and quiet-only/empty-only policies remain restrictions. A restart is an interruption, not seamless roaming. DFS preparation continues to require an empty compatible helper.
 

@@ -6,6 +6,38 @@ export function data_flow(previous,current){
     let reset=current.rx<previous.rx||current.tx<previous.tx;
     return current.rx-(reset?0:previous.rx)>4096&&current.tx-(reset?0:previous.tx)>4096;
 };
+function counter_snapshot(data){let copy={};for(let mac,d in data ?? {})copy[mac]={rx:d.rx,tx:d.tx};return copy;}
+// Positive service evidence is separate from mere association. Per-AP samples
+// prevent stale station records or counters from another radio proving service.
+export function client_health(before,liveness,radios,t,ping){
+    let locations={},proven={},working={},results={};
+    liveness.samples=liveness.samples ?? {};liveness.good=liveness.good ?? {};
+    for(let r in radios){
+        let samples=liveness.samples[r.name] ?? {},good=liveness.good[r.name] ?? {};
+        for(let mac in keys(good))if(!r.authorized[mac]||t-good[mac]>30)delete good[mac];
+        proven[r.name]={};
+        for(let mac in keys(r.authorized)){
+            locations[mac]=locations[mac] ?? [];push(locations[mac],r.name);
+            let current=r.client_data?.[mac];
+            if(data_flow(samples[mac],current))good[mac]=t;
+            if(good[mac]!=null&&t-good[mac]<=30){proven[r.name][mac]=true;working[mac]=true;}
+        }
+        liveness.samples[r.name]=counter_snapshot(r.client_data);liveness.good[r.name]=good;
+    }
+    for(let mac in keys(before)){
+        let present=length(locations[mac] ?? [])>0,ip=liveness.probes?.[mac];
+        if(present&&ip&&!working[mac]&&ping(ip)){
+            working[mac]=true;
+            if(length(locations[mac])==1)proven[locations[mac][0]][mac]=true;
+        }
+        results[mac]=present&&(!ip||!!working[mac]);
+    }
+    return {results,working,locations,proven};
+};
+export function failure_kind(r,target,health){
+    if(!r||!same(r.current,target)||r.aps?.[0]?.status?.status&&r.aps[0].status.status!='ENABLED')return 'radio';
+    return length(health.proven[r.name] ?? {})?'client':'inconclusive';
+};
 export function create_executor(io) {
 let fs=io.fs ?? system_fs;
 let cfg=io.cfg,state=io.state,now=io.now,save=io.save,lease=io.lease,release=io.release,call=io.call,request=io.request,config_fingerprint=io.config_fingerprint,phy_caps=io.phy_caps,allclients=io.allclients,empty_interface=io.empty_interface,apply_empty_config=io.apply_empty_config,restore_preparation=io.restore_preparation,private_json=io.private_json,coordination_ready=io.coordination_ready,dfs_mode=io.dfs_mode,history=io.history,boot=io.boot;
@@ -85,12 +117,13 @@ function start_cac(r,g,radios) {
     apply_empty_config('phy'+h.phy,path,h.ifname);
     history({event:'cac-start',helper:h.name,radio:r.name,channel:channel(g.freq),width:g.width});
 }
-function handoff_destination(r,radios,preferred) {
+function handoff_destination(r,radios,preferred,selected) {
     if(length(r.aps)!=1)return null;
     let a=r.aps[0],ac=a.config;
     // Keep security and LAN membership identical; credentials never enter status/logs.
     let targets=filter(radios,h=>h.name!=r.name&&!h.unsafe&&h.band==r.band&&length(h.aps)==1&&
-        same_network(h.aps[0].config,ac)&&
+        same_network(h.aps[0].config,ac)&&(!h.aps[0].status?.status||h.aps[0].status.status=='ENABLED')&&
+        !length(filter(selected ?? keys(r.clients),m=>io.client_avoided&&io.client_avoided(h.name,m,h.current)))&&
         (h.aps[0].status.airtime?.utilization ?? 0)<180);
     return sort(targets,(a,b)=>(a.name==preferred?-100:0)-(b.name==preferred?-100:0)+length(a.clients)-length(b.clients))[0];
 }
@@ -175,8 +208,7 @@ function capture_liveness(radios,source) {
         let fields=split(trim(line),/\s+/);
         if(length(fields)>=3&&private_ipv4(fields[2]))addresses[lc(fields[1])]=fields[2];
     }
-    let clients=keys(pending.before),probes={},attempts=0,data={};
-    for(let r in radios)for(let mac in clients)if(r.client_data?.[mac])data[mac]=r.client_data[mac];
+    let clients=keys(pending.before),probes={},attempts=0;
     clients=sort(clients,(a,b)=>(source.clients[b]?1:0)-(source.clients[a]?1:0));
     for(let mac in clients){
         let ip=addresses[lc(mac)];if(!ip||attempts>=8)continue;attempts++;
@@ -184,7 +216,58 @@ function capture_liveness(radios,source) {
     }
     // No addresses or identifiers are persisted in history/status. Unprobeable
     // clients require a longer association watch, not an invented success.
-    return {probes,data,unprobed:length(clients)-length(probes),failed:{}};
+    let samples={};for(let r in radios)samples[r.name]=counter_snapshot(r.client_data);
+    return {probes,samples,good:{},unprobed:length(clients)-length(probes),failed:{}};
+}
+function begin_client_rescue(r,radios,clients,preflight){
+    if(!length(clients)||length(filter(clients,m=>index(cfg.protected_clients,lc(m))>=0)))return false;
+    let target=handoff_destination(r,radios,null,clients);if(!target)return false;
+    pending.rescue={clients:[...clients],target:target.name,started:now(),stage:-1,preflight:!!preflight};
+    pending.rescue_attempted=true;
+    history({event:'client-recovery-start',radio:r.name,to:target.name,clients:length(clients),preflight:!!preflight});
+    return true;
+}
+// A bounded attempt affects only clients with failed service. Healthy clients
+// and the functioning AP remain in place. Association alone cannot finish it.
+function client_rescue(r,radios,health){
+    let rescue=pending.rescue,t=now(),elapsed=t-rescue.started;
+    if(!r||length(r.aps)!=1){clear_bans();delete pending.rescue;return 'failed';}
+    let recovered=filter(rescue.clients,m=>length(filter(radios,h=>h.name!=r.name&&
+        h.band==r.band&&length(h.aps)==1&&same_network(h.aps[0].config,r.aps[0].config)&&health.proven[h.name]?.[m])));
+    if(length(recovered)==length(rescue.clients)){
+        if(!rescue.preflight&&io.avoid_client)for(let mac in recovered)io.avoid_client(r.name,mac,pending.target,t+21600);
+        history({event:'client-recovery-verified',radio:r.name,clients:length(recovered),preflight:rescue.preflight});
+        clear_bans();delete pending.rescue;pending.last_problem=t;return 'recovered';
+    }
+    let target=handoff_destination(r,radios,rescue.target,rescue.clients);
+    if(!target||target.name!=rescue.target||elapsed>=cfg.handoff_wait+cfg.ban_seconds){
+        history({event:'client-recovery-unresolved',radio:r.name,clients:length(rescue.clients)-length(recovered),preflight:rescue.preflight});
+        clear_bans();delete pending.rescue;return 'failed';
+    }
+    let stage=elapsed>=int(cfg.handoff_wait*2/3)?2:elapsed>=int(cfg.handoff_wait/3)?1:0;
+    if(stage>rescue.stage){
+        rescue.stage=stage;
+        let stations=call('usteer','connected_clients')['hostapd.'+r.ifname] ?? {};
+        let nr=call('hostapd.'+target.ifname,'rrm_nr_get_own').value?.[2],count=0;
+        for(let mac in rescue.clients){
+            if(index(recovered,mac)>=0||!r.authorized[mac]||index(cfg.protected_clients,lc(mac))>=0)continue;
+            if(stage==2&&cfg.escalation=='decisive'){
+                state.forced=state.forced ?? {};
+                if(t-(state.forced[mac] ?? -100000)<300||state.forced[mac]==null&&length(state.forced)>=256)continue;
+                if(!force_signal_ok(stations[mac]?.measurements,'hostapd.'+target.ifname,r.signals[mac],cfg.target_min,cfg.source_min))continue;
+                state.forced[mac]=t;save();pending.bans=pending.bans ?? [];
+                push(pending.bans,{node:'hostapd.'+r.ifname,mac});
+                call('hostapd.'+r.ifname,'del_client',{addr:mac,reason:12,deauth:true,ban_time:cfg.ban_seconds*1000});count++;
+            }else if(stage==0||stage==1&&cfg.escalation!='gentle'){
+                if(!stations[mac]?.['bss-transition-management']||!match(nr ?? '',/^[a-fA-F0-9]{26,}$/))continue;
+                call('hostapd.'+r.ifname,'bss_transition_request',{addr:mac,disassociation_imminent:stage==1,
+                    disassociation_timer:0,validity_period:100,neighbors:[substr(nr,0,26)+'0301ff'],abridged:true,dialog_token:(t%254)+1});count++;
+            }
+        }
+        if(count)history({event:'client-recovery-request',radio:r.name,to:target.name,clients:count,stage});
+    }
+    state.status='Keeping the working radio in place; checking alternate service for '+length(rescue.clients)+' affected clients';
+    lease(90,state.status);save();return 'waiting';
 }
 function reconfigure_idle(r,g) {
     // Explicit opt-in, AP-only HT/VHT configurations, no global network reload.
@@ -231,6 +314,21 @@ function switch_radio(r,g) {
 }
 function operation(radios) {
     let t=now();if(!pending)return;
+    if(pending.kind=='client-handoff'){
+        let r=filter(radios,x=>x.name==pending.radio)[0];
+        if(!r||r.fingerprint!=pending.fingerprint||!same(r.current,pending.source))die('Client recovery source changed');
+        let health=client_health(pending.before,pending.liveness,radios,t,ping_client);
+        let result=client_rescue(r,radios,health);
+        if(result=='waiting')return;
+        if(result=='recovered'){
+            pending.preflight_done=true;pending.kind='move-wait';pending.started=t-12;save();return;
+        }
+        let s=state.radios[r.name];s.rejected=s.rejected ?? [];
+        push(s.rejected,{target:pending.target,until:t+21600,kind:'client',reason:'Known client-placement conflict; alternate service did not verify'});
+        while(length(s.rejected)>16)shift(s.rejected);
+        state.status='Placement deferred for six hours to preserve clients without verified alternate service';
+        pending=null;delete state.pending;release();io.completed();save();return;
+    }
     if(pending.kind=='reconcile'){
         lease(90,'Reconciling external channel change');
         let r=filter(radios,x=>x.name==pending.radio)[0];
@@ -259,20 +357,29 @@ function operation(radios) {
         lease(90,'Checking recovery to the previous channel');
         if(t-pending.started>=30){
             let r=filter(radios,x=>x.name==pending.radio)[0];
-            let restored=r&&same(r.current,pending.source),clients=allclients(radios);
-            let missing=filter(keys(pending.before),m=>!clients[m]);
-            for(let mac,ip in pending.liveness?.probes ?? {})if(!ping_client(ip)&&index(missing,mac)<0)push(missing,mac);
+            let restored=r&&same(r.current,pending.source);
+            let health=client_health(pending.before,pending.liveness,radios,t,ping_client);
+            let missing=filter(keys(pending.before),m=>!health.results[m]);
             if(restored&&length(missing)&&t-pending.started<cfg.verify_unprobed){
                 state.status='Previous channel restored; waiting for clients to reconnect';save();return;
             }
+            let unconfirmed=restored&&length(missing)&&length(health.proven[r.name] ?? {})&&
+                !length(filter(missing,m=>health.locations[m]?.[0]||index(cfg.protected_clients,lc(m))>=0));
             restored=restored&&!length(missing);
-            history({event:restored?'rollback-verified':'rollback-failed',radio:pending.radio,channel:channel(pending.source.freq)});
-            if(restored){
+            if(restored&&pending.failed_entry?.kind=='inconclusive'&&
+                !length(filter(pending.failure_clients ?? [],m=>!health.working[m]))){
+                pending.failed_entry.kind='client';pending.failed_entry.until=t+21600;
+                pending.failed_entry.reason='Client service recovered on previous placement; six-hour compatibility cooldown';
+            }
+            history({event:restored?'rollback-verified':unconfirmed?'recovery-client-unconfirmed':'rollback-failed',radio:pending.radio,channel:channel(pending.source.freq),clients_missing:length(missing)});
+            if(restored||unconfirmed){
                 if(state.halted==pending.own_stop)delete state.halted;
                 delete state.radios[pending.radio].failed;
                 state.radios[pending.radio].last_attempt=t;
+                if(unconfirmed)state.radios[pending.radio].recheck_until=t+(cfg.max_age ?? 900);
             }
-            state.status=restored?'Clients recovered on previous channel; failed destination excluded for six hours':'Recovery needs attention; inspect wireless status';
+            state.status=restored?'Clients recovered on previous placement; see the recorded exclusion reason and expiry':unconfirmed?
+                'Previous placement serves clients; absent clients remain unconfirmed. Moves briefly deferred':'Recovery needs attention; inspect wireless status';
             clear_bans();io.completed();
             pending=null;delete state.pending;release();save();
             
@@ -357,6 +464,19 @@ function operation(radios) {
             state.dfs={phase:'ready',radio:r.name,channel:channel(pending.target.freq),width:pending.target.width,completed:t};
             state.status='DFS block already cleared by the kernel';pending=null;delete state.pending;release();save();io.completed();return;
         }
+        if(io.client_avoided&&!pending.repair_attempted){
+            let affected=filter(keys(r.clients),m=>io.client_avoided(r.name,m,pending.target));
+            if(length(affected)){
+                pending.liveness=capture_liveness(radios,r);
+                if(!pending.preflight_done&&begin_client_rescue(r,radios,affected,true)){
+                    pending.kind='client-handoff';state.pending='client compatibility handoff';save();return;
+                }
+                let s=state.radios[r.name];s.rejected=s.rejected ?? [];
+                push(s.rejected,{target:pending.target,until:t+21600,kind:'client',reason:'Known client-placement conflict; no permitted compatible fallback'});
+                while(length(s.rejected)>16)shift(s.rejected);
+                die('Placement deferred for six hours: affected client has no permitted fallback');
+            }
+        }
         if(handoff_before_move(length(r.clients),r.config.method,r.config.occupied)&&!pending.handoff_done){
             if(handoff_destination(r,radios)){
                 let sent=handoff(r,radios);pending.kind='handoff';pending.started=t;
@@ -392,16 +512,10 @@ function operation(radios) {
         }
         else switch_radio(r,pending.target);
     }else if(pending.kind=='verify'&&t-pending.started>=5){
-        let r=filter(radios,x=>x.name==pending.radio)[0],present=allclients(radios);
-        let results={},working={};for(let mac in keys(pending.before)){
-            results[mac]=!!present[mac];let live=null;
-            for(let ap in radios)if(ap.client_data?.[mac])live=ap.client_data[mac];
-            working[mac]=!!present[mac]&&data_flow(pending.liveness?.data?.[mac],live);
-        }
-        for(let mac,ip in pending.liveness?.probes ?? {}){
-            // An inbound ICMP failure cannot overrule fresh bidirectional data.
-            results[mac]=!!present[mac]&&(working[mac]||ping_client(ip));working[mac]=results[mac];
-        }
+        let r=filter(radios,x=>x.name==pending.radio)[0];
+        pending.liveness=pending.liveness ?? {probes:{},samples:{},good:{},failed:{}};
+        let health=client_health(pending.before,pending.liveness,radios,t,ping_client);
+        let results=health.results,working=health.working;
         if(pending.reconnect&&t<pending.reconnect_until&&length(filter(values(results),v=>!v))){
             state.status='Waiting for clients to reconnect after the brief radio restart';save();return;
         }
@@ -431,10 +545,19 @@ function operation(radios) {
             state.status='HT40 setup retained 20 MHz; checking clients';
         }
         if(r&&!channel_ok&&!same(r.current,pending.source)&&!pending.external){
+            clear_bans();delete pending.rescue;
             pending.kind='reconcile';pending.started=t;state.pending='external recovery';
             state.status='Driver changed the operating channel; reconciling actual placement';save();return;
         }
         if(!channel_ok&&t-pending.started<30){state.status='Waiting for the announced channel to become active';save();return;}
+        if(pending.rescue&&!channel_ok){clear_bans();delete pending.rescue;}
+        if(pending.rescue){
+            let outcome=client_rescue(r,radios,health);
+            if(outcome=='waiting'||outcome=='recovered')return;
+        }else if(channel_ok&&length(missing)&&!pending.rescue_attempted&&!pending.repair_attempted&&
+            failure_kind(r,pending.target,health)=='client'&&begin_client_rescue(r,radios,keys(progress.failed),false)){
+            client_rescue(r,radios,health);return;
+        }
         let unknown=length(filter(keys(pending.before),m=>!working[m]));
         let deadline=unknown?(pending.verify_seconds ?? 180):45;
         if((channel_ok||r&&same(r.current,pending.source))&&!length(missing)&&t-pending.started<deadline+60&&
@@ -466,13 +589,38 @@ function operation(radios) {
             clients_missing:length(missing),clients_unproven:unknown,disconnect_events:pending.disconnects,method:pending.method};
         history(entry);log(sprintf('%J',entry));
         let s=state.radios[pending.radio];if(ok){s.last_move=t;state.last_move=t;delete s.failed;delete s.unavailable;}
+        if(ok&&pending.repair_attempted&&pending.failed_entry?.kind=='inconclusive'&&
+            !length(filter(pending.failure_clients ?? [],m=>!working[m]))){
+            pending.failed_entry.kind='client';pending.failed_entry.until=t+21600;
+            pending.failed_entry.reason='Client service recovered on previous placement; six-hour compatibility cooldown';
+        }
+        // A repair is already on the original placement. Never bounce back to
+        // the failed destination merely because a client is still absent.
+        if(!ok&&pending.repair_attempted&&channel_ok){
+            let absent=length(progress.failed)>0&&!length(filter(keys(progress.failed),m=>
+                health.locations[m]?.[0]||index(cfg.protected_clients,lc(m))>=0));
+            let serving=length(health.proven[r.name] ?? {})>0;
+            if(absent&&serving){
+                delete s.failed;s.recheck_until=t+(cfg.max_age ?? 900);
+                state.status='Previous placement serves clients; absent clients remain unconfirmed. Moves briefly deferred';
+            }else {s.failed=true;state.status='Previous placement restored; client recovery needs attention';}
+            if(pending.reconnect)fs.unlink(JOURNAL);
+            history({event:'recovery-client-unconfirmed',radio:r.name,clients_missing:length(progress.failed),reason:state.status});
+            clear_bans();pending=null;delete state.pending;release();io.completed();save();return;
+        }
         if(!ok){
             s.last_attempt=t;s.failed=true;
-            if(pending.method=='csa')s.csa_failed_until=t+21600;
+            let kind=failure_kind(r,pending.target,health);
+            if(pending.method=='csa'&&kind=='radio')s.csa_failed_until=t+21600;
             pending.own_stop='Service verification failed';
             s.rejected=filter(s.rejected ?? [],x=>x.until>t&&!same(x.target,pending.target));
-            push(s.rejected,{target:pending.target,until:t+21600,reason:'Client connectivity did not verify'});
+            pending.failure_clients=keys(progress.failed);
+            pending.failed_entry={target:pending.target,kind,until:t+(kind=='inconclusive'?(cfg.max_age ?? 900):21600),
+                reason:kind=='radio'?'Radio did not establish the requested placement':kind=='client'?
+                    'Radio serves other clients; affected clients lack verified alternate service':'Client check inconclusive; short retry deferral pending recovery evidence'};
+            push(s.rejected,pending.failed_entry);
             while(length(s.rejected)>16)shift(s.rejected);
+            history({event:'move-evidence',radio:pending.radio,kind,affected:length(pending.failure_clients),retry_seconds:pending.failed_entry.until-t});
             if(pending.reconnect){
                 if(!restore_preparation())die('Reconnect recovery journal is missing');
                 pending.kind='rollback';pending.started=t;

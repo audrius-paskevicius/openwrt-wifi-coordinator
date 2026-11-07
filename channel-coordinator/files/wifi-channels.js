@@ -40,6 +40,7 @@ return view.extend({
     if(r.csa_recovery_left>0)rows.push(E('p',{},'Recent CSA failure remembered for '+Math.ceil(r.csa_recovery_left/60)+' more minutes. Only Auto adapts the method.'));
     if(r.dfs_constraint)rows.push(E('p',{},r.dfs_constraint));
     if(r.ht40_constraint)rows.push(E('p',{},r.ht40_constraint));
+    if(r.client_avoid_count)rows.push(E('p',{},r.client_avoid_count+' client-specific placement cooldowns. Healthy clients can still use these placements.'));
     if(r.width_limit&&r.width_limit.until>st.updated)rows.push(E('p',{},r.width_limit.reason+'. Widths above '+r.width_limit.actual+' MHz deferred for '+Math.ceil((r.width_limit.until-st.updated)/60)+' more minutes; configured Auto/manual widths are unchanged.'));
     if(r.hardware_widths)rows.push(E('p',{},'Driver widths: '+r.hardware_widths.join(' / ')+' MHz. Widths to compare: '+(r.candidate_widths||[]).join(' / ')+' MHz.'));
     if((r.unavailable_widths||[]).length)rows.push(E('p',{},'Requested widths unavailable on this radio: '+r.unavailable_widths.join(' / ')+' MHz.'));

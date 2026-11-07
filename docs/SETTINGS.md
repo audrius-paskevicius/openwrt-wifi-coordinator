@@ -2,7 +2,7 @@
 
 This is a source and behavior review, not a runtime system that rewrites preferences. Explicit policies remain explicit. Auto resolves capabilities and known hardware behavior. Mandatory radio regulations, configuration checks and recovery remain authoritative; they do not silently turn an explicit planned CSA into a planned restart. After a failed operation, recovery may restart the affected radio to restore service.
 
-The applied channel and width-change methods appear beside each radio's settings, with reasons. Recent CSA failures affect Auto for six hours; explicit methods remain fixed. Failed destinations are independently excluded for six hours, with the reason and remaining time displayed. Choosing a fixed method does not erase failed-destination evidence. Unsupported explicit methods prevent the corresponding moves. Status describes applied settings until Save & Apply.
+The applied channel and width-change methods appear beside each radio's settings, with reasons. Confirmed radio failures during CSA affect Auto for six hours; explicit methods remain fixed. Confirmed failed destinations and unresolved client compatibility receive six-hour deferrals, with the reason and remaining time displayed. Inconclusive client evidence initially uses the evidence-freshness interval; verified alternate service instead creates a client-specific six-hour steering restriction. See the recovery policy in ARCHITECTURE.md. Choosing a fixed method does not erase failed-destination evidence. Unsupported explicit methods prevent the corresponding moves. Status describes applied settings until Save & Apply.
 
 ## Removed controls
 

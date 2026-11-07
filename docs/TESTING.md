@@ -1,6 +1,12 @@
 # Validation
 
-Source release: **0.6.0-r16**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r17**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r17 scoped client recovery
+
+The isolated OpenWrt suite passed: 109 policy, 40 hardware-width, 37 Radio Preference, 3 usteer integration, 103 planner/radar/survey, 80 executor, 8 client-memory, 5 journal-recovery, 6 comparison-snapshot, 6 candidate-limit, 11 radar-storage, 19 history and 668 archive-storage checks. New executor cases simulate healthy service with one affected client, duplicate station records, selective handoff, proof of alternate service, protected clients, weak signals, escalation limits, preflight compatibility checks and restoration without bouncing back to a failed placement. Memory tests cover six-hour expiry, placement scope, same-boot lifetime, replacement, the 256-entry cap and removal of expired identities. These are controlled simulations, not deliberate live client outages.
+
+Portable JavaScript, settings, graph and history/cache checks passed. The isolated browser fixture using the router's actual LuCI methods passed all 56 setting descriptions, hover/focus/tap behavior, retained comparison rendering and status refresh. The signed APK verified and its packaged files matched source. Live r17 installation preserved settings; both controllers resumed without an integration error or safety stop. All three APs remained available, radio0 retained 36/160 MHz, and router internet probes succeeded (3/3). The A55 remained associated with radio0. No live client failure was deliberately induced; simulated recovery does not establish uninterrupted roaming for every physical client.
 
 ## r16 absent optional UI lines
 

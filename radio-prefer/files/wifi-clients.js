@@ -22,6 +22,7 @@ var reasons={
  'unsupported':'Client does not advertise 802.11v roaming support',
  'recommend-unmeasured':'Advisory recommendation; destination measurement unavailable',
  'coordinator-reservation':'Radio reserved by channel coordination',
+ 'client-placement-cooldown':'This client recovered elsewhere; avoiding the previous placement temporarily',
  'target-unavailable':'Preferred AP information unavailable','target-busy':'Preferred AP busy or full','no-measurement-support':'Client cannot provide the required beacon measurement',
  'no-matching-target':'No available preferred AP with matching network and security'
 };
@@ -36,7 +37,8 @@ return view.extend({
    status.setAttribute('data-level',st.integration_error?'warning':'normal');
    var header=E('thead',{},E('tr',{},['Client address','Current connection','Decision','Requests sent'].map(function(x){return E('th',{'scope':'col'},_(x));}))),rows=[];
    Object.keys(st.clients||{}).forEach(function(mac){var c=st.clients[mac];rows.push(E('tr',{},[
-    mac,(c.source||'Unknown').replace('hostapd.',''),reasons[c.decision]||c.decision||'Waiting',String(c.attempts||0)
+    mac,(c.source||'Unknown').replace('hostapd.',''),(reasons[c.decision]||c.decision||'Waiting')+
+     (c.decision=='client-placement-cooldown'?' ('+Math.max(0,Math.ceil((c.compatibility_until-st.updated_uptime)/60))+' minutes remaining)':''),String(c.attempts||0)
    ].map(function(x){return E('td',{},x);})));});
    clients.replaceChildren(E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[header,E('tbody',{},rows)])));
   }

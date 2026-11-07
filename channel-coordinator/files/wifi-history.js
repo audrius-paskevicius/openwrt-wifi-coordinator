@@ -63,6 +63,10 @@ function congestionCell(sample,surveys){
 }
 var retentionChoices=[1,3,6,12,24,48,72,96,120,168,200];
 var actionNames={
+ 'client-recovery-start':'Targeted client recovery started','client-recovery-request':'Targeted roaming request',
+ 'client-recovery-verified':'Alternate client service verified','client-recovery-unresolved':'Alternate client service unconfirmed',
+ 'move-evidence':'Placement recovery assessment',
+ 'recovery-client-unconfirmed':'Radio restored; client return unconfirmed',
  'cac-start':'Radar check started','cac-shared':'Radar clearance shared','radar-state':'Radar state changed',
  'handoff-request':'Gentle roaming request','handoff-strong':'Stronger roaming request','handoff-disconnect':'Decisive handoff',
  'switch-verified':'Channel change verified','switch-safety-stop':'Channel change failed verification','switch-ignored':'Driver kept previous channel','scan-client-recovered':'Client reconnected after scan',
@@ -133,7 +137,7 @@ return view.extend({
    nodes.push(E('div',{'class':'wc-table-wrap wc-log-wrap'},E('table',{'class':'table wc-table'},[
     E('thead',{},E('tr',{},['Time','Action','Details'].map(function(x){return E('th',{'scope':'col'},_(x));}))),
     E('tbody',{},events.map(function(e){var detail=e.reason||[
-     e.radio,e.helper?'helper '+e.helper:'',e.from!=null?'from '+e.from:'',e.to!=null?'to '+e.to:'',e.channel!=null?'channel '+e.channel:'',e.width?e.width+' MHz':'',e.clients!=null?e.clients+' clients':'',e.elapsed!=null?e.elapsed+' seconds':'',e.ban_seconds?e.ban_seconds+'-second return restriction':'',e.disconnect_events!=null?e.disconnect_events+' disconnect events':'',e.neighbors!=null?e.neighbors+' networks observed':'',e.missing_count!=null?e.missing_count+' clients missing':'',e.scanned_frequencies!=null?e.scanned_frequencies+' frequencies measured':'',e.missing_frequencies!=null?e.missing_frequencies+' deferred':''
+     e.radio,e.kind?'assessment: '+e.kind:'',e.affected!=null?e.affected+' affected clients':'',e.retry_seconds?Math.round(e.retry_seconds/60)+'-minute deferral':'',e.preflight?'before channel change':'',e.stage!=null?['gentle','strong','decisive'][e.stage]:'',e.helper?'helper '+e.helper:'',e.from!=null?'from '+e.from:'',e.to!=null?'to '+e.to:'',e.channel!=null?'channel '+e.channel:'',e.width?e.width+' MHz':'',e.clients!=null?e.clients+' clients':'',e.elapsed!=null?e.elapsed+' seconds':'',e.ban_seconds?e.ban_seconds+'-second return restriction':'',e.disconnect_events!=null?e.disconnect_events+' disconnect events':'',e.neighbors!=null?e.neighbors+' networks observed':'',e.missing_count!=null?e.missing_count+' clients missing':'',e.scanned_frequencies!=null?e.scanned_frequencies+' frequencies measured':'',e.missing_frequencies!=null?e.missing_frequencies+' deferred':''
     ].filter(Boolean).join('; ');return E('tr',{},[stamp(e.time),actionNames[e.event]||e.event,detail].map(function(x){return E('td',{},x);}));}))
    ])));
    nodes.push(E('small',{'class':'wc-caption'},'RAM buffer: '+Math.round(h.ram_bytes/1024)+' / 1024 KiB. Flash history: '+(h.archive_bytes/1048576).toFixed(2)+' MiB in '+h.archive_files+' batch file(s). Offload every 6 hours; the most recent hour stays cached in RAM. '+(h.archive_saved?'Last offload: '+stamp(h.archive_saved)+'. ':'First offload has not happened yet. ')+(h.archive_next?'Next eligible offload: '+stamp(h.archive_next)+'. ':'')+'Refreshes every minute. An orderly reboot saves pending history to flash. Unexpected power loss can lose recent data since the last successful offload.'));

@@ -28,6 +28,12 @@ storage = storage.replace("system('sync')", "0")
 write("history-storage-test.uc", storage)
 
 main = read(production / "main.uc")
+start = main.index("let client_avoids=")
+end = main.index("if(state.pending", start)
+write("test-client-memory.uc", "let T=100,boot='test',writes=0,CLIENT_AVOIDS='/tmp/test-client-avoids';\n" +
+      "function now(){return T;}function readjson(){return {boot:'old',entries:[{}]};}\n" +
+      "function private_json(path,data){if(path!=CLIENT_AVOIDS)die('Unexpected storage');writes++;}\n" +
+      main[start:end] + "\n" + read(root / "tests/client-memory-cases.uc"))
 start = main.index("function restore_preparation()")
 end = main.index("if(ARGV[0]=='--recover')", start)
 write("test-reconnect-recovery.uc", read(root / "tests/recovery-header.uc") + "\n" +
@@ -35,7 +41,7 @@ write("test-reconnect-recovery.uc", read(root / "tests/recovery-header.uc") + "\
 start = main.index("function sample(radios)")
 end = main.index("    for(let mac,at in state.forced", start)
 write("test-comparison-snapshot.uc", "import {same,group} from '../channel-coordinator/files/policy.uc';\n" +
-      "let state={},executor=null;function now(){return 100;}\n" + main[start:end] + "}\n" +
+      "let state={},executor=null;function now(){return 100;}function prune_client_avoids(){}\n" + main[start:end] + "}\n" +
       read(root / "tests/comparison-cases.uc"))
 start = main.index("function candidates(r,radios,rules)")
 end = main.index("function sum_overlap", start)
