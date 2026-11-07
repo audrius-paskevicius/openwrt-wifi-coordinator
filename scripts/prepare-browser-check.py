@@ -2,7 +2,7 @@
 """Build an isolated browser integration fixture using the target router's LuCI.
 
 Usage: python3 scripts/prepare-browser-check.py RESOURCE_DIR OUTPUT_HTML
-RESOURCE_DIR contains form.js, ui.js and cascade.css downloaded from LuCI.
+RESOURCE_DIR contains luci.js, form.js, ui.js and cascade.css downloaded from LuCI.
 No router configuration, credentials or browser profile are used by the fixture.
 """
 import json
@@ -19,7 +19,9 @@ def portion(text, begin, end):
 
 form = (resources / 'form.js').read_text(encoding='utf-8')
 ui = (resources / 'ui.js').read_text(encoding='utf-8')
+luci = (resources / 'luci.js').read_text(encoding='utf-8')
 methods = {
+    'append': portion(luci, 'append(node,children){', ',content(node,children){'),
     'frame': portion(form, 'renderFrame(section_id,in_table,option_index,nodes){', ',renderWidget(section_id,option_index,cfgvalue){'),
     'section': portion(form[form.index('const CBINamedSection='):], 'renderContents(data){', ',render(){'),
     'show': portion(ui, 'showTooltip(ev){', ',hideTooltip(ev){'),
@@ -40,10 +42,9 @@ String.prototype.format=function(...args){let i=0;return this.replace(/%s/g,()=>
 function E(tag,attrs,children){
  const node=document.createElement(tag);
  Object.entries(attrs||{}).forEach(([k,v])=>{if(v==null)return;if(typeof v==='function')node.addEventListener(k,v);else node.setAttribute(k,typeof v==='object'?JSON.stringify(v):v);});
- function add(x){if(x==null)return;if(Array.isArray(x))x.forEach(add);else if(x instanceof Node)node.appendChild(x);else node.insertAdjacentHTML('beforeend',String(x));}
- add(children);return node;
+ dom.append(node,children);return node;
 }
-const dom={append:(n,x)=>n.appendChild(x),bindClassInstance:()=>{}};
+const dom={append:eval('({'+payload.methods.append+'})').append,elem:x=>x instanceof Node,bindClassInstance:()=>{}};
 const L={Class:{extend:o=>o},resource:()=>'',bind:(f,self,...a)=>f.bind(self,...a)};
 const _=x=>x;
 const findParent=(n,s)=>n&&n.closest?n.closest(s):null;
@@ -112,6 +113,8 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  const statuses=document.querySelectorAll('.cbi-section-descr .wc-caption');assert(statuses.length===3,'all three applied-method descriptions must render');
  assert(statuses[0].textContent.includes('Synthetic connectivity failure'),'temporary exclusions must be visible');
  const comparison=document.querySelector('details');comparison.open=true;
+ const textNodes=document.createTreeWalker(document.getElementById('pages'),NodeFilter.SHOW_TEXT);
+ while(textNodes.nextNode())assert(textNodes.currentNode.textContent.trim()!=='null','absent optional lines must not render literal null');
  const unsaved=document.querySelector('input[type="text"]');unsaved.value='unsaved edit';
  state.pending='scan';state.status='Paced survey in progress';state.updated=150;state.proposal.placements_changed=true;
  await polls[0]();assert(statuses[0].isConnected,'status must remain attached after polling');

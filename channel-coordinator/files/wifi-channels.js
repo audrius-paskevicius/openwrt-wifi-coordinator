@@ -62,14 +62,14 @@ return view.extend({
     E('h4',{},_('Last completed comparison')),E('p',{},comparisonTime(p,st)),E('p',{},p.neighbors+' nearby networks.'),
     E('p',{},'Capacity-score improvement: '+Number(p.improvement||0).toFixed(1)+' points. Spectrum separation and the wider-channel preference take priority; this is not a speed prediction.'),
     (p.changes||[]).length?E('ul',{},p.changes.map(function(c){return E('li',{},'Compared target '+c.radio+': channel '+c.from+' to '+c.to+' ('+c.width+' MHz)');})):E('p',{},_('Placement at comparison retained.')),
-    p.placements_changed?E('p',{},_('Radio placements have changed since this comparison.')):null,
-    p.separate?E('p',{},_('Separate spectrum takes priority. Each intermediate move must also avoid increasing overlap.')):null,
-    p.decision?E('p',{},p.decision.reason+(p.decision.margin!=null?' (required benefit '+Number(p.decision.margin).toFixed(1)+' points; '+Object.keys(p.decision.comparisons||{}).map(function(name){return name+': '+p.decision.comparisons[name]+' supporting surveys';}).join(', ')+')':'')):null,
-    p.steps?E('ol',{},p.steps.map(function(c){return E('li',{},c.radio+' to '+c.to+' / '+c.width+' MHz'+(c.staging?' (staging step)':''));})):null,   ]));
+    p.placements_changed?E('p',{},_('Radio placements have changed since this comparison.')):'',
+    p.separate?E('p',{},_('Separate spectrum takes priority. Each intermediate move must also avoid increasing overlap.')):'',
+    p.decision?E('p',{},p.decision.reason+(p.decision.margin!=null?' (required benefit '+Number(p.decision.margin).toFixed(1)+' points; '+Object.keys(p.decision.comparisons||{}).map(function(name){return name+': '+p.decision.comparisons[name]+' supporting surveys';}).join(', ')+')':'')):'',
+    p.steps?E('ol',{},p.steps.map(function(c){return E('li',{},c.radio+' to '+c.to+' / '+c.width+' MHz'+(c.staging?' (staging step)':''));})):'',   ]));
    if(dfs){var phase={listening:'Listening for radar',restoring:'Restoring the spare radio',ready:'Completed and shared',recovered:'Restored after an interrupted check',inactive:'Previous check ended','restored-after-error':'Restored after an error'};cards.push(E('div',{'class':'wc-summary'},[
     E('h4',{},_('Last radar preparation')),E('p',{},phase[dfs.phase]||dfs.phase),
     E('p',{},'Channel '+dfs.channel+' / '+dfs.width+' MHz'+(dfs.helper?' using '+dfs.helper:'')),
-    dfs.elapsed!=null?E('p',{},'Preparation elapsed: '+dfs.elapsed+' seconds (includes radio setup).'):null
+    dfs.elapsed!=null?E('p',{},'Preparation elapsed: '+dfs.elapsed+' seconds (includes radio setup).'):''
    ]));}
    if(cards.length)items.push(E('div',{'class':'wc-summaries'},cards));
    if(p&&p.alternatives)comparisonContent.replaceChildren.apply(comparisonContent,[
@@ -84,7 +84,7 @@ return view.extend({
      E('h4',{},a.radio+(a.hold?' — at comparison: '+a.hold:'')),
      E('p',{},_('Channel pool at comparison: ')+(a.channels||[]).join(' ')),
      E('p',{},_('Widths at comparison: ')+(a.widths||[]).join(' / ')+' MHz'),
-     a.width_limit?E('p',{},'Width constraint at comparison: '+a.width_limit.reason+'; widths above '+a.width_limit.actual+' MHz temporarily deferred.'):null,
+     a.width_limit?E('p',{},'Width constraint at comparison: '+a.width_limit.reason+'; widths above '+a.width_limit.actual+' MHz temporarily deferred.'):'',
      ...((a.rejected||[]).length?[E('p',{},'Excluded at comparison: '+a.rejected.map(function(x){return (x.target.freq<3000?(x.target.freq-2407)/5:(x.target.freq-5000)/5)+' / '+x.target.width+' MHz — '+(x.reason||'Connectivity check failed');}).join('; ')+'.')]:[]),
      E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[
       E('thead',{},E('tr',{},['Channel / width','Cost','Estimated congestion','Estimated usable width','Sharing','Radar memory','Evidence uncertainty'].map(function(x){return E('th',{},x);}))),

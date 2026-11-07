@@ -1,6 +1,10 @@
 # Validation
 
-Source release: **0.6.0-r15**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r16**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r16 absent optional UI lines
+
+The native browser fixture now also uses the target LuCI `dom.append()` method from `luci.js`. Unlike the earlier stub, that version stringifies null entries inside child arrays. The regression reproduced literal null text before the fix; absent optional comparison/card lines now use empty strings. The fixture passes with absent fields, comparison refresh, retained expansion and the existing help interactions. Client recovery and exclusion behavior are unchanged.
 
 ## r15 progress toward wide-channel plans
 
@@ -29,7 +33,7 @@ Opaque light/dark tooltip surfaces, a border, padding and a subtle shadow distin
 
 - The live planner attempted HT40 on radio1 with primary 9/secondary 13. Hostapd explicitly rejected 40 MHz because of overlapping BSSes and retained 20 MHz. Both clients recovered with zero missing/unproven clients and two disconnect events. This exposed an early-fallback classification bug in the initial staging APK; the final r12 build waits for width setup to settle, records the constrained width, and keeps normal client verification. The exact early-tick/new-primary sequence passes the executor regression. VHT160 execution and segmented clearance passed injected tests; sustained live 160 MHz operation and throughput have not yet been demonstrated.
 
-To reproduce the browser component check, download the target's `luci-static/resources/form.js`, `ui.js` and its theme's `cascade.css` into a temporary directory, then run `python3 scripts/prepare-browser-check.py RESOURCE_DIR OUTPUT_HTML`. Open the result in an isolated browser profile; its status must read PASS. The generated fixture contains no router credentials and makes no router changes.
+To reproduce the browser component check, download the target's `luci-static/resources/luci.js`, `form.js`, `ui.js` and its theme's `cascade.css` into a temporary directory, then run `python3 scripts/prepare-browser-check.py RESOURCE_DIR OUTPUT_HTML`. Open the result in an isolated browser profile; its status must read PASS. The generated fixture contains no router credentials and makes no router changes.
 
 ## r11 settings behavior audit
 
