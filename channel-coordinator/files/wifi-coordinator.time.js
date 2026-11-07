@@ -8,8 +8,9 @@ function stamp(t){return date(t)+' '+clock(t,true);}
 function zone(){return Intl.DateTimeFormat().resolvedOptions().timeZone||'Browser local time';}
 function offset(t){var n=-new Date(t*1000).getTimezoneOffset();return 'UTC'+(n<0?'-':'+')+pad(Math.floor(Math.abs(n)/60))+':'+pad(Math.abs(n)%60);}
 function sameDay(start,end){return date(start)===date(end);}
+function showDate(start,end){return end-start>=86400&&!sameDay(start,end);}
 function ticks(start,end,width){
- var count=Math.max(2,Math.min(7,Math.floor(Math.max(1,width)/(sameDay(start,end)?85:115))));
+ var count=Math.max(2,Math.min(7,Math.floor(Math.max(1,width)/(showDate(start,end)?115:85))));
  var step=[1,5,15,30,60,300,900,1800,3600,7200,10800,21600,43200,86400,172800,604800].find(s=>s>=(end-start)/(count-1))||604800;
  // Anchor at local midnight. Daily ticks use calendar days across DST changes.
  var d=new Date(start*1000);d.setHours(0,0,0,0);
@@ -22,9 +23,9 @@ function ticks(start,end,width){
  return values.length?values:[start];
 }
 function label(t,start,end,values){
- var seconds=end-start<120,c=clock(t,seconds),lines=sameDay(start,end)?[c]:[date(t),c];
+ var seconds=end-start<120,c=clock(t,seconds),lines=showDate(start,end)?[date(t),c]:[c];
  // Repeated local hours during the autumn clock change need an offset.
  if((values||[]).some(v=>v!==t&&date(v)===date(t)&&clock(v,seconds)===c))lines.push(offset(t));
  return lines.length===1?lines[0]:lines;
 }
-return baseclass.extend({date:date,clock:clock,stamp:stamp,zone:zone,offset:offset,sameDay:sameDay,ticks:ticks,label:label});
+return baseclass.extend({date:date,clock:clock,stamp:stamp,zone:zone,offset:offset,sameDay:sameDay,showDate:showDate,ticks:ticks,label:label});

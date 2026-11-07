@@ -1,12 +1,16 @@
 # Validation
 
-Source release: **0.6.0-r32**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.6.0-r33**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 35 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r33 axis and amber refinement
+
+Removed the date caption beneath both time axes. Date tick lines now require both a span of at least 24 hours and a local midnight crossing; short overnight views show time only. Full timestamps in tooltips and action records are preserved. Amber opacity now falls linearly with remembered strength, with a more saturated colour and similar 100% intensity to the grey scale. The legend fades toward white; graph transparency reveals the survey layer below it. Portable project/UI checks and actual Chart.js browser checks passed, including the 24-hour boundary, short overnight views and the 25-hour daylight-saving day without a midnight crossing. The signed package and packaged source checks passed; installation required no dependency changes. The live six-hour view showed matching time-only ticks and no axis captions on both graphs. The coordinator resumed with no safety stop.
 
 ## r32 date/time and radar contrast
 

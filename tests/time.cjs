@@ -11,7 +11,11 @@ try {
  assert(time.sameDay(start,end));
  const midnight=epoch('2026-12-31T23:30:00+01:00');
  assert(!time.sameDay(midnight,midnight+3600));
- assert.deepEqual(time.label(midnight+3600,midnight,midnight+3600),['2027-01-01','00:30']);
+ assert.equal(time.label(midnight+3600,midnight,midnight+3600),'00:30');
+ assert(!time.showDate(midnight,midnight+86399));
+ assert.deepEqual(time.label(midnight+3600,midnight,midnight+86400),['2027-01-01','00:30']);
+ const longDay=epoch('2026-10-25T00:00:00+02:00');
+ assert(!time.showDate(longDay,longDay+24*3600)); // 25-hour local day, no midnight crossed.
  assert(time.ticks(start,end,300).length<time.ticks(start,end,1000).length);
  assert(time.ticks(start,start+200*3600,1000).length<=7);
  const fall=epoch('2026-10-25T00:00:00+02:00'),fallEnd=epoch('2026-10-25T05:00:00+01:00');

@@ -66,8 +66,8 @@ try{
   assert(JSON.stringify(tickData(c))===JSON.stringify(tickData(t)),'both graphs share time ticks');
   assert(c.scales.x.ticks.length<=7,'bounded tick count');
   assert(c.options.scales.x.title.text!=='Time','no redundant Time label');
-  assert(c.options.scales.x.title.display===timefmt.sameDay(a,b),'date caption only for same-day view');
-  assert(c.scales.x.ticks.every(t=>timefmt.sameDay(a,b)?typeof t.label==='string':Array.isArray(t.label)&&/^\d{4}-\d{2}-\d{2}$/.test(t.label[0])),'local dates across midnight');
+  assert(!c.options.scales.x.title.display,'no caption beneath time axis');
+  assert(c.scales.x.ticks.every(t=>timefmt.showDate(a,b)?Array.isArray(t.label)&&/^\d{4}-\d{2}-\d{2}$/.test(t.label[0]):typeof t.label==='string'),'dates only for 24-hour or longer views crossing midnight');
   c.destroy();t.destroy();
  }));
  document.getElementById('legend').innerHTML=names.map((r,i)=>'<span style="color:'+graph.colour(r,i)+';margin-right:24px"><i style="display:inline-block;width:25px;height:12px;border:2px solid;'+graph.patternStyle(r,i)+'"></i> '+r+'</span>').join('');

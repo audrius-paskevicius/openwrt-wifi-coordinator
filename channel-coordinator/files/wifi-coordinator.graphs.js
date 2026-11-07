@@ -66,7 +66,7 @@ function baseOptions(start,end){return {
  scales:{x:{type:'linear',min:start,max:end,grid:{color:'#e5e5e5'},border:{color:'#999'},
   afterBuildTicks:function(s){s.ticks=timefmt.ticks(start,end,s.chart.width-120).map(v=>({value:v}));},
   ticks:{color:'#444',autoSkip:false,maxRotation:0,callback:function(v,i,ticks){return timefmt.label(v,start,end,ticks.map(t=>t.value));}},
-  title:{display:timefmt.sameDay(start,end),text:timefmt.date(start),color:'#444'}},
+  title:{display:false}},
  y:{type:'linear',grid:{color:'#e5e5e5'},border:{color:'#999'},ticks:{color:'#444'},afterFit:function(s){s.width=100;}}}
 };}
 function line(label,data,color,extra){return Object.assign({label:label,data:data,borderColor:color,backgroundColor:color,fill:false,pointRadius:0,pointHoverRadius:3,borderWidth:2.5,tension:0,spanGaps:false},extra||{});}
@@ -129,7 +129,7 @@ function surveyData(surveys,start,end,axis){
   barThickness:function(c){var y=c.chart.scales.y;return Math.abs(y.getPixelForValue(axis.position(bin.high))-y.getPixelForValue(axis.position(bin.low)));}
  };});
 }
-function radarColour(level){return 'rgba(90,60,0,'+(0.74*Math.sqrt(Math.max(0,Math.min(1,level))))+')';}
+function radarColour(level){return 'rgba(140,90,0,'+(0.90*Math.max(0,Math.min(1,level)))+')';}
 function radarGradient(){return 'linear-gradient(to right,'+Array.from({length:25},(_,i)=>radarColour(Math.pow(2,-3*i/24))+' '+(100*i/24)+'%').join(',')+'), #fff';}
 function radarData(records,start,end,halfLife,axis){
  axis=axis||defaultAxis;
