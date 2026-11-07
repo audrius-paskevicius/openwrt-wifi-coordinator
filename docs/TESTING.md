@@ -1,12 +1,18 @@
 # Validation
 
-Source release: **0.6.0-r30**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release.
+Source release: **0.6.0-r31**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 35 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r31 documentation and distribution audit
+
+The documentation was compared with package hooks, declared dependencies, fresh defaults, recovery checks, history/privacy handling, the four-page menu and release assets. Corrected the five-file download/checksum instructions, build-time ucode prerequisite, builder outputs, fixed recovery deadline, unresolved failure handling, stop-versus-disable behavior and historical validation wording. No controller or UI behavior changed.
+
+Validation: portable source and UI checks passed. A history scan covered 320 stored source blobs and found no private-key, credential-token or known private-value matches. The signed APK verified; all 36 extracted payload files matched the intended repository inputs byte for byte, including generated version/disclaimer text and the upgrade keep-list. Its payload, hook metadata and package metadata also had no sensitive-data matches in the performed checks. Package configuration files are generic defaults, not copies of live UCI configuration. These checks are evidence for this artifact, not a guarantee that pattern scanners detect every possible secret. The new APK installed successfully and coordination resumed scanning with no safety stop. The complete radio/runtime suite was not repeated for this documentation-only change; r28 records the latest full run.
 
 ## r30 dedicated disclaimer tab
 
@@ -16,7 +22,7 @@ Validation: portable source/UI checks passed. The signed APK verified and instal
 
 ## r29 visible software disclaimer
 
-The canonical `DISCLAIMER.txt` appears at the top of the README and release descriptions, inside the APK, and during installation. The LuCI notice gates first use in each browser and remains visible on all three pages after acknowledgement. Browser storage records the exact text, not the package version; it does not write to router flash or change running services. Tests cover acknowledgement, changed text, blocked storage, repeated module loads, full-text access, and coverage of all three views.
+The canonical `DISCLAIMER.txt` appears at the top of the README and release descriptions, inside the APK, and during installation. In r29, the LuCI notice gated first use in each browser and remained visible on all three pages after acknowledgement. The r30 tab replaced that recurring banner. Browser storage records the exact text, not the package version; it does not write to router flash or change running services. Tests cover acknowledgement, changed text, blocked storage, repeated module loads, full-text access, and coverage of all three views.
 
 Validation: portable source/UI checks and the native LuCI fixture (55 descriptions) passed. The signed APK verified. On the installed router, all three views displayed the warning; first use withheld controls until acknowledgement, subsequent pages remembered it, and the full-text button opened the notice. The install log printed the canonical text. Existing radio recovery state was inspected separately before coordination resumed. No planner or steering code changed in this release.
 
@@ -64,7 +70,7 @@ The history/cache regression covers RAM and archive files over 300 kB, newest-pe
 
 The planner uses one service objective in place of width-first ranking and the separate narrowing gate. The new isolated service suite covers clean 160 MHz headroom without connected clients, primary-only moves, nested narrower transmission capacity, avoiding repeated counting of one wide neighbouring BSS, distinct subchannel interferers, clean narrow versus crowded wide spectrum, minimum-gain admission for widening, fractional radar half-lives, HT/VHT stream decoding, unequal AP capacity, incumbent primary ties and invariance to client names/counts/offered traffic. Candidate tests also ensure a different primary cannot evade a failed-footprint exclusion. The exhaustive small-layout reference and existing executor/recovery tests remain in the runtime suite.
 
-The isolated runtime suite passed 1,131 checks, including 30 new service cases and 7 candidate-limit cases. Portable UI checks and the offline fixture using actual LuCI methods passed, including all 55 setting descriptions. The signed APK verified, packaged files matched source, and installation required no dependency changes. Both services resumed, all three APs remained present, and router internet probes succeeded (3/3). A fresh 33-frequency survey completed and live scoring decoded the expected 3/3/1 spatial streams. Its automatic 2.4 GHz attempt on channel 13 requested 40 MHz, but the driver retained 20 MHz and one client failed to reconnect. The existing recovery restored channel 9, verified both clients, and recorded a six-hour destination exclusion plus a temporary 20 MHz width limit. The final state had no pending operation or safety stop. No 5 GHz throughput benchmark was run for this release.
+The isolated runtime suite passed 1,131 checks, including 30 new service cases and 7 candidate-limit cases. Portable UI checks and the offline fixture using actual LuCI methods passed, including all 55 setting descriptions. The signed APK verified, packaged files matched source, and installation required no dependency changes. Both services resumed, all three APs remained present, and router internet probes succeeded (3/3). A fresh 33-frequency survey completed and live scoring decoded the expected 3/3/1 spatial streams. Its automatic 2.4 GHz attempt on channel 13 requested 40 MHz, but the driver retained 20 MHz and one client failed to reconnect. The existing recovery restored channel 9, verified both clients, and recorded a six-hour destination exclusion plus a temporary 20 MHz width limit. The final state had no pending operation. The safety-stop check was invalid; see the r28 correction. No 5 GHz throughput benchmark was run for this release.
 
 The service index is a spectrum/capability model, not a measured throughput result. These tests establish policy behavior and regression coverage; they do not establish globally optimal client speeds or uninterrupted roaming for every device.
 
@@ -124,7 +130,7 @@ To reproduce the browser component check, download the target's `luci-static/res
 - JavaScript syntax, native-help interactions and nine history/cache cases passed. A settings-form harness checks actual option registration, Auto defaults, explicit choices, numeric-list validation, conditional controls, preservation of hidden values, Advanced placement and refreshed method/exclusion status. These use stubs, not a full browser rendering test.
 - An isolated UCI fixture confirmed retired timing keys are removed, missing methods become Auto, and explicit CSA/channel lists remain unchanged. Entry-point compilation, package signature and extracted-file comparisons passed.
 - The simulated and actual upgrade changed only this package. The installed configuration uses Auto for channels, widths and both switching methods on all three radios, with Automatic occupied-client handling. All six retired keys were removed. Existing failed-destination evidence was retained.
-- After installation, both controllers and usteer were running, all four clients remained associated, all six checked UI resources returned HTTP 200, and three router internet probes succeeded. Auto resolved to CSA on radio0, restart on radio2, and restart on radio1 because of its remembered CSA failure. A subsequent paced survey covered all 41 requested frequencies and completed evaluation without a safety stop.
+- After installation, both controllers and usteer were running, all four clients remained associated, all six checked UI resources returned HTTP 200, and three router internet probes succeeded. Auto resolved to CSA on radio0, restart on radio2, and restart on radio1 because of its remembered CSA failure. A subsequent paced survey covered all 41 requested frequencies and completed evaluation. The safety-stop check was invalid; see the r28 correction.
 - This release validates policy behavior and live deployment; it does not establish seamless traffic during every future channel change or repeat all historical RF experiments.
 
 ## r10 automatic channel discovery and compact help
@@ -157,7 +163,7 @@ Run `python3 scripts/prepare-tests.py` before the ucode suite. This creates test
 ## r8 installation checks
 
 - The simulated transaction upgraded only Wi-Fi Coordinator; all declared dependencies were already present. Full `wpad-mbedtls` exposed the required client, neighbor, BSS-transition and channel-switch APIs.
-- The signed APK upgraded r7 to r8 successfully. Channel Coordinator, Radio Preference and usteer were running afterward, with no coordinator safety stop.
+- The signed APK upgraded r7 to r8 successfully. Channel Coordinator, Radio Preference and usteer were running afterward. The safety-stop check was invalid; see the r28 correction.
 - Wireless and both coordinator configuration files remained byte-identical. All three APs remained available, with the same client counts and frequencies at the before/after checks.
 - All six UI JavaScript/CSS resources returned HTTP 200. These HTTP and syntax checks do not replace a full browser interaction test.
 - The router answered all three internet probes at approximately 3 ms. This installation check does not establish lossless client traffic or retest RF throughput.
@@ -177,6 +183,8 @@ Tests do not prove maximum speed, universal device compatibility, lossless roami
 
 GitHub Actions runs portable file, documentation-link, syntax, and UI/cache checks. The full ucode suite requires OpenWrt's runtime modules and is documented separately rather than reported as having run in a generic Node CI environment.
 
-## Self-contained project validation
+## Earlier self-contained project validation
+
+This is historical build evidence, not a claim that the complete runtime suite was rerun for every documentation or UI release. Consult the revision-specific entries above.
 
 The complete ucode suite passed from an isolated copy of this project, using test modules generated by `scripts/prepare-tests.py`. The portable Node UI/cache tests and project checks also passed. The documented APK builder produced a signed APK and package index from that isolated source, and native `apk verify` accepted the package. Packaged application files were compared with source, accounting for the build-time stylesheet version substitution. The private signing key remained outside the source tree and was removed from the temporary build host afterward.

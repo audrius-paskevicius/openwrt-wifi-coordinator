@@ -42,7 +42,7 @@ The local APK is checked against its installed signing key. Dependencies use the
 
 ## Trust and install
 
-Obtain all four assets: the APK, `packages.adb`, public key and `SHA256SUMS` from [GitHub Releases](https://github.com/audrius-paskevicius/openwrt-wifi-coordinator/releases/latest). In a directory containing all four assets, run `sha256sum -c SHA256SUMS` to check them. The manifest covers the APK, index and key; omitting the index makes this full check report a missing file. The index is not required for direct APK installation. Copy `radio-prefer-public.pem` into `/etc/apk/keys/`, then install the APK with `apk add` or the LuCI software page. Keep normal OpenWrt feeds enabled to resolve dependencies.
+Obtain all five assets: the APK, `packages.adb`, public key, `DISCLAIMER.txt` and `SHA256SUMS` from [GitHub Releases](https://github.com/audrius-paskevicius/openwrt-wifi-coordinator/releases/latest). In a directory containing all five assets, run `sha256sum -c SHA256SUMS` to check them. The manifest covers the APK, index, key and disclaimer; omitting a listed file makes this full check fail. `SHA256SUMS` does not checksum itself. The index is not required for direct APK installation. Copy `radio-prefer-public.pem` into `/etc/apk/keys/`, then install the APK with `apk add` or the LuCI software page. Keep normal OpenWrt feeds enabled to resolve dependencies.
 
 The public key authenticates future packages signed with the same private key; verify that you trust the repository owner before installing it. Neither a checksum nor a public key obtained from an untrusted source establishes authenticity by itself.
 
@@ -89,14 +89,14 @@ History loading uses LuCI's authenticated streaming reader for RAM and archive f
 
 ## Stop or remove
 
-Disable automatic coordination in LuCI or stop its service:
+Choose Observe to keep surveying without automatic channel changes, or turn off **Enable channel coordination** to stop that controller. Client steering has its own enable switch. The following commands stop both services for the current session; they do not disable their configured startup after reboot:
 
 ```sh
 /etc/init.d/channel-coordinator stop
 /etc/init.d/radio-prefer stop
 ```
 
-After an interrupted operation, the coordinator restores its recovery journal and checks the enabled radios. It resumes automatically after 30 seconds of stable AP state. It allows the configured radar-check timeout plus 60 seconds for recovery; an unresolved journal, inconsistent AP state or an existing recovery failure still needs attention. This verifies AP operation, not end-to-end internet access. No radio is restarted by the observation check. Removing the package disables the services; do not delete the public key if another installed package still relies on it.
+After an interrupted operation, the coordinator restores its recovery journal and checks the enabled radios. It resumes automatically after 30 seconds of stable AP state. The fixed recovery deadline is 780 seconds (the internal 720-second radar-check allowance plus 60 seconds); an unresolved journal, inconsistent AP state or an existing recovery failure still needs attention. This verifies AP operation, not end-to-end internet access. No radio is restarted by the observation check. Removing the package disables the services; do not delete the public key if another installed package still relies on it.
 
 ## Upgrades
 

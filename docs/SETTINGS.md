@@ -48,7 +48,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `improvement` | Minimum service-index gain to admit a new capacity plan, including widening. Admitted multi-step plans do not repay this margin while remaining benefit is positive. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
 | `min_dwell` | Avoids repeated moves after successful verification. Independent of survey frequency. |
 | `persist` | Whether verified wireless placements are checkpointed, at most every six hours. Separate from graph history and radar memory. |
-| `clear_stop` | One-shot acknowledgement after resolving a recovery failure, reset after use. Routine interrupted-operation recovery resumes automatically. Does not erase remembered failed destinations. |
+| `clear_stop` | One-shot acknowledgement after resolving a recovery failure, reset after use. Interrupted-operation recovery resumes automatically only after readiness checks pass. This acknowledgement clears the global stop and per-radio unresolved-failure flags after an administrator has checked recovery; it does not erase timed destination or client-specific exclusions. |
 | `handoff_wait` | Time to give compatible clients a chance to roam before restart. Skipped if no compatible target exists. |
 | `handoff_escalation` | Gentle, Strong or Decisive handoff requests. Does not disable the separately selected restart fallback. |
 | `allow_reconnect` | Allows occupied restart after handoff fails. Protected clients and explicit quiet/empty policies still restrict it. |
@@ -59,7 +59,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `handoff_target_min` | Advanced: weakest measured destination allowed for forced handoff. |
 | `handoff_source_min` | Advanced: proximity requirement when destination cannot be measured. Co-located radio estimate, not a promised destination signal. |
 | `dfs_mode` | Exclude, use already cleared channels, or prepare using a spare. Requires matching global/per-radio ETSI regions; a conflict is reported. |
-| `dfs_helper` | Optional explicit helper for installations with unequal radio coverage. Only shown for Prepare. An unavailable explicit helper is waited for, not replaced. |
+| `dfs_helper` | Optional explicit helper for installations with unequal radio coverage. Only shown for Prepare. Only that helper is eligible. If it cannot prepare the target, preparation is deferred rather than silently selecting another radio. |
 | `radar_half_life` | Default 3600 seconds (one hour): interruption-history weight halves each hour. Independent of mandatory kernel non-occupancy time. |
 | `scan_policy` | Paced, empty-only or sustained-quiet scanning: direct disruption/coverage tradeoff. |
 | `scan_duty` | Paced only: maximum off-channel duty calculated from measured visit duration. |

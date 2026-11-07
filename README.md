@@ -35,7 +35,7 @@ The package combines channel planning, Radio Preference, and a LuCI interface un
 
 ## Install the release
 
-Download the APK, `packages.adb`, public key, and `SHA256SUMS` from [GitHub Releases](https://github.com/audrius-paskevicius/openwrt-wifi-coordinator/releases/latest). Generated APKs and package indexes are kept there, separate from source. The index is included in the checksum manifest; it is not needed to install the APK directly. The [public signing key](radio-prefer/release/radio-prefer-public.pem) is also tracked here.
+Download the five release files: the APK, `packages.adb`, public key, `DISCLAIMER.txt`, and `SHA256SUMS` from [GitHub Releases](https://github.com/audrius-paskevicius/openwrt-wifi-coordinator/releases/latest). Generated APKs and package indexes are kept there, separate from source. The index is included in the checksum manifest; it is not needed to install the APK directly. The [public signing key](radio-prefer/release/radio-prefer-public.pem) is also tracked here.
 
 1. Use OpenWrt 25.12 with `apk` v3, LuCI, and full hostapd/wpad support for 802.11k/v. This APK is not for older `opkg` firmware.
 2. Configure the real country, working APs, and the intended Wi-Fi networks first. The package does not create SSIDs or set passwords.
@@ -53,7 +53,7 @@ Alternatively, after installing the key, upload the APK through LuCI's software 
 
 ## Build from source
 
-You need a Linux/OpenWrt environment with native **apk-tools v3 `mkpkg` and `mkndx`**, POSIX shell utilities, and your own signing key. No compilation of the application or downloading JavaScript dependencies is needed.
+You need a Linux/OpenWrt build environment with native **apk-tools v3 `mkpkg` and `mkndx`**, `ucode` with its `fs` module, POSIX shell utilities, and your own signing key. The example below also uses OpenSSL to create the key. The builder uses `ucode` to embed the canonical disclaimer in the UI; it does not compile the controllers or download JavaScript dependencies.
 
 ```sh
 # Keep private keys outside this repository.
@@ -70,7 +70,7 @@ KEYS_DIR="$(pwd)/../wifi-coordinator-signing/public" \
 APK_TOOL=apk sh wifi-coordinator/build-apk.sh
 ```
 
-Outputs are written to `wifi-coordinator/dist/`. [VERSION](VERSION) sets the package version and the UI stylesheet cache version. `APK_TOOL` can name a native `apk.static` or OpenWrt SDK host tool. Packages built with your key require your corresponding public key on the destination router. The published APK's private signing key is not included.
+The builder writes the APK and signed `packages.adb` index to `wifi-coordinator/dist/`. For a release, separately copy `DISCLAIMER.txt` and the matching public signing key there, then generate `SHA256SUMS` covering those four files. The builder does not create these three extra release assets. [VERSION](VERSION) sets the package version and the UI stylesheet cache version. `APK_TOOL` can name a native `apk.static` or OpenWrt SDK host tool. Packages built with your key require your corresponding public key on the destination router. The published APK's private signing key is not included.
 
 ## Test
 
@@ -96,7 +96,7 @@ The automated controller tests mock hardware operations; they do not switch live
 | `scripts/`, `tests/` | Portable validation and test preparation |
 | `docs/` | [Installation](docs/INSTALL.md), [current architecture](docs/ARCHITECTURE.md), [settings reference](docs/SETTINGS.md), [behavior review](docs/AGREEMENTS.md), [validation](docs/TESTING.md) |
 
-This source distribution contains no router passwords, Wi-Fi credentials, private signing keys, saved browser sessions, client inventories, or router backups. Test addresses and Wi-Fi names are synthetic fixtures.
+This source distribution contains no router passwords, Wi-Fi credentials, private signing keys, saved browser sessions, client inventories, or router backups. Test addresses and Wi-Fi names are synthetic fixtures. This describes the published source and package, not live runtime files on an installed router; see [runtime privacy](docs/ARCHITECTURE.md#history-persistence-and-privacy).
 
 ## Scope and limitations
 
@@ -112,4 +112,4 @@ MIT; see [LICENSE](LICENSE). Bundled Chart.js 4.5.1 is MIT-licensed; its [licens
 
 ## Publishing releases
 
-Use `python3 scripts/prepare-release-notes.py NOTES.txt RELEASE-NOTES.md` to prepend the full [disclaimer](DISCLAIMER.txt), then pass the generated file to `gh release create --notes-file RELEASE-NOTES.md`. Include `DISCLAIMER.txt` with the release downloads and checksum manifest. The same canonical text is embedded in the APK UI during the build; unchanged text preserves browser acknowledgements.
+Use `python3 scripts/prepare-release-notes.py NOTES.txt RELEASE-NOTES.md` to prepend the full [disclaimer](DISCLAIMER.txt), then pass the generated file to `gh release create --notes-file RELEASE-NOTES.md`. Publish and verify the new signed assets before withdrawing an older release. This repository currently keeps only the latest release and its version tag public; older revisions in the validation notes are historical evidence, not available release downloads. Include `DISCLAIMER.txt` with the release downloads and checksum manifest. The same canonical text is embedded in the APK UI during the build; unchanged text preserves browser acknowledgements.

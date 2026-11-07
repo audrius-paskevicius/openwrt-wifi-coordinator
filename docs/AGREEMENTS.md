@@ -12,7 +12,9 @@ Width Auto follows advertised HT/VHT capabilities. The tested router advertises 
 
 | Request | Current implementation / evidence |
 | --- | --- |
-| One self-contained installable project | One signed APK includes both cooperating services, all three LuCI pages and bundled Chart.js. Source, build scripts, tests and dependency instructions are published together. |
+| One self-contained installable project | One signed APK includes both cooperating services, four LuCI pages (Channels, Clients, History and the disclaimer tab) and bundled Chart.js. Source, build scripts, tests and dependency instructions are published together. |
+| Visible disclaimer without a recurring banner | The README and release start with the full notice. The APK prints and bundles it; a boldly labelled LuCI tab always exposes it. First use requires browser acknowledgement, preserved across upgrades while the text is unchanged. |
+| Automatic restart recovery | Interrupted operations restore temporary configuration and check AP readiness for 30 seconds before resuming. Existing unresolved failures still require attention; restarting does not erase them. |
 | Actual libraries and native styling | Charts use Chart.js; forms and help use LuCI's renderer and tooltip behavior. No separate tooltip library or custom help button appearance. |
 | Auto channel lists for all radios; manual primary lists independent of width | Per-PHY live capabilities supply Auto. Manual primary-channel and width lists are separate plain text fields. Secondary frequencies still undergo regulatory/driver checks. |
 | Auto can adapt, explicit choices stay explicit | Fixed planned CSA/restart choices remain fixed; Auto adapts to capabilities and recent failures. Applied choices and reasons are visible. Emergency service recovery remains possible. |
@@ -30,7 +32,7 @@ Width Auto follows advertised HT/VHT capabilities. The tested router advertises 
 | Recent RAM history, older flash archive; infrequent writes | Immutable batches are offloaded every six hours. Original five-minute summaries, surveys and actions retain their detail. Flash has no arbitrary 256 KiB cap; writes reserve free space. RAM is bounded at 1 MiB. Authenticated streaming reads avoid the ordinary ubus file-size limit; read errors are visible. Storage diagnostics stay collapsed unless opened. |
 | Reboot survival; pause and clear are separate | Orderly shutdown checkpoints pending history and radar memory. Ordinary service restarts reuse RAM. Disabling recording pauses it; explicit clearing deletes graph history/actions. Recent actions share the selected retention. |
 | Refresh must preserve expanded comparison and editing | The comparison details element is reused, and polling updates status without rebuilding the form. The native-browser fixture checks expansion and unsaved input preservation. |
-| No credentials in the public project | Published source/release checks reject private keys and credential tokens. Router configuration and signing secrets remain outside the repository. |
+| No credentials in the public project | Portable source checks reject recognizable private-key and GitHub-token patterns; release audits also inspect the extracted APK and compare its files with the intended source. Router configuration and signing secrets remain outside the repository. |
 
 ## Boundaries still requiring explicit distinction
 
