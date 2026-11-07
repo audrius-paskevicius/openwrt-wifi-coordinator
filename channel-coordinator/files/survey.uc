@@ -15,6 +15,7 @@ let scan_ended={},scan_duration={};
 function lease(seconds,reason){io.lease(seconds,reason,pending?.scanner?[pending.scanner.name]:[]);}
 function release(){io.release();}
 function eligible(r,ignore_gap){
+    if(state.radios[r.name]?.failed||state.radios[r.name]?.unavailable)return false;
     if(now()<(state.radios[r.name]?.scan_until ?? 0))return false;
     if(!length(r.clients))return true;
     if(cfg.scan_policy=='idle')return false;

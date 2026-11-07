@@ -67,6 +67,7 @@ function congestionCell(sample,surveys){
 }
 var retentionChoices=[1,3,6,12,24,48,72,96,120,168,200];
 var actionNames={
+ 'radio-recovered':'Radio service recovered automatically','restart-retry':'Automatic restart-recovery check','switch-request-failed':'Channel switch request failed',
  'client-recovery-start':'Targeted client recovery started','client-recovery-request':'Targeted roaming request',
  'client-recovery-verified':'Alternate client service verified','client-recovery-unresolved':'Alternate client service unconfirmed',
  'move-evidence':'Placement recovery assessment',

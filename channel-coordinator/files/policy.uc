@@ -69,7 +69,7 @@ export function switch_methods(method,width_method,wrt,name,band,csa,failed_unti
     let automatic=!csa||wrt&&name=='radio2'?'idle_reconfigure':'csa';
     let reason=!csa?'Driver does not advertise CSA':wrt&&name=='radio2'?'Tested radio2 restart requirement':'Driver advertises CSA';
     let remaining=max(0,(failed_until ?? 0)-t);
-    if(remaining>0){automatic='idle_reconfigure';reason='Recent CSA connectivity failure';}
+    if(remaining>0){automatic='idle_reconfigure';reason='Recent CSA command or service failure';}
     let effective=method=='auto'?automatic:method;
     let width_restart=band=='2g'||wrt;
     let width=width_method=='inherit'?effective:width_method=='auto'?(width_restart?'idle_reconfigure':automatic):width_method;

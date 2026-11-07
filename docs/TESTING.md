@@ -1,12 +1,18 @@
 # Validation
 
-Source release: **0.6.0-r34**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.6.0-r35**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 35 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r35 unattended recovery audit
+
+Corrected rejected CSA commands being classified as permanent radio failures, temporary observation errors discarding operation context, restored restart exceptions losing rollback verification, recovery timeouts lacking automatic retries, and finite process restart limits. Steering preparation is now supervised. Failed-radio reassessment proceeds independently of unrelated radio operations and requires stable legal AP state and fresh service evidence; it never moves or restarts a radio. Existing client/destination restrictions and explicit settings remain authoritative.
+
+The isolated runtime suite passed, including 102 executor assertions plus 1,000 repeated failed-radio retry cycles, and 23 restart-recovery assertions plus 1,000 retry-delay cycles. These are simulated failure/recovery cycles, not a claim of years of live uptime. Portable source and UI checks passed. No deliberate client outage or new throughput test was performed. The signed APK installed on the WRT3200ACM without dependency changes. Its existing radio0 failure latch cleared automatically after positive live evidence from two clients, and Auto selected the six-hour restart fallback. No failure flag was manually cleared. A fresh comparison restored 81 radio0 candidates with no recovery hold, and router internet probes passed. The installed executor matched the final packaged source; procd reported a 30-second respawn delay and retry limit 0.
 
 ## r34 matching legend scales
 

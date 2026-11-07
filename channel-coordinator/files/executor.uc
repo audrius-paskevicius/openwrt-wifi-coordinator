@@ -41,7 +41,7 @@ export function failure_kind(r,target,health){
 export function create_executor(io) {
 let fs=io.fs ?? system_fs;
 let cfg=io.cfg,state=io.state,now=io.now,save=io.save,lease=io.lease,release=io.release,call=io.call,request=io.request,config_fingerprint=io.config_fingerprint,phy_caps=io.phy_caps,allclients=io.allclients,empty_interface=io.empty_interface,apply_empty_config=io.apply_empty_config,restore_preparation=io.restore_preparation,private_json=io.private_json,coordination_ready=io.coordination_ready,dfs_mode=io.dfs_mode,history=io.history,boot=io.boot;
-let N=nl.const,JOURNAL='/tmp/channel-coordinator-cac.json',pending=null,handoff;
+let N=nl.const,JOURNAL='/tmp/channel-coordinator-cac.json',pending=null,handoff,rechecks={};
 function log(s){io.log(s);}
 function reconnect_allowed(r){return cfg.allow_reconnect&&r.config.occupied=='handoff'&&length(r.aps)==1&&!r.unsafe&&
     !length(filter(keys(r.clients),m=>index(cfg.protected_clients,lc(m))>=0));}
@@ -203,13 +203,13 @@ function ping_client(ip) {
     let p=fs.popen('ping -c 1 -W 1 '+ip+' >/dev/null 2>&1','r');
     if(!p)return false;p.read('all');return p.close()==0;
 }
-function capture_liveness(radios,source) {
+function capture_liveness(radios,source,before) {
     let addresses={};
     for(let line in split(fs.readfile('/tmp/dhcp.leases') ?? '','\n')){
         let fields=split(trim(line),/\s+/);
         if(length(fields)>=3&&private_ipv4(fields[2]))addresses[lc(fields[1])]=fields[2];
     }
-    let clients=keys(pending.before),probes={},attempts=0;
+    let clients=keys(before ?? pending.before),probes={},attempts=0;
     clients=sort(clients,(a,b)=>(source.clients[b]?1:0)-(source.clients[a]?1:0));
     for(let mac in clients){
         let ip=addresses[lc(mac)];if(!ip||attempts>=8)continue;attempts++;
@@ -219,6 +219,44 @@ function capture_liveness(radios,source) {
     // clients require a longer association watch, not an invented success.
     let samples={};for(let r in radios)samples[r.name]=counter_snapshot(r.client_data);
     return {probes,samples,good:{},unprobed:length(clients)-length(probes),failed:{}};
+}
+// Failed radios are re-observed, never reset merely because a timer expired.
+// This RAM-only evidence contains client identities; it is not status/history.
+function reassess(radios) {
+    if(!pending&&fs.stat(JOURNAL))return;
+    let t=now();
+    for(let name in keys(rechecks))if(!state.radios[name]?.failed&&!state.radios[name]?.unavailable)delete rechecks[name];
+    for(let name,s in state.radios){
+        if(!s.failed&&!s.unavailable)continue;
+        if(pending&&index([pending.radio,pending.helper?.name,pending.spare,pending.handoff_target,pending.handoff_source],name)>=0)continue;
+        if(t<(s.recovery_next ?? 0))continue;
+        let r=filter(radios,r=>r.name==name)[0],q=rechecks[name];
+        if(!q){q={started:t};rechecks[name]=q;}
+        let ready=r&&!r.unsafe&&length(r.aps)&&!length(filter(r.aps,a=>a.status?.status!='ENABLED'||a.status?.dfs?.cac_active||a.status.freq&&a.status.freq!=r.current.freq));
+        if(ready){
+            let rules=request(N.NL80211_CMD_GET_REG,0,{}).reg_rules ?? [];
+            ready=permitted(r.current,r.caps,rules,[channel(r.current.freq)],'available');
+        }
+        if(ready){
+            let signature=sprintf('%J',[r.current,sort(keys(r.authorized))]);
+            if(q.signature!=signature){q.signature=signature;q.stable=t;q.live=capture_liveness(radios,r,r.authorized);}
+            let h=client_health(r.authorized,q.live,[r],t,ping_client);
+            let proven=!length(filter(keys(r.authorized),m=>!h.working[m]));
+            s.recovery_status=proven?'Checking stable AP and client service':'Waiting for positive client traffic or reachability evidence';
+            if(proven&&t-q.stable>=60){
+                // A legacy command-rejection latch gets the same bounded Auto fallback.
+                if(index(s.failure ?? '',"switch_chan")>=0)s.csa_failed_until=t+21600;
+                delete s.failed;delete s.failure;delete s.unavailable;delete s.recovery_status;
+                delete s.recovery_next;delete s.recovery_attempts;delete rechecks[name];
+                s.last_attempt=t;history({event:'radio-recovered',radio:name,clients:length(r.authorized)});if(!pending)io.completed();save();continue;
+            }
+        }else {delete q.signature;delete q.stable;s.recovery_status='Waiting for an enabled, consistent and legal AP';}
+        if(t-q.started>=max(180,cfg.verify_unprobed ?? 180)){
+            s.recovery_attempts=min(4,(s.recovery_attempts ?? 0)+1);
+            s.recovery_next=t+[0,60,120,240,300][s.recovery_attempts];
+            s.recovery_status='Automatic service recheck scheduled';delete rechecks[name];save();
+        }
+    }
 }
 function begin_client_rescue(r,radios,clients,preflight){
     if(!length(clients)||length(filter(clients,m=>index(cfg.protected_clients,lc(m))>=0)))return false;
@@ -280,11 +318,12 @@ function reconfigure_idle(r,g) {
     let backup=path+'.channel-coordinator-before';
     if(!fs.writefile(backup,original)||!fs.chmod(backup,0600))die('Cannot save runtime configuration backup');
     // Preserve permissions: OpenWrt runs hostapd as the unprivileged network user.
+    pending.command_started=true;
     if(!fs.writefile(path,content))die('Cannot update runtime configuration');
     try{apply_empty_config('phy'+r.phy,path,r.ifname);}
     catch(e){
         if(!fs.writefile(path,original))die('Cannot restore runtime configuration after deferred restart');
-        if(index(''+e,'Selected radio acquired clients; restart deferred')>=0)return false;
+        if(index(''+e,'Selected radio acquired clients; restart deferred')>=0){pending.command_started=false;return false;}
         die(e);
     }
     return true;
@@ -303,12 +342,14 @@ function reconfigure_reconnect(r,g) {
     // RAM-only journal: service interruption restores the old live channel.
     // Power loss boots the existing saved UCI configuration instead.
     private_json(JOURNAL,{kind:'reconnect',boot,phy:'phy'+r.phy,ifname:r.ifname,path,original,temporary,source:r.current});
+    pending.command_started=true;
     if(!fs.writefile(path,temporary))die('Cannot write reconnect configuration');
     history({event:'radio-reconnect',radio:r.name,from:channel(r.current.freq),to:channel(g.freq),width:g.width,clients:length(r.clients)});
     io.apply_radio_config('phy'+r.phy,path,r.ifname,true);
 }
 function switch_radio(r,g) {
     // force=false is essential: never fall back to disabling/restarting the AP.
+    pending.command_started=true;
     return call('hostapd.'+r.ifname,'switch_chan',{freq:g.freq,center_freq1:g.center,center_freq2:0,
         bandwidth:g.width,sec_channel_offset:g.sec,ht:true,vht:r.band=='5g',he:false,
         block_tx:false,bcn_count:cfg.csa_count,force:false});
@@ -376,6 +417,7 @@ function operation(radios) {
             if(restored||unconfirmed){
                 if(state.halted==pending.own_stop)delete state.halted;
                 delete state.radios[pending.radio].failed;
+                delete state.radios[pending.radio].failure;
                 state.radios[pending.radio].last_attempt=t;
                 if(unconfirmed)state.radios[pending.radio].recheck_until=t+(cfg.max_age ?? 900);
             }
@@ -496,7 +538,8 @@ function operation(radios) {
         for(let mac in keys(r.clients))pending.before[mac]=true;
         pending.liveness=capture_liveness(radios,r);
         pending.verify_seconds=pending.liveness.unprobed?cfg.verify_unprobed:45;
-        pending.kind='verify';pending.started=now();state.pending='verification';state.status='Verifying '+r.config.method+' and client reachability on '+r.name;save();
+        pending.kind='verify';pending.started=now();pending.command_started=false;pending.command_done=false;
+        state.pending='verification';state.status='Verifying '+r.config.method+' and client reachability on '+r.name;save();
         pending.switch_clients={...r.clients};
         if(pending.reconnect){
             pending.reconnect_until=now()+60;
@@ -511,7 +554,14 @@ function operation(radios) {
                 state.pending='move';state.status='Waiting for driver station records to clear before restarting this radio';save();return;
             }
         }
-        else switch_radio(r,pending.target);
+        else try{switch_radio(r,pending.target);}catch(e){
+            // RPC rejection does not establish an outage (or even prove no move).
+            // Retain the client baseline and observe the actual placement first.
+            pending.command_error=''+e;
+            state.status='Channel switch request failed; checking existing service';
+            history({event:'switch-request-failed',radio:r.name,reason:''+e});save();
+        }
+        pending.command_done=true;
     }else if(pending.kind=='verify'&&t-pending.started>=5){
         let r=filter(radios,x=>x.name==pending.radio)[0];
         pending.liveness=pending.liveness ?? {probes:{},samples:{},good:{},failed:{}};
@@ -575,13 +625,17 @@ function operation(radios) {
             // An ignored command with the original channel and healthy clients
             // is not an outage. Quarantine this target and keep serving.
             let s=state.radios[pending.radio];
-            s.rejected=filter(s.rejected ?? [],x=>x.until>t&&!same_block(x.target,pending.target));
-            push(s.rejected,{target:pending.target,until:t+21600,reason:'Driver left the original channel/width unchanged'});
-            while(length(s.rejected)>16)shift(s.rejected);
+            if(pending.command_error)s.csa_failed_until=t+21600;
+            else {
+                s.rejected=filter(s.rejected ?? [],x=>x.until>t&&!same_block(x.target,pending.target));
+                push(s.rejected,{target:pending.target,until:t+21600,reason:'Driver left the original channel/width unchanged'});
+                while(length(s.rejected)>16)shift(s.rejected);
+            }
+            delete s.failed;delete s.failure;delete s.unavailable;
             if(pending.reconnect)restore_preparation();
             history({event:'switch-ignored',radio:pending.radio,from:channel(pending.source.freq),to:channel(pending.target.freq),width:pending.target.width,method:pending.method});
-            clear_bans();pending=null;delete state.pending;release();
-            state.status='Driver left channel unchanged; target deferred and clients verified';io.completed();save();
+            state.status=pending.command_error?'Switch request failed; original service verified. Auto will temporarily use restart fallback':'Driver left channel unchanged; target deferred and clients verified';
+            clear_bans();pending=null;delete state.pending;release();io.completed();save();
             
             return;
         }
@@ -589,7 +643,7 @@ function operation(radios) {
             from:channel(pending.source.freq),to:channel(pending.target.freq),width:pending.target.width,
             clients_missing:length(missing),clients_unproven:unknown,disconnect_events:pending.disconnects,method:pending.method};
         history(entry);log(sprintf('%J',entry));
-        let s=state.radios[pending.radio];if(ok){s.last_move=t;state.last_move=t;delete s.failed;delete s.unavailable;}
+        let s=state.radios[pending.radio];if(ok){s.last_move=t;state.last_move=t;delete s.failed;delete s.failure;delete s.unavailable;}
         if(ok&&pending.repair_attempted&&pending.failed_entry?.kind=='inconclusive'&&
             !length(filter(pending.failure_clients ?? [],m=>!working[m]))){
             pending.failed_entry.kind='client';pending.failed_entry.until=t+21600;
@@ -656,17 +710,31 @@ function operation(radios) {
         
     }
 }
-function abort(e) {
+function abort(e,force) {
     
     
     let reason=''+e;log(reason);state.status=reason;
+    if(!force&&(pending?.kind=='rollback'||pending?.kind=='verify'&&(pending.command_done||pending.external))){
+        pending.observation_failed_since=pending.observation_failed_since ?? now();
+        if(now()-pending.observation_failed_since<(cfg.verify_unprobed ?? 180)+60){
+            state.status='Service check interrupted; retrying: '+reason;lease(90,state.status);save();return;
+        }
+    }
     clear_bans();
     if(pending?.radio){state.radios[pending.radio].last_attempt=now();state.last_action=now();}
     if(fs.stat(JOURNAL)){
-        try{restore_preparation();if(!pending?.reconnect)state.dfs={...state.dfs,phase:'restored-after-error',reason};}
+        try{
+            let restored=restore_preparation();
+            if(restored&&pending?.reconnect&&!force){
+                state.radios[pending.radio].failed=true;state.radios[pending.radio].failure=reason;
+                pending.kind='rollback';pending.started=now();state.pending='verification';
+                state.status='Configuration restored after command error; checking clients';lease(90,state.status);save();return;
+            }
+            if(!pending?.reconnect)state.dfs={...state.dfs,phase:'restored-after-error',reason};
+        }
         catch(err){state.halted='Spare-radio recovery needs attention: '+err;}
     }
-    if(pending?.kind=='verify'){state.radios[pending.radio].failed=true;state.radios[pending.radio].failure=reason;}
+    if(pending&&(pending.kind=='rollback'||pending.kind=='verify'&&(pending.command_started||pending.external))){state.radios[pending.radio].failed=true;state.radios[pending.radio].failure=reason;}
     pending=null;delete state.pending;release();io.completed();history({event:'error',reason});save();
     
 }
@@ -685,7 +753,7 @@ function event(e,radios){
     if(msg.radar_event!=0)return;
     let r=filter(radios,r=>r.phy==msg.wiphy&&index(r.current.members,msg.wiphy_freq)>=0)[0];
     if(!r)return;
-    if(pending&&pending.radio!=r.name){abort('Radar invalidated operation reservation');}
+    if(pending&&pending.radio!=r.name){abort('Radar invalidated operation reservation',true);}
     if(!pending)pending={radio:r.name,source:r.current,target:r.current,before:{...r.authorized},fingerprint:r.fingerprint,disconnects:0};
     clear_bans();
     if(fs.stat(JOURNAL))try{restore_preparation();}catch(err){history({event:'helper-recovery-deferred',reason:''+err});}
@@ -693,5 +761,6 @@ function event(e,radios){
     state.pending='radar evacuation';state.status='Radar evacuation: waiting for the driver to establish legal service';
     history({event:'radar-evacuation',radio:r.name,channel:channel(msg.wiphy_freq)});lease(90,state.status);save();
 }
-return {start,tick:operation,abort,event,busy:()=>pending!=null,pending:()=>pending};
+function tick(radios){operation(radios);if(pending)delete pending.observation_failed_since;}
+return {start,tick,abort,event,reassess,busy:()=>pending!=null,pending:()=>pending};
 };

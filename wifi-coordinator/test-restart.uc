@@ -1,4 +1,4 @@
-import {begin_restart_check,check_restart} from '../channel-coordinator/files/recovery.uc';
+import {begin_restart_check,check_restart,schedule_recovery} from '../channel-coordinator/files/recovery.uc';
 let checks=0;function check(v,s){if(!v)die('FAIL: '+s+'\n');checks++;}
 let state,radio;
 function setup(){
@@ -28,4 +28,11 @@ setup();state.halted='Spare-radio restoration failed';check(tick(130)==null&&sta
 setup();tick(100);check(begin_restart_check(state,110)&&tick(110)=='waiting'&&tick(140)=='resumed','another interrupted operation starts a fresh observation');
 setup();check(tick(800,[])=='waiting','startup permits long DFS listening period');
 check(tick(801)=='waiting'&&tick(831)=='resumed','long radar preparation can finish without manual acknowledgement');
+setup();tick(880,[radio],true);check(state.recovery_retry_at==940,'failed recovery schedules automatic retry');
+check(begin_restart_check(state,940,true),'scheduled retry can reassess a previous failure');
+check(tick(940)=='waiting'&&tick(970)=='resumed'&&!state.recovery_retry_at,'repaired journal state resumes after renewed stability checks');
+setup();state.radios.a.failed=true;tick(880);begin_restart_check(state,940,true);
+check(tick(970)=='waiting'&&state.radios.a.failed,'retry does not blindly clear individual radio failure');
+delete state.radios.a.failed;tick(980);check(tick(1010)=='resumed','positive per-radio recovery permits global resume');
+setup();for(let i=0;i<1000;i++){schedule_recovery(state,100+i*1000);check(state.recovery_retry_at>100+i*1000&&state.recovery_retry_at<=400+i*1000,'retry delay stays bounded indefinitely');}
 print('PASS: '+checks+' restart recovery checks\n');

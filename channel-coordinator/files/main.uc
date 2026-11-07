@@ -11,7 +11,7 @@ import {assess,choose,decide,spatial_streams} from './planner.uc';
 import {open_memory} from './radar.uc';
 import {create_survey} from './survey.uc';
 import {create_executor} from './executor.uc';
-import {begin_restart_check,check_restart} from './recovery.uc';
+import {begin_restart_check,check_restart,schedule_recovery} from './recovery.uc';
 
 const N=nl.const, STATE='/tmp/channel-coordinator-state.json', LEASE='/tmp/channel-coordinator-lease.json', JOURNAL='/tmp/channel-coordinator-cac.json';
 const CLIENT_AVOIDS='/tmp/wifi-coordinator-client-avoids.json';
@@ -344,7 +344,7 @@ function candidates(r,radios,rules) {
     }
     let current=rated(r.current);
     s.rejected=filter(s.rejected ?? [],x=>x.until>t);
-    s.planning_hold=!r.config.managed?'Excluded from planning':r.unsafe?'Unsupported or inactive configuration':s.failed?'Unresolved recovery on this radio':
+    s.planning_hold=!r.config.managed?'Excluded from planning':r.unsafe?'Unsupported or inactive configuration':s.failed||s.unavailable?(s.recovery_status ?? 'Automatic recovery check pending'):
         s.recheck_until>t?'Previous service restored; waiting for fresh client evidence':
         !survey_covers(rules,r,scan_result.frequencies,dm)?'Incomplete fresh survey':
         t-(s.last_move ?? -100000)<cfg.cooldown?'Minimum residence after verified move':
@@ -462,6 +462,14 @@ let test_started=false;
 timer=uloop.timer(1000,()=>{try{
     if(stopping)return;
     discovered=inventory();sample(discovered);persist_channels();
+    executor.reassess(discovered);
+    if(state.halted&&!state.restart_check&&!executor.busy()&&!scanner.busy()&&now()>=(state.recovery_retry_at ?? 0)){
+        try{
+            if(fs.stat(JOURNAL))restore_preparation();
+            begin_restart_check(state,now(),true);
+            history({event:'restart-retry'});
+        }catch(err){state.status='Automatic recovery retry deferred: '+err;schedule_recovery(state,now());}
+    }
     if(state.restart_check){
         let enabled=[];
         cursor.foreach('wireless','wifi-iface',s=>{

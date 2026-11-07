@@ -213,6 +213,10 @@ if (ARGV[0] == '--check') {
     exit(0);
 }
 if (!cfg.enabled) exit(0);
+// Preparation is supervised too: transient startup failures must be retried.
+if (system('/usr/bin/ucode /usr/share/radio-prefer/coordination.uc --prepare') != 0)
+    die('Steering preparation failed; service supervisor will retry\n');
+system('if /etc/init.d/usteer running; then /etc/init.d/usteer reload; fi');
 let boot = trim(fs.readfile('/proc/sys/kernel/random/boot_id'));
 let state = { boot, preferred_radio: cfg.preferred_radio, clients: {} };
 try {

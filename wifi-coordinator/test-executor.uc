@@ -232,4 +232,62 @@ peer={...radio,name:'peer',phy:2,ifname:'peer0',current:group(5745,80),clients:{
 pair=[radio,peer];ex.start(radio,group(5580,80),pair);T+=15;ex.tick(pair);
 check(ex.pending().kind=='spare-handoff'&&ex.pending().handoff_target=='peer','occupied DFS helper reaches compatible handoff');
 check(length(filter(calls,c=>c.method=='bss_transition_request'))==1&&!journal&&!repairs,'helper handoff starts without prematurely reconfiguring occupied AP');
+// Rejected requests keep the observation baseline instead of latching failure.
+opt=setup();let basecall=opt.call;
+opt.call=(obj,method,args)=>{if(method=='switch_chan')die('Operation not supported');return basecall(obj,method,args);};
+ex=create_executor(opt);ex.start(radio,group(5580,80),[radio]);T+=15;ex.tick([radio]);
+check(ex.busy()&&ex.pending().command_error&&!st.radios.r.failed,'rejected CSA stays in service verification');
+T+=181;ex.tick([radio]);
+check(!ex.busy()&&!st.radios.r.failed&&st.radios.r.csa_failed_until==T+21600,'unchanged healthy service enables bounded Auto fallback');
+check(!length(st.radios.r.rejected),'command rejection does not blacklist otherwise usable spectrum');
+opt=setup();basecall=opt.call;
+opt.call=(obj,method,args)=>{let v=basecall(obj,method,args);if(method=='switch_chan')die('Reply lost');return v;};
+ex=create_executor(opt);ex.start(radio,group(5580,80),[radio]);T+=15;ex.tick([radio]);T+=181;ex.tick([radio]);
+check(!ex.busy()&&!st.radios.r.failed&&!st.radios.r.csa_failed_until&&events[-1].event=='switch-verified','lost reply with successful move is judged from observed service');
+setup();ex.start(radio,group(5580,80),[radio]);T+=15;ex.tick([radio]);
+ex.abort('Temporary status RPC failure');
+check(ex.busy()&&!st.radios.r.failed,'one observation error keeps verification context');
+T+=181;ex.tick([radio]);check(!ex.busy()&&!st.radios.r.failed,'observation resumes without a stuck radio');
+setup();ex.start(radio,group(5580,80),[radio]);T+=15;ex.tick([radio]);ex.abort('Status unavailable');T+=241;ex.abort('Status unavailable');
+check(!ex.busy()&&st.radios.r.failed,'persistent read errors leave a visible reassessment condition');
+opt=setup('idle_reconfigure');opt.cfg.allow_reconnect=true;radio.aps=[{}];
+opt.apply_radio_config=()=>{die('AP setup failed');};
+ex.start(radio,group(5580,80),[radio]);T+=15;try{ex.tick([radio]);}catch(e){ex.abort(e);}
+check(ex.pending()?.kind=='rollback'&&restores==1,'restored restart exception retains client verification');
+T+=31;ex.tick([radio]);check(!ex.busy()&&!st.radios.r.failed,'verified restored configuration clears failure');
+opt=setup('idle_reconfigure');opt.cfg.allow_reconnect=true;radio.aps=[{}];
+opt.fs.readfile=()=>'';ex.start(radio,group(5580,80),[radio]);T+=15;
+try{ex.tick([radio]);}catch(e){ex.abort(e);}
+check(!ex.busy()&&!st.radios.r.failed&&!repairs,'pre-command validation error cannot mark a radio failed');
+opt=setup();radio.aps=[{status:{status:'ENABLED',freq:5500}}];
+st.radios.r.failed=true;st.radios.r.failure='hostapd.test0.switch_chan: Operation not supported';
+ex.reassess([radio]);T+=61;radio.client_data.client={rx:30000,tx:30000};ex.reassess([radio]);
+check(!st.radios.r.failed&&!st.radios.r.failure&&st.radios.r.csa_failed_until==T+21600,'legacy rejection recovers only after fresh service evidence');
+check(!length(calls)&&!repairs&&events[-1].event=='radio-recovered','reassessment performs no radio moves or restarts');
+opt=setup();radio.aps=[{status:{status:'ENABLED',freq:5500}}];st.radios.r.failed=true;
+ex.reassess([radio]);T+=181;ex.reassess([radio]);
+check(st.radios.r.failed&&st.radios.r.recovery_next==T+60,'stale associations alone cannot clear a failed radio');
+T+=60;ex.reassess([radio]);T+=61;radio.client_data.client={rx:40000,tx:40000};ex.reassess([radio]);
+check(!st.radios.r.failed&&!st.radios.r.recovery_next,'later traffic recovers without manual reset');
+opt=setup();st.radios.r.failed=true;
+for(let i=0;i<1000;i++){
+ ex.reassess([]);T+=181;ex.reassess([]);
+ check(st.radios.r.failed&&st.radios.r.recovery_next>T&&st.radios.r.recovery_next<=T+300,'bounded retry continues for absent radio');
+ T=st.radios.r.recovery_next;
+}
+radio.aps=[{status:{status:'ENABLED',freq:5500}}];radio.clients={};radio.authorized={};
+ex.reassess([radio]);T+=61;ex.reassess([radio]);
+check(!st.radios.r.failed,'empty AP can recover after many retry cycles');
+opt=setup();radio.aps=[{status:{status:'ENABLED',freq:5500}}];st.radios.r.failed=true;
+ex.reassess([radio]);T+=30;radio.current=group(5580,80);radio.aps[0].status.freq=5580;ex.reassess([radio]);
+T+=31;radio.client_data.client={rx:40000,tx:40000};ex.reassess([radio]);check(st.radios.r.failed,'channel change resets stability observation');
+T+=31;radio.client_data.client={rx:60000,tx:60000};ex.reassess([radio]);check(!st.radios.r.failed,'stable replacement channel can recover');
+opt=setup();radio.aps=[{status:{status:'ENABLED',freq:5500}}];radio.clients={};radio.authorized={};radio.config.channels=[36];st.radios.r.failed=true;
+ex.reassess([radio]);T+=61;ex.reassess([radio]);check(!st.radios.r.failed,'manual candidate pool does not prevent verification of legal existing service');
+opt=setup();radio.aps=[{status:{status:'ENABLED',freq:5500}}];radio.clients={};radio.authorized={};st.radios.r.failed=true;
+radio.caps[5500].disabled=true;ex.reassess([radio]);T+=61;ex.reassess([radio]);check(st.radios.r.failed,'regulatory-disabled channel cannot pass reassessment');
+opt=setup();radio.aps=[{status:{status:'ENABLED',freq:5500}}];st.radios.r.failed=true;
+peer={...radio,name:'peer',phy:2,ifname:'peer0',current:group(5745,80),clients:{},authorized:{}};st.radios.peer={};
+ex.start(peer,group(5180,80),[radio,peer]);ex.reassess([radio,peer]);T+=61;radio.client_data.client={rx:40000,tx:40000};ex.reassess([radio,peer]);
+check(!st.radios.r.failed&&ex.pending().radio=='peer','other-radio operation cannot starve reassessment or lose its own context');
 print('PASS: '+checks+' executor integration and failure cases\n');

@@ -96,7 +96,7 @@ Choose Observe to keep surveying without automatic channel changes, or turn off 
 /etc/init.d/radio-prefer stop
 ```
 
-After an interrupted operation, the coordinator restores its recovery journal and checks the enabled radios. It resumes automatically after 30 seconds of stable AP state. The fixed recovery deadline is 780 seconds (the internal 720-second radar-check allowance plus 60 seconds); an unresolved journal, inconsistent AP state or an existing recovery failure still needs attention. This verifies AP operation, not end-to-end internet access. No radio is restarted by the observation check. Removing the package disables the services; do not delete the public key if another installed package still relies on it.
+After an interrupted operation, the coordinator restores its recovery journal and checks the enabled radios. It resumes automatically after 30 seconds of stable AP state. The fixed recovery deadline is 780 seconds (the internal 720-second radar-check allowance plus 60 seconds); an unresolved journal, inconsistent AP state or existing failure schedules further automatic checks with backoff capped at five minutes. Failed radios need stable AP state and positive service evidence from their currently authorized clients before planning resumes. This verifies AP operation, not end-to-end internet access. No radio is restarted by the observation check. Removing the package disables the services; do not delete the public key if another installed package still relies on it.
 
 ## Upgrades
 

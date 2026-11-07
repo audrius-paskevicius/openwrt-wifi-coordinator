@@ -1,8 +1,12 @@
 // Restart recovery observes existing APs; it never moves or restarts a radio.
 const CHECKING='Checking radios after interrupted operation';
-export function begin_restart_check(state,t) {
+export function schedule_recovery(state,t) {
+    state.recovery_attempts=min(4,(state.recovery_attempts ?? 0)+1);
+    state.recovery_retry_at=t+[0,60,120,240,300][state.recovery_attempts];
+};
+export function begin_restart_check(state,t,retry) {
     // A genuine recovery error must never be cleared by another service restart.
-    if(state.halted&&state.halted!=CHECKING)return false;
+    if(state.halted&&state.halted!=CHECKING&&!retry)return false;
     state.restart_check={started:t,radios:keys(state.radios ?? {})};
     state.halted=CHECKING;state.status=CHECKING;
     return true;
@@ -31,12 +35,14 @@ export function check_restart(state,radios,enabled,t,journal,timeout) {
     if(!length(problems)&&t-check.stable_since>=30){
         for(let name in expected)delete state.radios[name].unavailable;
         delete state.halted;delete state.restart_check;
+        delete state.recovery_retry_at;delete state.recovery_attempts;
         state.status='Radio state verified after restart; coordination resumed';
         return 'resumed';
     }
     if(t-check.started>=timeout){
         state.halted='Restart recovery needs attention: '+(length(problems)?join('; ',problems):'radio state did not settle');
         state.status=state.halted;delete state.restart_check;
+        schedule_recovery(state,t);
         return 'failed';
     }
     state.status=length(problems)?'Waiting for restart recovery: '+join('; ',problems):'Radios are ready; checking stability before resuming';

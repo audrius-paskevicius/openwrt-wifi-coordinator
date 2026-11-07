@@ -14,7 +14,7 @@ function radioName(r) { return r['.name']+' ('+(r.band=='2g'?'2.4':'5')+' GHz)';
 function readState() { return fs.read('/tmp/channel-coordinator-state.json').then(JSON.parse).catch(function(){return {};}); }
 function operationText(st) {
  return st.restart_check?(st.status||'Checking radios after interruption'):
-  st.halted?'Coordination paused: '+st.halted:(st.status||'No evaluation yet.');
+  st.halted?'Coordination paused: '+st.halted+(st.recovery_retry_at>st.updated?' — automatic retry in '+Math.ceil(st.recovery_retry_at-st.updated)+' seconds.':' — automatic reassessment pending.'):(st.status||'No evaluation yet.');
 }
 function statusText(st, services) {
  var running=Object.values(((services||{})['channel-coordinator']||{}).instances||{}).some(function(i){return i.running;});
@@ -47,6 +47,7 @@ return view.extend({
     if(r.csa_recovery_left>0)rows.push(E('p',{},'Recent CSA failure remembered for '+Math.ceil(r.csa_recovery_left/60)+' more minutes. Only Auto adapts the method.'));
     if(r.dfs_constraint)rows.push(E('p',{},r.dfs_constraint));
     if(r.ht40_constraint)rows.push(E('p',{},r.ht40_constraint));
+    if(r.failed||r.unavailable)rows.push(E('p',{},(r.recovery_status||'Automatic recovery check pending')+(r.recovery_next>st.updated?' — next check in '+Math.ceil(r.recovery_next-st.updated)+' seconds.':'.')+(r.failure?' Last failure: '+r.failure:'')));
     if(r.client_avoid_count)rows.push(E('p',{},r.client_avoid_count+' client-specific placement cooldowns. Healthy clients can still use these placements.'));
     if(r.width_limit&&r.width_limit.until>st.updated)rows.push(E('p',{},r.width_limit.reason+'. Widths above '+r.width_limit.actual+' MHz deferred for '+Math.ceil((r.width_limit.until-st.updated)/60)+' more minutes; configured Auto/manual widths are unchanged.'));
     if(r.hardware_widths)rows.push(E('p',{},'Driver widths: '+r.hardware_widths.join(' / ')+' MHz. Widths to compare: '+(r.candidate_widths||[]).join(' / ')+' MHz.'));
