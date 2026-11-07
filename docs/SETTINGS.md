@@ -102,7 +102,9 @@ Channel handoffs and preferred-radio steering have separate signal/request polic
 | Key | Why keep it / precise scope |
 | --- | --- |
 | `history_enabled` | Pauses new recording without deleting existing history. |
-| `history_hours` | Maximum retention and graph-selection range (up to 200 hours), subject to the documented RAM/free-flash safeguards. |
+| `history_hours` | Maximum retention and both graph/export selection ranges (up to 200 hours), subject to the documented RAM/free-flash safeguards. |
 | `clear_history` | Explicit one-shot deletion, reset after use. Independent of pausing recording; does not erase radar memory. |
+
+These settings are on **Storage & export**. History's Show and exports' Period selectors are independent local viewing/download choices, each limited by saved retention. They do not change recording or stored retention.
 
 History recording, retaining working wireless placements, and radar-memory persistence serve different purposes; merging their controls would obscure what survives reboot. Storage mechanics remain fixed: six-hour batched offloads, recent RAM cache, and an orderly shutdown checkpoint. No user-facing flash-write frequency knob is needed.

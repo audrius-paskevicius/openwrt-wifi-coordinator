@@ -37,7 +37,7 @@ Survey bands use `start` and `step` in MHz. Bin `i` spans `[start + i * step, st
 
 ## CSV conventions
 
-UTF-8, comma delimiter, quoted cells, doubled embedded quotes and CRLF row endings. Each file has a header and `record_type` column:
+UTF-8, comma delimiter and CRLF row endings. Data cells are quoted with doubled embedded quotes; null values are empty cells. The fixed header names are unquoted. Each file has a header and `record_type` column:
 
 - `metadata`: export metadata in the `message` column.
 - `data`: actual dataset rows. Filter to these for plotting or spreadsheet calculations.

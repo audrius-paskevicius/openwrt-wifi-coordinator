@@ -17,6 +17,8 @@ Coordinated channel selection and client steering for OpenWrt, developed and liv
 
 The package combines channel planning, Radio Preference, and a LuCI interface under **Network → Wi-Fi Coordinator**. It uses `usteer` for measurements while keeping competing steering decisions passive. It preserves your Wi-Fi names, passwords, and LAN/WAN topology; automatic operation changes radio channels and widths.
 
+The five tabs are **Channels**, **Clients**, **History**, **Storage & export**, and the full disclaimer. History displays observations; Storage & export controls retention and downloads, with an independent export-period selector.
+
 ## What it does
 
 - Surveys the surrounding spectrum with paced scans and serving gaps.
@@ -95,7 +97,7 @@ The automated controller tests mock hardware operations; they do not switch live
 | `radio-prefer/files/` | Preferred-radio steering and coordination protocol |
 | `wifi-coordinator/` | APK builder, package hooks, shared UI files, ucode tests |
 | `scripts/`, `tests/` | Portable validation and test preparation |
-| `docs/` | [Installation](docs/INSTALL.md), [current architecture](docs/ARCHITECTURE.md), [settings reference](docs/SETTINGS.md), [behavior review](docs/AGREEMENTS.md), [validation](docs/TESTING.md) |
+| `docs/` | [Installation](docs/INSTALL.md), [current architecture](docs/ARCHITECTURE.md), [settings reference](docs/SETTINGS.md), [history export formats](docs/EXPORT.md), [behavior review](docs/AGREEMENTS.md), [validation](docs/TESTING.md) |
 
 This source distribution contains no router passwords, Wi-Fi credentials, private signing keys, saved browser sessions, client inventories, or router backups. Test addresses and Wi-Fi names are synthetic fixtures. This describes the published source and package, not live runtime files on an installed router; see [runtime privacy](docs/ARCHITECTURE.md#history-persistence-and-privacy).
 

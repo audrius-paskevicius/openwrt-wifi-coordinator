@@ -9,7 +9,7 @@ import { stream, DATASETS } from '/usr/share/channel-coordinator/history-export.
 function fail(status,message){
  print('Status: '+status+'\r\nContent-Type: text/plain; charset=utf-8\r\nCache-Control: no-store\r\n\r\n'+message+'\n');exit(0);
 }
-if(getenv('REQUEST_METHOD')!='POST')fail('405 Method Not Allowed','Use the History page export controls.');
+if(getenv('REQUEST_METHOD')!='POST')fail('405 Method Not Allowed','Use the Storage & export page download controls.');
 if(split(getenv('CONTENT_TYPE') ?? '',';')[0]!='application/x-www-form-urlencoded')fail('415 Unsupported Media Type','Invalid request encoding.');
 let size=getenv('CONTENT_LENGTH') ?? '';
 if(!match(size,/^[0-9]+$/)||int(size)<1||int(size)>1024)fail('400 Bad Request','Invalid request size.');

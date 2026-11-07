@@ -1,12 +1,20 @@
 # Validation
 
-Source release: **0.6.0-r41**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.6.0-r42**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 35 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r42 documentation alignment and release audit
+
+Reviewed the documentation against the current menu, settings, planner, recovery, history storage, export engine and package builder. Corrected the tab count, automatic recovery description, numeric radar legend, independent retention-capped export/view selectors and CSV quoting conventions. Installation guidance now locates storage controls and explains the export decoder's transitive LuCI dependency, confirmed against the installed package metadata. The export endpoint's GET error message now points to Storage & export. Controller behavior, dependencies and UI layout are unchanged.
+
+Portable source/documentation and UI checks passed, as did the 26 isolated export-engine checks and 14 CGI authorization/download checks. The signed APK verified; all 40 extracted payload files matched intended source or generated content, and release hashes, public key and disclaimer matched. Source, extracted payload and release assets were scanned for known private values and recognizable secret patterns; none were found. This is a bounded release audit, not a guarantee that every possible secret format is detectable.
+
+The package installed without restarting the unchanged controller processes or changing dependency versions. The installed CGI passed all 14 checks again; an HTTP GET confirmed the corrected page guidance. The full controller simulation suite and RF throughput tests were not repeated for this documentation/text-only revision.
 
 ## r41 remove timezone caption
 

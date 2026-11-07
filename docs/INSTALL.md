@@ -21,7 +21,7 @@ The APK builder declares these dependencies in the package metadata:
 
 | Dependency | Purpose |
 | --- | --- |
-| `luci-base` | LuCI views, forms, RPC, filesystem client libraries and the authenticated CGI download path used for large history files |
+| `luci-base` | LuCI views, forms, RPC and filesystem clients. Its dependencies include `cgi-io` for large history reads and `liblucihttp-ucode` for the export endpoint's form decoder. |
 | `iw` | Wireless information and driver interactions |
 | `usteer` | Client measurements and neighbor information |
 | `ucode` | Controller runtime |
@@ -85,7 +85,9 @@ Every setting uses the same native LuCI help behavior: a short explanation is al
 
 History retention ranges from 1 to 200 hours. Recent records use a 1 MiB RAM buffer; immutable flash batches are written at most once every six hours during normal operation, keeping at least 4 MiB of flash free. There is no fixed archive-size cap. Heavy activity or failed offloads can shorten retained history when the RAM buffer fills. Orderly shutdown checkpoints pending history and radar memory. Unexpected power loss can lose unsaved recent data. Disabling recording pauses new history; **Clear recorded history** explicitly deletes recorded graphs, surveys, and actions while preserving radar-avoidance memory. Only current `batch-*.json` history archives are supported; legacy `history.json` archives are not imported. See [architecture](ARCHITECTURE.md) for scoring, timing and storage details.
 
-History loading uses LuCI's authenticated streaming reader for RAM and archive files larger than the ordinary ubus read limit. Read errors appear above the graphs. Detailed storage statistics are under **History storage**; opening that section survives refreshes. The survey background carries each last observation forward until another measurement replaces it; hover for its actual measurement time.
+The **History** tab contains graphs, summaries and recent actions. **Storage & export** contains retention settings, collapsed **History storage** diagnostics and downloads. History's **Show** selector and exports' **Period** selector are independent, and each is capped by the saved retention setting. Exports default to **All retained history**. CSV downloads one selected dataset; JSON downloads all graph data and actions. Both stream directly without creating an export file on the router. See [export formats, privacy and completeness](EXPORT.md).
+
+History loading uses LuCI's authenticated streaming reader for RAM and archive files larger than the ordinary ubus read limit. Read errors appear above the graphs. Opening **History storage** survives refreshes. The survey background carries each last observation forward until another measurement replaces it; hover for its actual measurement time.
 
 ## Stop or remove
 
