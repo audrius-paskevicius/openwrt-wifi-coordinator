@@ -104,8 +104,7 @@ function advance_scan(radios) {
     if(state.halted||expired){
         history({event:'scan-partial',scanned_frequencies:length(completed),missing_frequencies:length(missing)});
         scan_result=null;
-        state.status=state.halted?'Survey stopped; completed portions retained':expired?'Survey exceeded the freshness limit; waiting for new measurements':
-            'Partial survey saved: '+length(completed)+' frequencies measured; '+length(missing)+' deferred. Channel decisions await a complete survey';
+        state.status=state.halted?'Survey stopped; completed portions retained':'Survey exceeded the freshness limit; waiting for new measurements';
         pending=null;delete state.pending;release();save();
     }else{
         scan_result={at:now(),observations:pending.observations,frequencies:completed,scanners:pending.scanners,scanner:join(', ',uniq(values(pending.scanners)))};

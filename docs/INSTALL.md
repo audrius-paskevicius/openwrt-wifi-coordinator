@@ -9,9 +9,34 @@
 
 See the official [OpenWrt APK documentation](https://openwrt.org/docs/guide-user/additional-software/apk) and [package-signing documentation](https://openwrt.org/docs/guide-user/security/signatures).
 
+## How dependencies are handled
+
+The APK builder declares these dependencies in the package metadata:
+
+| Dependency | Purpose |
+| --- | --- |
+| `luci-base` | LuCI views, forms, RPC and filesystem client libraries |
+| `iw` | Wireless information and driver interactions |
+| `usteer` | Client measurements and neighbor information |
+| `ucode` | Controller runtime |
+| `ucode-mod-fs`, `ucode-mod-ubus`, `ucode-mod-uci`, `ucode-mod-uloop`, `ucode-mod-nl80211` | Files, service APIs, configuration, event loop and wireless APIs |
+
+`apk add` resolves those requirements and their dependencies using installed packages and the router's configured feeds. Missing packages need reachable feeds or separately supplied packages; a standalone APK does not bundle the OpenWrt runtime. The package hooks do not run a separate downloader or a blanket package upgrade. Chart.js is bundled, so the graphs need no CDN, npm or internet access.
+
+Full hostapd/wpad is a manual prerequisite, not an automatically selected dependency. Several mutually exclusive variants exist, and silently replacing an installed variant could disrupt wireless service. Install a suitable full variant for your firmware and verify its required APIs before enabling automatic coordination. Development and live validation used `wpad-mbedtls`.
+
+Runtime package versions are not pinned to one router's installed builds. Use feeds matching the firmware release; the supported/tested baseline is OpenWrt 25.12.6. This does not guarantee compatibility with every future API change. Preview the exact transaction before installing:
+
+```sh
+# Replace VERSION with the downloaded release version.
+apk add --simulate /tmp/luci-app-wifi-coordinator-VERSION.apk
+```
+
+The local APK is checked against its installed signing key. Dependencies use the keys and repositories configured by OpenWrt. The custom signing key does not replace OpenWrt's keys.
+
 ## Trust and install
 
-Obtain the APK and public key from this repository or its GitHub release. Check `release/SHA256SUMS` against downloaded files. Copy `radio-prefer-public.pem` into `/etc/apk/keys/`, then install the APK with `apk add` or the LuCI software page. Keep normal OpenWrt feeds enabled to resolve dependencies.
+Obtain the APK, public key and `SHA256SUMS` from [GitHub Releases](https://github.com/audrius-paskevicius/openwrt-wifi-coordinator/releases/latest). In a directory containing the downloaded assets, run `sha256sum -c SHA256SUMS` to check them. Copy `radio-prefer-public.pem` into `/etc/apk/keys/`, then install the APK with `apk add` or the LuCI software page. Keep normal OpenWrt feeds enabled to resolve dependencies.
 
 The public key authenticates future packages signed with the same private key; verify that you trust the repository owner before installing it. Neither a checksum nor a public key obtained from an untrusted source establishes authenticity by itself.
 
@@ -32,7 +57,7 @@ Automatic channel changes follow one rule on every managed radio:
 1. Use live CSA when the selected method supports it.
 2. For a required restart, attempt a compatible same-network, same-band handoff.
 3. If handoff cannot finish, clear temporary return restrictions and briefly restart only the changing radio. If no compatible AP exists, skip the impossible handoff.
-4. Let clients reconnect, verify their service, and restore the prior channel if recovery fails.
+4. Let clients reconnect and check recovery using available ping responses, bidirectional traffic and associations. If clients cannot be probed, a longer association check is used; this does not prove internet access. Restore the prior channel if recovery fails.
 
 The shared setting **Change channel even if handoff cannot finish** is under **Protect playback**. Explicit protected clients and quiet-only/empty-only policies remain restrictions. A restart is an interruption, not seamless roaming. DFS preparation continues to require an empty compatible helper.
 
@@ -40,7 +65,7 @@ The shared setting **Change channel even if handoff cannot finish** is under **P
 
 Configuration lives in `/etc/config/channel_coordinator` and `/etc/config/radio_prefer`. Use LuCI for explanations of each setting. Fresh normal Radio Preference uses gentle recommendations; strong mode is an administrator choice and still does not set an AP disconnect timer.
 
-History retention ranges from 1 to 200 hours. Recent records use a bounded RAM buffer; immutable flash batches are written at most once every six hours during normal operation. Orderly shutdown checkpoints pending history and radar memory. Unexpected power loss can lose unsaved recent data. Disabling recording pauses new history; **Clear recorded history** explicitly deletes recorded graphs, surveys, and actions while preserving radar-avoidance memory.
+History retention ranges from 1 to 200 hours. Recent records use a 1 MiB RAM buffer; immutable flash batches are written at most once every six hours during normal operation, keeping at least 4 MiB of flash free. There is no fixed archive-size cap. Heavy activity or failed offloads can shorten retained history when the RAM buffer fills. Orderly shutdown checkpoints pending history and radar memory. Unexpected power loss can lose unsaved recent data. Disabling recording pauses new history; **Clear recorded history** explicitly deletes recorded graphs, surveys, and actions while preserving radar-avoidance memory. Only current `batch-*.json` history archives are supported; legacy `history.json` archives are not imported. See [architecture](ARCHITECTURE.md) for scoring, timing and storage details.
 
 ## Stop or remove
 

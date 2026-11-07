@@ -7,10 +7,11 @@
  const ram={samples:[{...sample,end:250,n:2,traffic_sum:6}],periods:[{...period,end:250}],surveys:[],events:[],archive_saved:210};
  const path='/etc/wifi-coordinator/',ramPath='/tmp/wifi-coordinator-history.json';
  data[path+'batch-210.json']=JSON.stringify(archive);data[ramPath]=JSON.stringify(ram);
- listing=[{name:'batch-210.json',type:'file'},{name:'unrelated.txt',type:'file'},{name:'batch-211.json.new',type:'file'}];
+ data[path+'history.json']=JSON.stringify({...archive,samples:[{...sample,time:1}]});
+ listing=[{name:'history.json',type:'file'},{name:'batch-210.json',type:'file'},{name:'unrelated.txt',type:'file'},{name:'batch-211.json.new',type:'file'}];
  const fs={list:async()=>listing,read:async p=>{calls.push(p);if(!(p in data))throw Object.assign(Error('No such file'),{name:'NotFoundError'});return data[p];}};
  const read=new Function('fs',prefix+';return readHistory;')(fs);
- let h=await read();check(h.samples.length===1&&h.samples[0].n===2,'boundary sample dedup');
+ let h=await read();check(h.samples.length===1&&h.samples[0].n===2,'boundary sample dedup and obsolete archive ignored');
  check(h.periods.length===1&&h.periods[0].end===250,'residence extension dedup');
  check(h.archive_files===1&&h.archive_bytes===data[path+'batch-210.json'].length,'owned batch bytes only');
  calls=[];await read();check(calls.length===2&&calls[0]===ramPath,'closed batch cache avoids repeated reads');

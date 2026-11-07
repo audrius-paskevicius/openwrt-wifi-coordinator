@@ -1,4 +1,5 @@
 wifi-coordinator/dist/
+/release/
 wifi-coordinator/history-test-module.uc
 wifi-coordinator/history-storage-test.uc
 wifi-coordinator/test-reconnect-recovery.uc

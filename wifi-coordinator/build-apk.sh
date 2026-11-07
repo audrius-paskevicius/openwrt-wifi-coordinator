@@ -7,6 +7,7 @@ APK_TOOL=${APK_TOOL:-apk}
 : "${SIGN_KEY:?Private signing key must be outside the source tree}"
 KEYS_DIR=${KEYS_DIR:-"$RP/release"}
 VERSION=${VERSION:-$(cat "$BASE/../VERSION")}
+case "$VERSION" in *[!0-9A-Za-z._+-]*|'') echo "Invalid package version" >&2; exit 1;; esac
 OUT=${OUT:-"$BASE/dist"}
 mkdir -p "$OUT"
 ROOT=$(mktemp -d "$OUT/root.XXXXXX")
@@ -20,6 +21,9 @@ cp "$RP/files/radio-prefer.init" "$ROOT/etc/init.d/radio-prefer"
 cp "$CC/files/main.uc" "$CC/files/policy.uc" "$CC/files/planner.uc" "$CC/files/radar.uc" "$CC/files/executor.uc" "$CC/files/survey.uc" "$CC/files/country.uc" "$CC/files/defaults.uc" "$CC/files/history.uc" "$CC/files/history-shutdown.uc" "$CC/files/history-storage.uc" "$CC/LICENSE" "$ROOT/usr/share/channel-coordinator/"
 cp "$RP/files/main.uc" "$RP/files/coordination.uc" "$RP/files/integration-version" "$RP/LICENSE" "$ROOT/usr/share/radio-prefer/"
 cp "$CC/files/wifi-channels.js" "$CC/files/wifi-history.js" "$RP/files/wifi-clients.js" "$ROOT/www/luci-static/resources/view/"
+for view in "$ROOT/www/luci-static/resources/view/"*.js; do
+ sed -i "s/@WIFI_COORDINATOR_VERSION@/$VERSION/g" "$view"
+done
 mkdir -p "$ROOT/www/luci-static/resources/wifi-coordinator"
 cp "$CC/files/wifi-coordinator.chart.js" "$ROOT/www/luci-static/resources/wifi-coordinator/chart.js"
 cp "$CC/files/wifi-coordinator.graphs.js" "$ROOT/www/luci-static/resources/wifi-coordinator/graphs.js"

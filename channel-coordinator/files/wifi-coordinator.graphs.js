@@ -68,13 +68,13 @@ function trafficData(samples,names){
  return names.map(function(r,i){
   // One weighted value per five-minute bucket, even if the radio changed channel.
   var buckets={};samples.filter(function(s){return s.radio==r&&s.n>0;}).forEach(function(s){
-   var b=buckets[s.time]||(buckets[s.time]={time:s.time,end:s.end,interval:s.interval||300,n:0,sum:0,peak:0});
+   var b=buckets[s.time]||(buckets[s.time]={time:s.time,end:s.end,n:0,sum:0,peak:0});
    b.end=Math.max(b.end,s.end);b.n+=s.n;b.sum+=s.traffic_sum;b.peak=Math.max(b.peak,s.traffic_peak);
   });
   var points=[],previous=null;
   Object.keys(buckets).map(Number).sort(function(a,b){return a-b;}).forEach(function(t){
    var b=buckets[t];if(previous!=null&&t>previous)points.push({x:t-1,y:null});
-   points.push({x:t,y:b.sum/b.n,peak:b.peak,end:b.end,interval:b.interval});previous=t+b.interval;
+   points.push({x:t,y:b.sum/b.n,peak:b.peak,end:b.end});previous=t+300;
   });return line(r,points,colour(r,i),{radio:r,borderDash:dash(r,i),pointRadius:points.filter(function(p){return p.y!=null;}).length==1?2:0});
  });
 }
@@ -142,7 +142,7 @@ function trafficChart(canvas,samples,names,start,end){
  var options=baseOptions(start,end);options.scales.y.min=0;options.scales.y.suggestedMax=0.1;
  options.scales.y.ticks.maxTicksLimit=5;options.scales.y.title={display:true,text:'Traffic (Mbit/s)',color:'#444'};
  options.plugins.tooltip.callbacks={title:function(items){return items.length?dated(items[0].raw.x)+' – '+dated(items[0].raw.end):'';},
-  label:function(c){return c.dataset.label+': '+c.raw.y.toFixed(3)+' Mbit/s average; '+c.raw.peak.toFixed(3)+' peak ('+(c.raw.interval/60)+'-minute summary)';}};
+  label:function(c){return c.dataset.label+': '+c.raw.y.toFixed(3)+' Mbit/s average; '+c.raw.peak.toFixed(3)+' peak (5-minute summary)';}};
  return new chartlib.Chart(canvas,{type:'line',data:{datasets:trafficData(samples,names)},options:options});
 }
 return baseclass.extend({channelChart:channelChart,trafficChart:trafficChart,colour:colour,keyStyle:keyStyle,patternStyle:patternStyle,patternName:patternName,geometry:geometry,channelData:channelData,trafficData:trafficData,surveyData:surveyData,radarData:radarData});

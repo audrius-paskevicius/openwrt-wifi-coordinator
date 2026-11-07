@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - name: Check source and signed release checksums
+      - name: Check source, JSON and credential patterns
         run: python3 scripts/check-project.py
       - name: Check LuCI syntax and history/cache behavior
         run: node tests/check-ui.cjs

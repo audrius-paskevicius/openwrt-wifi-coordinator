@@ -1,6 +1,6 @@
 import * as system_fs from 'fs';
 import * as nl from 'nl80211';
-import {channel,group,same,overlap,permitted,uses_dfs,dfs_ready,preparation_text,reconfigure_text,same_network,force_signal_ok,private_ipv4,liveness_progress,move_method,quiet_ready} from './policy.uc';
+import {channel,same,overlap,permitted,uses_dfs,dfs_ready,preparation_text,reconfigure_text,same_network,force_signal_ok,private_ipv4,liveness_progress,move_method,quiet_ready} from './policy.uc';
 export function data_flow(previous,current){
     if(!previous||!current)return false;
     let reset=current.rx<previous.rx||current.tx<previous.tx;
@@ -14,7 +14,7 @@ function log(s){io.log(s);}
 function reconnect_allowed(r){return cfg.allow_reconnect&&r.config.occupied=='handoff'&&length(r.aps)==1&&!r.unsafe&&
     !length(filter(keys(r.clients),m=>index(cfg.protected_clients,lc(m))>=0));}
 function move_allowed(r){return !length(r.clients)||pending?.reconnect&&reconnect_allowed(r)||r.config.method=='csa'&&(r.config.occupied=='handoff'||r.config.occupied=='quiet'&&quiet_ready(io.quiet_since[r.name],now(),cfg.quiet_seconds));}
-function handoff_before_move(clients,method,policy,ready){return clients>0&&method!='csa'&&policy=='handoff';}
+function handoff_before_move(clients,method,policy){return clients>0&&method!='csa'&&policy=='handoff';}
 function start(r,target,radios) {
     coordination_ready();
     if(!target)die('Unsupported target channel or width');
@@ -80,17 +80,15 @@ function handoff_destination(r,radios,preferred) {
 }
 function handoff(r,radios,preferred,strong) {
     for(let mac in keys(r.clients))pending.before[mac]=true;
-    if(!pending.handoff_clients){pending.handoff_clients=filter(keys(r.clients),m=>!pending.only_client||pending.only_client==m);pending.handoff_source=r.name;}
+    if(!pending.handoff_clients){pending.handoff_clients=keys(r.clients);pending.handoff_source=r.name;}
     let target=handoff_destination(r,radios,preferred);if(!target)return 0;
     pending.handoff_target=target.name;
     let nr=call('hostapd.'+target.ifname,'rrm_nr_get_own').value?.[2];
     if(!match(nr ?? '',/^[a-fA-F0-9]{26,}$/))return 0;
     let stations=call('usteer','connected_clients')['hostapd.'+r.ifname] ?? {},count=0;
     for(let mac in keys(r.clients)){
-        if(pending.only_client&&pending.only_client!=mac)continue;
-        // Explicit manual gentle trials are allowed; background optimisation
-        // must not repeatedly interrupt a protected work device's failed roam.
-        if(index(cfg.protected_clients,lc(mac))>=0&&ARGV[0]!='--test-handoff')continue;
+        // Protected work devices must not be interrupted by handoff requests.
+        if(index(cfg.protected_clients,lc(mac))>=0)continue;
         if(!stations[mac]||!stations[mac]['bss-transition-management'])continue;
         call('hostapd.'+r.ifname,'bss_transition_request',{addr:mac,disassociation_imminent:!!strong&&index(cfg.protected_clients,lc(mac))<0,
             disassociation_timer:0,validity_period:100,neighbors:[substr(nr,0,26)+'0301ff'],abridged:true,
@@ -129,7 +127,6 @@ function escalate_handoff(r,radios) {
         let clients=call('usteer','connected_clients')['hostapd.'+r.ifname] ?? {},count=0;
         state.forced=state.forced ?? {};
         for(let mac in keys(r.clients)){
-            if(pending.only_client&&pending.only_client!=mac)continue;
             if(index(cfg.protected_clients,lc(mac))>=0)continue;
             if(now()-(state.forced[mac] ?? -100000)<300)continue;
             if(state.forced[mac]==null&&length(state.forced)>=256)continue;
@@ -267,13 +264,6 @@ function operation(radios) {
         return;
     }
     if(index(['cac','restore','handoff','spare-handoff'],pending.kind)>=0)lease(90,'Coordinating radar preparation and client handoff');
-    if(pending.kind=='handoff-grace'){
-        if(t-pending.started>=12){
-            let r=filter(radios,x=>x.name==pending.radio)[0];if(!r)die('Test radio unavailable');
-            handoff(r,radios);pending.kind='handoff';pending.started=t;
-        }
-        return;
-    }
     if(pending.kind=='spare-handoff'){
         let h=filter(radios,r=>r.name==pending.spare)[0];if(!h)die('Spare radio unavailable during handoff');
         escalate_handoff(h,radios);
@@ -322,14 +312,8 @@ function operation(radios) {
         escalate_handoff(r,radios);
         if(pending.kind!='handoff')return;
         state.status='Client handoff: '+length(r.clients)+' remain on '+r.name+'; quiet for '+(state.radios[r.name]?.quiet_seconds ?? 0)+' seconds';
-        let remaining=pending.only_client?(r.clients[pending.only_client]?1:0):length(r.clients);
-        if(ARGV[0]=='--test-handoff'&&!remaining&&forced_relocated(radios)&&handoff_relocated(radios)){
-            let destinations=filter(radios,x=>x.name!=r.name&&length(filter(pending.handoff_clients ?? [],m=>x.clients[m])));
-            history({event:'handoff-verified',from:r.name,to:join(', ',map(destinations,x=>x.name))});
-            state.status='Client handoff verified; radio channels unchanged';clear_bans();pending=null;delete state.pending;release();save();io.completed();return;
-        }
-        if(ARGV[0]=='--test-handoff'&&t-pending.started>=cfg.handoff_wait)die('Client handoff test did not complete');
-        let quiet_csa=ARGV[0]!='--test-handoff'&&r.config.method=='csa'&&move_allowed(r)&&forced_relocated(radios);
+        let remaining=length(r.clients);
+        let quiet_csa=r.config.method=='csa'&&move_allowed(r)&&forced_relocated(radios);
         if((!remaining&&forced_relocated(radios)&&handoff_relocated(radios))||quiet_csa||t-pending.started>=cfg.handoff_wait){
             pending.handoff_done=true;pending.kind='move-wait';pending.started=t-12;pending.disconnects=0;
         }
@@ -355,7 +339,7 @@ function operation(radios) {
             state.dfs={phase:'ready',radio:r.name,channel:channel(pending.target.freq),width:pending.target.width,completed:t};
             state.status='DFS block already cleared by the kernel';pending=null;delete state.pending;release();save();io.completed();return;
         }
-        if(handoff_before_move(length(r.clients),r.config.method,r.config.occupied,move_allowed(r))&&!pending.handoff_done){
+        if(handoff_before_move(length(r.clients),r.config.method,r.config.occupied)&&!pending.handoff_done){
             if(handoff_destination(r,radios)){
                 let sent=handoff(r,radios);pending.kind='handoff';pending.started=t;
                 state.status='Sent '+sent+' voluntary roaming requests; waiting for clients or quiet traffic';lease(90,state.status);save();return;

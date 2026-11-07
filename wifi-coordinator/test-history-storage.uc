@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import {open_history,set_now} from './history-test-module.uc';
-import {DIRECTORY,ARCHIVE,RAM_LIMIT,archive_info,read_archive,merge_history,checkpoint,clear_archive,expire_archive,prune,bounded} from './history-storage-test.uc';
+import {DIRECTORY,RAM_LIMIT,archive_info,read_archive,merge_history,checkpoint,clear_archive,expire_archive,prune,bounded} from './history-storage-test.uc';
 let checks=0;
 function check(ok,why){if(!ok)die('FAIL: '+why+'\n');checks++;}
 const PATH='/tmp/wifi-history-test.json';
@@ -63,15 +63,16 @@ let attempt=r.archive_attempt;h=open_history('new-boot',true,200);h.flush(true);
 check(json(fs.readfile(PATH)).archive_attempt==attempt,'failed write retries rate limited across restart');
 fs.rmdir(DIRECTORY+'/batch-'+failtime+'.json.new');
 h.clear();check(!length(archive_info().files),'clear deletes all batches');
-// Upgrade imports existing history without rewriting or inventing lost detail.
-let legacy={...r,saved:failtime};fs.writefile(ARCHIVE,sprintf('%J',legacy));
-let legacy_text=fs.readfile(ARCHIVE);
+// Retention deletes expired batches without changing the current batch.
+let older={periods:[],samples:[{...r.samples[0],time:failtime,end:failtime}],surveys:[],events:[]};
 let newer={periods:[],samples:[{...r.samples[0],time:failtime+21600,end:failtime+21600}],surveys:[],events:[]};
-check(checkpoint(newer,failtime+21600,200),'new batch alongside legacy archive');
-check(fs.readfile(ARCHIVE)==legacy_text&&length(archive_info().files)==2,'legacy archive kept byte-identical');
-check(length(read_archive().samples)==2,'legacy and new samples both readable');
+check(checkpoint(older,failtime,200)&&checkpoint(newer,failtime+21600,200),'two current-format batches');
+let current_text=fs.readfile(DIRECTORY+'/batch-'+(failtime+21600)+'.json');
 expire_archive(failtime+21600,1);
-check(!fs.stat(ARCHIVE)&&length(archive_info().files)==1,'only wholly expired files deleted');
+check(length(archive_info().files)==1&&fs.readfile(DIRECTORY+'/batch-'+(failtime+21600)+'.json')==current_text,'only wholly expired batches deleted');
+fs.writefile(DIRECTORY+'/history.json','obsolete');
+check(length(archive_info().files)==1&&length(read_archive().samples)==1,'obsolete archive is not imported');
+fs.unlink(DIRECTORY+'/history.json');
 // File-size safeguard reports loss rather than silently hiding it.
 let huge={periods:[],samples:[],surveys:[],events:[]};for(let i=0;i<100;i++)push(huge.events,{time:i,event:'x',reason:'0123456789012345678901234567890123456789'});
 check(length(bounded(huge,1024))<=1024&&huge.dropped_records>0,'RAM overflow is bounded and counted');

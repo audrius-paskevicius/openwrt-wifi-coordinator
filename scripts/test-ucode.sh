@@ -9,8 +9,9 @@ LOCK=/tmp/wifi-coordinator-project-test.lock
 mkdir "$LOCK" 2>/dev/null || { echo 'Another test run owns the test lock.' >&2; exit 1; }
 trap 'rmdir "$LOCK"' EXIT HUP INT TERM
 cd "$BASE"
-ucode -e 'import {tests} from "./channel-coordinator/files/policy.uc"; tests();'
+ucode wifi-coordinator/test-policy.uc
 ucode radio-prefer/files/main.uc --self-test
+ucode radio-prefer/files/coordination.uc --self-test
 ucode wifi-coordinator/test-redesign.uc
 ucode wifi-coordinator/test-executor.uc
 ucode wifi-coordinator/test-reconnect-recovery.uc

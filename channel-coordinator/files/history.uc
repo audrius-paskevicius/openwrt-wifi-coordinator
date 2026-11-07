@@ -6,8 +6,8 @@ export function open_history(boot,enabled,hours) {
     hours=max(1,min(200,hours));
     let h={boot,started:time(),periods:[],samples:[],events:[],surveys:[]},last_record=0,last_flush=0;
     try { if((fs.stat(PATH)?.size ?? LIMIT+1)<=LIMIT){let old=json(fs.readfile(PATH));
-        if(old.boot==boot&&type(old.periods)=='array'&&type(old.samples)=='array'&&type(old.events)=='array')
-            h={...old,boot,surveys:type(old.surveys)=='array'?old.surveys:[]};
+        if(old.boot==boot&&type(old.periods)=='array'&&type(old.samples)=='array'&&type(old.events)=='array'&&type(old.surveys)=='array')
+            h=old;
     } }catch(e){}
     let archive=archive_info();
     let saved=archive.saved ?? 0;

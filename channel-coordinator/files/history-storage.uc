@@ -1,7 +1,6 @@
 // Immutable six-hour batches: retention controls flash use, not an archive byte cap.
 import * as fs from 'fs';
 export const DIRECTORY='/etc/wifi-coordinator';
-export const ARCHIVE=DIRECTORY+'/history.json'; // Read-only migration from 0.4.0.
 export const RAM_LIMIT=1048576;
 export const INTERVAL=21600;
 const LISTS=['periods','samples','events','surveys'];
@@ -18,10 +17,9 @@ function read_file(path) {
 export function archive_info() {
     let files=[],saved=0,bytes=0;
     for(let name in fs.lsdir(DIRECTORY) ?? []){
-        let m=match(name,/^batch-([0-9]+)\.json$/),at=null;
-        if(m)at=int(m[1]);
-        else if(name=='history.json')at=read_file(ARCHIVE)?.saved;
-        if(at==null)continue;
+        let m=match(name,/^batch-([0-9]+)\.json$/);
+        if(!m)continue;
+        let at=int(m[1]);
         let stat=fs.stat(DIRECTORY+'/'+name);
         if(stat?.type!='file')continue;
         push(files,{name,saved:at,size:stat.size});saved=max(saved,at);bytes+=stat.size;
@@ -30,7 +28,7 @@ export function archive_info() {
 };
 export function clear_archive() {
     for(let name in fs.lsdir(DIRECTORY) ?? [])
-        if(name=='history.json'||name=='history.json.new'||match(name,/^batch-[0-9]+\.json(\.new)?$/))fs.unlink(DIRECTORY+'/'+name);
+        if(match(name,/^batch-[0-9]+\.json(\.new)?$/))fs.unlink(DIRECTORY+'/'+name);
 };
 export function expire_archive(t,hours) {
     for(let file in archive_info().files)
@@ -38,7 +36,7 @@ export function expire_archive(t,hours) {
 };
 function key(k,x) {
     if(k=='periods')return sprintf('%J',[x.radio,x.start,x.channel,x.center,x.width,x.role]);
-    if(k=='samples')return sprintf('%J',[x.radio,x.time,x.channel,x.width,x.role,x.interval ?? 300,x.source]);
+    if(k=='samples')return sprintf('%J',[x.radio,x.time,x.channel,x.width,x.role,x.source]);
     if(k=='surveys')return ''+(x.cycle ?? x.time);
     return sprintf('%J',x);
 }

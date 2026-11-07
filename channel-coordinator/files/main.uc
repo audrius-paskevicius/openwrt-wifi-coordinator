@@ -5,7 +5,7 @@ import * as ubus from 'ubus';
 import * as uci from 'uci';
 import * as uloop from 'uloop';
 import {open_history} from './history.uc';
-import {channel, group, same, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample, tests} from './policy.uc';
+import {channel, group, same, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample} from './policy.uc';
 import {survey_covers,move_method} from './policy.uc';
 import {assess,choose,decide} from './planner.uc';
 import {open_memory} from './radar.uc';
@@ -13,7 +13,6 @@ import {create_survey} from './survey.uc';
 import {create_executor} from './executor.uc';
 
 const N=nl.const, STATE='/tmp/channel-coordinator-state.json', LEASE='/tmp/channel-coordinator-lease.json', JOURNAL='/tmp/channel-coordinator-cac.json';
-if (ARGV[0]=='--self-test') { tests(); exit(0); }
 let bus=ubus.connect(), cursor=uci.cursor();
 if (!bus) die('ubus unavailable\n');
 function call(obj,method,args) {
@@ -41,7 +40,7 @@ function number(k,d,lo,hi) { let v=int(raw[k] ?? d); if(v<lo||v>hi) die(`Invalid
 let cfg={enabled:raw.enabled=='1',mode:raw.mode ?? 'observe',interval:number('interval',60,30,86400),
     cooldown:number('min_dwell',180,30,86400),retry_delay:number('retry_delay',30,10,3600),
     improvement:number('improvement',3,1,200),
-    overlap_penalty:number('overlap_penalty',25,0,500),max_mbps:+(raw.max_mbps ?? '0.1'),
+    overlap_penalty:number('overlap_penalty',25,0,500),max_mbps:+(raw.max_mbps ?? '0.05'),
     separate:raw.separate_radios!='0',
 
     wide_threshold:number('wide_threshold',70,10,100),
@@ -127,7 +126,6 @@ if(state.pending&&state.pending!='scan') state.halted='Service restarted during 
 if(fs.stat(JOURNAL)){restore_preparation();state.halted='Interrupted radio operation recovered; inspect radios before clearing safety stop';}
 if(!state.pending&&index(['listening','restoring'],state.dfs?.phase)>=0)state.dfs.phase='inactive';
 delete state.pending;
-delete state.confirmations;
 if(raw.clear_stop=='1'&&!length(ARGV)){
     delete state.halted;for(let name,r in state.radios)delete r.failed;
     cursor.set('channel_coordinator','main','clear_stop','0');cursor.commit('channel_coordinator');
@@ -149,7 +147,7 @@ function coordination_ready() {
     for(let name in ['wifi-auto-channel','dawn','linksys-steering'])
         if(running(name))die(`Stop competing service ${name} before channel coordination`);
     if(running('radio-prefer')&&trim(fs.readfile('/usr/share/radio-prefer/integration-version') ?? '')!='1')
-        die('Radio Preference 0.1.2 or newer is required for the scan/switch handoff');
+        die('A compatible Radio Preference coordination protocol is required for scan/switch handoff');
     if(running('usteer')){
         let c=call('usteer','get_config');
         for(let k in ['assoc_steering','probe_steering','min_connect_snr','min_snr','roam_scan_snr','roam_trigger_snr','load_kick_enabled','band_steering_interval'])
@@ -168,7 +166,7 @@ function rcfg(name,band) {
     if(index(['csa','idle_reconfigure'],method)<0)die(`Invalid switch method for ${name}`);
     let width_method=r.width_method ?? method;
     if(index(['csa','idle_reconfigure'],width_method)<0)die(`Invalid width-change method for ${name}`);
-    let occupied=r.occupied_policy ?? (r.move_clients=='1'?'quiet':'empty');
+    let occupied=r.occupied_policy ?? 'handoff';
     if(index(['empty','quiet','handoff'],occupied)<0)die('Invalid occupied-radio policy');
     return {managed:r.managed!='0',occupied,method,width_method,channels:ch,widths};
 }

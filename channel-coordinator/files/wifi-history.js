@@ -7,7 +7,7 @@
 'require wifi-coordinator.graphs as graphs';
 function historyKey(k,x){
  if(k=='periods')return JSON.stringify([x.radio,x.start,x.channel,x.center,x.width,x.role]);
- if(k=='samples')return JSON.stringify([x.radio,x.time,x.channel,x.width,x.role,x.interval||300,x.source]);
+ if(k=='samples')return JSON.stringify([x.radio,x.time,x.channel,x.width,x.role,x.source]);
  if(k=='surveys')return String(x.cycle==null?x.time:x.cycle);
  return JSON.stringify(x);
 }
@@ -16,7 +16,7 @@ async function readHistory(){
  var errors=[],directory='/etc/wifi-coordinator/';
  async function read(path){try{var raw=await fs.read(path),h=JSON.parse(raw);h.file_bytes=new TextEncoder().encode(raw).length;return h;}catch(e){if(e.name!='NotFoundError'&&!/No such file/i.test(e.message||''))errors.push('Cannot read history: '+(e.message||e));return {};}}
  var files=await fs.list(directory).catch(function(e){if(e.name!='NotFoundError'&&!/No such file/i.test(e.message||''))errors.push('Cannot list history: '+(e.message||e));return [];});
- files=files.filter(function(f){return f.type=='file'&&(f.name=='history.json'||/^batch-[0-9]+\.json$/.test(f.name));}).sort(function(a,b){return a.name.localeCompare(b.name);});
+ files=files.filter(function(f){return f.type=='file'&&/^batch-[0-9]+\.json$/.test(f.name);}).sort(function(a,b){return a.name.localeCompare(b.name);});
  var names=new Set(files.map(function(f){return f.name;}));archiveCache.forEach(function(v,k){if(!names.has(k))archiveCache.delete(k);});
  var parts=[];
  // Closed batches are immutable: fetch once, then reuse them on minute refreshes.
@@ -64,7 +64,7 @@ var retentionChoices=[1,3,6,12,24,48,72,96,120,168,200];
 var actionNames={
  'cac-start':'Radar check started','cac-shared':'Radar clearance shared','radar-state':'Radar state changed',
  'handoff-request':'Gentle roaming request','handoff-strong':'Stronger roaming request','handoff-disconnect':'Decisive handoff',
- 'handoff-verified':'Handoff verified','switch-verified':'Channel change verified','switch-safety-stop':'Channel change failed verification','switch-ignored':'Driver kept previous channel','scan-client-recovered':'Client reconnected after scan',
+ 'switch-verified':'Channel change verified','switch-safety-stop':'Channel change failed verification','switch-ignored':'Driver kept previous channel','scan-client-recovered':'Client reconnected after scan',
  'rollback-verified':'Previous channel restored','rollback-failed':'Channel recovery needs attention',
  'plan-start':'Joint plan started','radio-repair':'Radio data service recovery','radar-evacuation':'Driver radar evacuation',
  'external-recovery-verified':'External channel change verified','external-recovery-unresolved':'External recovery needs attention',
@@ -108,7 +108,7 @@ return view.extend({
     E('p',{'class':'wc-caption'},_('Time runs left to right; channel position runs bottom to top. Each outline spans the radio’s channel width. The // mark removes the unused gap between 2.4 and 5 GHz; MHz spacing is preserved within each band.')),
     E('div',{'class':'wc-chart wc-spectrum-chart'},channelCanvas),legend(true),
     E('div',{'class':'wc-survey-key'},['Survey background ',E('span',{'class':'wc-grey-scale','aria-hidden':'true'}),' fewer/weaker networks → more/stronger networks']),
-    E('p',{'class':'wc-caption'},surveys.length?_('Grey shows the survey results between measurements. Hover for the measurement time and congestion estimate. Darker means more or stronger overlapping networks, adjusted for advertised load where available; it is not measured airtime.'):_('Survey background starts with the next completed scan. Older surveys were not retained. Only compact channel-level summaries are stored; no network names or addresses.')),
+    E('p',{'class':'wc-caption'},surveys.length?_('Grey shows the survey results between measurements. Hover for the measurement time and congestion estimate. Darker means more or stronger overlapping networks, adjusted for advertised load where available; it is not measured airtime.'):_('Survey background starts with the next completed scan. Only compact channel-level summaries are stored; no network names or addresses.')),
     E('p',{'class':'wc-caption'},_('Colour and hatch direction identify each radio; white edging separates the outlines from the background. Overlapping radios combine their patterns; transparent spaces show the survey background. Hover or tap an outline for its primary channel, centre frequency, width and time. Dashed outlines indicate radar listening. Gaps mean no observation.')),
     radarKey,
     E('p',{'class':'wc-caption'},_('Amber marks the affected channel block. Avoidance strength halves every ')+elapsedLabel(radarHalf)+_('; the percentages show relative strength, not radar probability. New detections strengthen the memory again. Fading does not shorten the mandatory radar prohibition or replace a radar check. Hover over a band for detection details.')),
@@ -121,7 +121,7 @@ return view.extend({
    nodes.push(E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[
     E('thead',{},E('tr',{},head.map(function(x){return E('th',{'scope':'col'},_(x));}))),
     E('tbody',{},latest.map(function(s){return E('tr',{},[
-     s.radio,s.interval==7200?'2-hour aggregate':s.channel+' / '+s.width+' MHz',(s.traffic_sum/Math.max(1,s.n)).toFixed(2)+' / '+s.traffic_peak.toFixed(2)+' Mbps',String(s.clients_peak),congestionCell(s,surveys),s.signal_min!=null?s.signal_min+' dBm':s.clients_peak===0?'No clients':'No signal data'
+     s.radio,s.channel+' / '+s.width+' MHz',(s.traffic_sum/Math.max(1,s.n)).toFixed(2)+' / '+s.traffic_peak.toFixed(2)+' Mbps',String(s.clients_peak),congestionCell(s,surveys),s.signal_min!=null?s.signal_min+' dBm':s.clients_peak===0?'No clients':'No signal data'
     ].map(function(x){return E('td',{},x);}));}))
    ])));
    nodes.push(E('p',{'class':'wc-caption'},_('Airtime is measured; survey estimates describe nearby networks on a 0–100 scale. Hover over a value for its source, measurement time and coverage.')));
@@ -138,7 +138,6 @@ return view.extend({
    if(h.archive_error)nodes.push(E('p',{'class':'alert-message warning'},h.archive_error));
    if(h.dropped_records)nodes.push(E('p',{'class':'alert-message warning'},h.dropped_records+' records were dropped because the recent RAM buffer filled before a successful offload.'));
    (h.read_errors||[]).forEach(function(e){nodes.push(E('p',{'class':'alert-message warning'},e));});
-   if(samples.some(function(s){return s.interval==7200;}))nodes.push(E('p',{'class':'wc-caption'},'Some imported records were already reduced to two-hour summaries by an earlier version. New records retain five-minute detail.'));
    display.replaceChildren.apply(display,nodes);
    var attempts=0;
    function draw(){
@@ -150,7 +149,7 @@ return view.extend({
   }
   selector.addEventListener('change',function(){hours=Number(selector.value);redraw(history);});
   poll.add(function(){return readHistory().then(function(h){history=h;redraw(h);});},60);
-  var m=new form.Map('channel_coordinator',_('History retention'),_('Recent data stays in RAM and is offloaded to flash every six hours. Five-minute traffic summaries, channel residence times and each spectrum survey keep their original detail for the selected period. New batches are written once; expired batches are deleted without rewriting the rest. An orderly reboot saves remaining history once; ordinary service restarts do not force extra flash writes. Flash history has no fixed archive-size cap. No browsing activity, Wi-Fi names or client identities are recorded. No automatic export.'));
+  var m=new form.Map('channel_coordinator',_('History retention'),_('Recent data stays in RAM and is offloaded to flash every six hours. Five-minute traffic summaries, channel residence times and each spectrum survey retain their original detail, subject to the RAM limit and available flash space. New batches are written once; expired batches are deleted without rewriting the rest. An orderly reboot saves remaining history once; ordinary service restarts do not force extra flash writes. Flash history has no fixed archive-size cap; writes reserve 4 MiB of free space. Heavy activity or failed offloads can shorten retention when the 1 MiB RAM buffer fills. No browsing activity, Wi-Fi names or client identities are recorded. No automatic export.'));
   var s=m.section(form.NamedSection,'main','coordinator');s.anonymous=true;
   var o=s.option(form.Flag,'history_enabled',_('Record Wi-Fi history'),_('Turn off to pause new recording. Existing graphs and actions are kept until their retention period expires. Use Clear recorded history to delete them.'));o.default='1';o.rmempty=false;
   o=s.option(form.ListValue,'history_hours',_('Retain up to this many hours'),_('Show follows this selection. Reducing retention hides older records immediately; the next scheduled offload prunes the archive without an extra flash rewrite.'));o.default='24';o.datatype='range(1,200)';o.rmempty=false;
@@ -158,7 +157,7 @@ return view.extend({
   o.onchange=function(ev,section,value){setRetention(value);redraw(history);};
   o=s.option(form.Flag,'clear_history',_('Clear recorded history'),_('Delete recorded graphs, surveys and actions from RAM and flash when settings are applied. This switch resets itself. Recording follows the setting above; radar-avoidance memory is preserved.'));o.default='0';o.rmempty=false;
   return m.render().then(function(node){redraw(history);return E('div',{'class':'wifi-coordinator'},[
-   E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=0.6.0-r2'}),E('h2',{},_('Wi-Fi Coordinator: history')),E('p',{},[_('Show: '),selector]),display,node
+   E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),E('h2',{},_('Wi-Fi Coordinator: history')),E('p',{},[_('Show: '),selector]),display,node
   ]);});
  }
 });

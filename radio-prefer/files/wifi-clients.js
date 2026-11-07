@@ -9,7 +9,7 @@
 var services=rpc.declare({object:'service',method:'list',params:['name'],expect:{'':{}}});
 function readState(){return fs.read('/tmp/radio-prefer-state.json').then(JSON.parse).catch(function(){return {};});}
 var reasons={
- 'protected':'Protected from automatic roaming in Channels / Client handling',
+ 'protected':'Protected from automatic roaming in Channels / Protect playback',
  'on-preferred-radio':'Already on the preferred radio',
  'settling':'Allowing this connection to settle',
  'measure':'Requesting a fresh signal measurement',
@@ -51,7 +51,7 @@ return view.extend({
   var m=new form.Map('radio_prefer',_('Client steering settings'),_('These settings choose a preferred radio. Candidate channels, radar preparation and temporary handoff policy are on the Channels page. Status refreshes every five seconds without changing unsaved settings.'));
   var s=m.section(form.NamedSection,'main','radio_prefer');s.anonymous=true;
   var o=s.option(form.Flag,'enabled',_('Enable preferred-radio steering'),_('Requires full wpad/hostapd with 802.11k/v support and usteer. While enabled, competing usteer steering rules are held passive. Disabling this service restores the previous rules while preserving administrator changes.'));o.rmempty=false;
-  o=s.option(form.ListValue,'preferred_radio',_('Radio to prefer'),_('For this WRT3200ACM, radio0 is the main 5 GHz radio. The preferred AP must use the same Wi-Fi name, security credentials and LAN as the client\'s current AP.'));
+  o=s.option(form.ListValue,'preferred_radio',_('Radio to prefer'),_('Choose the radio with the capabilities and coverage you want to prefer. On a WRT3200ACM, radio0 is normally the main 5 GHz radio. The preferred AP must use the same Wi-Fi name, security credentials and LAN as the client\'s current AP.'));
   o.value('',_('Select a radio'));uci.sections('wireless','wifi-device').forEach(function(r){o.value(r['.name'],r['.name']+' ('+(r.band=='2g'?'2.4':'5')+' GHz)');});
   o.validate=function(section,v){return this.map.lookupOption('enabled',section)[0].formvalue(section)!='1'||v?true:_('Select a preferred radio.');};o.rmempty=false;
   o=s.option(form.ListValue,'mode',_('How strongly to recommend a move'),_('Gentle sends a suggestion. Strong also signals that disassociation is imminent, but sets no AP disconnect timer. A client may reconnect in response or decline either mode. Channel-operation handoff escalation is configured separately on the Channels page.'));
@@ -62,6 +62,6 @@ return view.extend({
   value('cooldown','Wait between recommendations (seconds)',300,'range(60,3600)','300 is five minutes per client. This avoids repeatedly disturbing a device that declines to move.');
   value('max_attempts','Maximum recommendations per episode',3,'range(1,10)','After this many attempts, requests pause for this count multiplied by the recommendation interval. The budget also resets after one minute on the preferred radio. Declining a move does not block future recommendations forever.');
   return m.render().then(function(node){return E('div',{'class':'wifi-coordinator'},[
-   E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=0.3.0-r2'}),intro,node]);});
+   E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),intro,node]);});
  }
 });

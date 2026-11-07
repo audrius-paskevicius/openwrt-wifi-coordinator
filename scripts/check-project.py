@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Portable source/release checks. No authentication or router access required."""
-import hashlib
 import json
 import re
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 root = Path(__file__).resolve().parent.parent
 errors = []
@@ -13,7 +13,7 @@ token = re.compile(r"\b(?:gh[pousr]_" + r"[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9
 personal = re.compile(r"C:[/\\]" + r"Users[/\\]")
 required = ["README.md", "LICENSE", "VERSION", "wifi-coordinator/build-apk.sh",
             "channel-coordinator/files/main.uc", "radio-prefer/files/main.uc",
-            "radio-prefer/release/radio-prefer-public.pem", "release/SHA256SUMS"]
+            "radio-prefer/release/radio-prefer-public.pem", "docs/ARCHITECTURE.md"]
 for name in required:
     if not (root / name).is_file():
         errors.append("Missing required file: " + name)
@@ -42,16 +42,14 @@ for path in root.rglob("*"):
             json.loads(text)
         except ValueError:
             errors.append("Invalid JSON: " + relative)
-
-for line in (root / "release/SHA256SUMS").read_text(encoding="ascii").splitlines():
-    expected, name = line.split(None, 1)
-    name = name.strip()
-    path = (root / "release" / name).resolve()
-    if root not in path.parents or not path.is_file():
-        errors.append("Invalid checksum path: " + name)
-    elif hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-        errors.append("Checksum mismatch: " + name)
+    if path.suffix == ".md":
+        for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", text):
+            link = urlsplit(target)
+            if link.scheme or link.netloc or not link.path:
+                continue
+            if not (path.parent / unquote(link.path)).exists():
+                errors.append("Broken documentation link in {}: {}".format(relative, target))
 
 if errors:
     raise SystemExit("\n".join(errors))
-print("PASS: {} text files, required source, JSON, release checksums and credential patterns".format(count))
+print("PASS: {} text files, required source, documentation links, JSON and credential patterns".format(count))
