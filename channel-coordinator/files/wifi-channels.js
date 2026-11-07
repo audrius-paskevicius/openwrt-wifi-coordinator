@@ -33,6 +33,9 @@ return view.extend({
      E('p',{},'Applied width-change method: '+(methods[r.requested_width_method]||'?')+' → '+(methods[r.width_method]||'?')+'. '+(r.width_reason||''))];
     if(r.csa_recovery_left>0)rows.push(E('p',{},'Recent CSA failure remembered for '+Math.ceil(r.csa_recovery_left/60)+' more minutes. Only Auto adapts the method.'));
     if(r.dfs_constraint)rows.push(E('p',{},r.dfs_constraint));
+    if(r.ht40_constraint)rows.push(E('p',{},r.ht40_constraint));
+    if(r.hardware_widths)rows.push(E('p',{},'Driver widths: '+r.hardware_widths.join(' / ')+' MHz. Widths to compare: '+(r.candidate_widths||[]).join(' / ')+' MHz.'));
+    if((r.unavailable_widths||[]).length)rows.push(E('p',{},'Requested widths unavailable on this radio: '+r.unavailable_widths.join(' / ')+' MHz.'));
     var rejected=(r.rejected||[]).filter(function(x){return x.until>st.updated;});
     if(rejected.length)rows.push(E('p',{},'Temporary destination exclusions: '+rejected.map(function(x){var f=x.target.freq;return 'channel '+(f==2484?14:f<3000?(f-2407)/5:(f-5000)/5)+' / '+x.target.width+' MHz — '+(x.reason||'Connectivity verification failed')+'; '+Math.ceil((x.until-st.updated)/60)+' minutes remaining';}).join('. ')+'.'));
     node.replaceChildren.apply(node,rows);
@@ -69,7 +72,7 @@ return view.extend({
      E('h4',{},a.radio+(a.hold?' — '+a.hold:'')),
      E('p',{},_('Current channel pool: ')+(((st.radios||{})[a.radio]||{}).candidate_channels||[]).join(' ')),
      E('p',{},_('Widths to compare: ')+(((st.radios||{})[a.radio]||{}).candidate_widths||[]).join(' / ')+' MHz'),
-     ...((a.rejected||[]).length?[E('p',{},'Temporarily excluded after failed connectivity checks: '+a.rejected.map(function(x){return ((x.target.freq-5000)/5>0?(x.target.freq-5000)/5:(x.target.freq-2407)/5)+' / '+x.target.width+' MHz';}).join(', ')+'. Each exclusion lasts six hours.')]:[]),
+     ...((a.rejected||[]).length?[E('p',{},'Temporarily excluded placements: '+a.rejected.map(function(x){return (x.target.freq<3000?(x.target.freq-2407)/5:(x.target.freq-5000)/5)+' / '+x.target.width+' MHz — '+(x.reason||'Connectivity check failed')+' ('+Math.max(0,Math.ceil((x.until-st.updated)/60))+' minutes remaining)';}).join('; ')+'.')]:[]),
      E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[
       E('thead',{},E('tr',{},['Channel / width','Cost','Estimated congestion','Estimated usable width','Sharing','Radar memory','Evidence uncertainty'].map(function(x){return E('th',{},x);}))),
       E('tbody',{},a.candidates.slice().sort(function(x,y){return (p.separate?x.shared-y.shared:0)||x.cost-y.cost;}).map(function(c){return E('tr',{},[
@@ -138,18 +141,18 @@ return view.extend({
   radios.forEach(function(r){
    var name=r['.name'],two=r.band=='2g';if(!uci.get('channel_coordinator',name))uci.add('channel_coordinator','radio',name);
    var q=m.section(form.NamedSection,name,'radio',radioName(r));q.anonymous=true;
-   q.description=methodStatus[name]=E('div',{'class':'wc-caption'});
+   help.sectionStatus(q,methodStatus[name]=E('div',{'class':'wc-caption'}));
    var v=q.option(form.Flag,'managed',_('Include this radio'),_('Excluded radios keep their current placement and are not used for radar preparation. This switch does not turn the radio off or exclude it from scanning or preferred-radio steering.'));v.default='1';v.rmempty=false;
    v=q.option(form.ListValue,'occupied_policy',_('When clients are connected'),_('Automatic uses live CSA with clients where supported, otherwise tries a compatible handoff and then the shared brief-reconnect fallback under Protect playback. Quiet-only and empty-only remain explicit restrictions.'));
    v.value('handoff',_('Automatic: live CSA or coordinated handoff'));v.value('quiet',_('Wait for quiet traffic, then announce the switch'));v.value('empty',_('Wait until the radio is empty'));v.default='handoff';v.rmempty=false;
    v=q.option(form.ListValue,'method',_('How this radio changes channels'),_('Auto adapts to driver capabilities, tested hardware behavior and recent CSA failures. An explicit CSA or restart choice is never substituted for a planned move; an unsupported choice prevents that move. Recovery can still restore service after a failed operation. Regulatory restrictions always apply.'));
    v.value('auto',_('Automatic'));v.value('csa',_('Announce a channel switch (CSA)'));v.value('idle_reconfigure',_('Restart this radio'));v.default='auto';v.rmempty=false;
-   v=q.option(form.ListValue,'width_method',_('When channel width also changes'),_('Auto selects a method independently, including restart for tested WRT width changes. Follow channel method uses the resolved channel-change method. Explicit CSA or restart remains fixed. Client restrictions and recovery still apply.'));
+   v=q.option(form.ListValue,'width_method',_('When channel width also changes'),_('Auto selects a method independently, including restart for tested WRT width changes. This method also applies to 2.4 GHz HT40 channel moves, which need a restart for hostapd coexistence checks. Explicit CSA cannot bypass that check. Follow channel method uses the resolved channel-change method. Explicit choices remain fixed.'));
    v.value('auto',_('Automatic'));v.value('inherit',_('Follow channel method'));v.value('csa',_('Announce a channel switch (CSA)'));v.value('idle_reconfigure',_('Restart this radio'));v.default='auto';v.rmempty=false;
    v=q.option(form.Value,'channels',_('Candidate primary channels'),_('Auto uses all driver-allowed primary channels. Or enter channel numbers separated by spaces. Width is chosen separately; driver and regulatory limits always apply.'));
    v.default='auto';v.placeholder='auto';v.validate=function(section,x){x=x.trim();return x=='auto'||/^\d+(\s+\d+)*$/.test(x)&&x.split(/\s+/).every(function(c){return +c>=1&&+c<=(two?14:184);})?true:_('Enter auto or valid channel numbers separated by spaces.');};v.rmempty=false;
-   v=q.option(form.Value,'widths',_('Candidate widths (MHz)'),_('Auto compares all widths supported by this coordinator: 20 MHz on 2.4 GHz, and 20/40/80 MHz on 5 GHz. Or enter widths separated by spaces. Primary channels are selected separately. Driver and regulatory limits still apply. Wider channels are preferred where usable; scores estimate capacity, not measured speed.'));
-   v.default='auto';v.placeholder='auto';v.validate=function(section,x){return (two?/^(auto|20)$/:/^(auto|(20|40|80)(\s+(20|40|80))*)$/).test(x.trim())?true:_('Enter auto, 20 on 2.4 GHz, or widths from 20 40 80 on 5 GHz.');};v.rmempty=false;
+   v=q.option(form.Value,'widths',_('Candidate widths (MHz)'),_('Auto follows this radio\'s advertised HT/VHT widths in its current band. Or enter widths separated by spaces. Legal channel blocks, radar clearance and 2.4 GHz coexistence still apply. The applied status lists driver capabilities and unavailable requests. Wider channels are preferred where usable; scores estimate capacity, not measured speed.'));
+   v.default='auto';v.placeholder='auto';v.validate=function(section,x){return (two?/^(auto|(20|40)(\s+(20|40))*)$/:/^(auto|(20|40|80|160)(\s+(20|40|80|160))*)$/).test(x.trim())?true:_('Enter auto or space-separated widths: 20/40 on 2.4 GHz, 20/40/80/160 on 5 GHz. Driver limits apply.');};v.rmempty=false;
   });
   refresh(state);
   help.compact(m);

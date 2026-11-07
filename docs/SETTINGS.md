@@ -59,11 +59,11 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `managed` | Include in channel planning/preparation. Exclusion leaves placement fixed but does not disable scanning, the radio or preference steering. |
 | `occupied_policy` | Automatic handoff/reconnect, quiet-only CSA, or empty-only. An explicit restriction can deliberately prevent moves indefinitely. |
 | `method` | Auto, explicit CSA or explicit restart. Auto uses advertised CSA unless known hardware behavior or recent failure favors restart. |
-| `width_method` | Auto, follow channel method, or a fixed method. Needed because drivers can support frequency CSA but fail width changes. Auto is independent; Follow inherits the resolved channel method. |
+| `width_method` | Auto, follow channel method, or a fixed method. Needed because drivers can support frequency CSA but fail width changes. Also applies to HT40 channel moves, which require restart for coexistence checks. Auto is independent; Follow inherits the resolved channel method. |
 | `channels` | Auto discovers allowed primary channels in the active band. A manual list restricts primaries only; secondary frequencies still require regulatory/driver permission. |
-| `widths` | Auto compares coordinator-supported widths (2.4 GHz: 20; 5 GHz: 20/40/80 MHz), further constrained by hardware. Manual width restrictions remain useful for client compatibility. |
+| `widths` | Auto follows the radio's current-band HT/VHT capability bits, up to 40 MHz in 2.4 GHz and 160 MHz in 5 GHz. Regulatory/coexistence checks determine eligible blocks. Manual restrictions remain useful for client compatibility; unsupported requests are displayed and excluded. |
 
-On WRT3200ACM/WRT32X, Auto uses restart for radio2 frequency changes and for 5 GHz width changes. Other supported radios use capability-based Auto. This is hardware-specific execution knowledge, not a separate planning algorithm. Auto does not imply unsupported 160 MHz, 2.4 GHz HT40, HE/EHT or 6 GHz support.
+On WRT3200ACM/WRT32X, Auto uses restart for radio2 frequency changes and width changes. HT40 requires restart for hostapd coexistence checks on all hardware. Other supported radios use capability-based Auto. This is execution knowledge, not a separate planning algorithm. HE/EHT, 6 GHz and noncontiguous 80+80 remain outside the supported HT/VHT scope; this router does not advertise them.
 
 ## Preferred-radio steering
 

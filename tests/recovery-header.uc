@@ -1,4 +1,4 @@
-import {same,group} from '../channel-coordinator/files/policy.uc';
+import {same,group,live_width} from '../channel-coordinator/files/policy.uc';
 let checks=0,j,content,live,applies,occupied=true;
 const JOURNAL='/test',boot='boot',N={NL80211_CMD_GET_INTERFACE:1,NLM_F_DUMP:2};
 function check(v,s){if(!v)die('FAIL: '+s+'\n');checks++;}

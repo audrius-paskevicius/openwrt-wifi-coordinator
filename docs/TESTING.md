@@ -1,6 +1,21 @@
 # Validation
 
-Source release: **0.6.0-r11**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r12**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r12 help integration and hardware width discovery
+
+- The native browser regression reproduced the r11 bug: DOM setting descriptions were omitted by LuCI's string-only Value/NamedSection render methods. With r12, all 56 setting descriptions across the three pages render. Native text/icon hover, focus, click/tap, Escape, viewport fit, polling, preserved expansion/unsaved edits and form re-rendering passed. The fixture uses actual renderer/tooltip methods and the theme downloaded from the target router; UCI data, widgets and radio state are synthetic. This is a browser component integration check, not an authenticated end-to-end router session.
+- Portable help tests cover HTML/attribute escaping and delegated interaction handling. Form registration, conditional-value retention, six JavaScript syntax checks, nine history/cache cases and graph checks for HT40/VHT160 geometry and retained colors/patterns passed.
+- All 109 policy checks and 40 new hardware-width/regulatory/segmented-DFS cases passed. Coverage includes the three observed PHY capability sets, both HT40 directions, VHT160 geometry/configuration, per-frequency restrictions, contiguous AUTO_BW ranges, rejection of regulatory gaps, and an 80 MHz helper preparing both halves of a 160 MHz target. Helper-only clearance cannot authorize the serving radio.
+- Executor integration expanded from 40 to 47 passing cases: actual 160 MHz restart configuration, successful verification, HT40 coexistence setup, verified 20 MHz fallback, bounded coexistence refusal, early fallback on a changed primary, and rejection of explicit CSA that would bypass the HT40 check.
+- The remaining full suite passed: 32 preference cases, usteer restoration, 97 planner/radar/survey cases, five extracted recovery cases, 11 radar-persistence cases, 19 history cases and 668 storage cases. Entry-point compilation, signed APK verification and extracted source comparisons passed.
+- A read-only execution of the actual inventory/configuration functions against the router resolved radio0 to 160/80/40/20, radio1 to 40/20, and radio2 to 80/40/20 MHz in its current band. Kernel data allowed lower and DFS 160 MHz blocks; the upper 149-based block remained ineligible. This capability check did not change radios.
+
+- The signed r12 upgrade changed only this package and preserved Auto channels, widths and switching methods on all three radios. Both controllers and usteer were running afterward; six UI resources returned HTTP 200, and three router internet probes succeeded. Two paced surveys completed all 41 requested frequencies. The first automatic move changed radio0 from channel 149/80 to 100/80 and finished with zero missing or unproven clients; four disconnect/reassociation events were recorded, so this was not a lossless-roaming result.
+
+- The live planner attempted HT40 on radio1 with primary 9/secondary 13. Hostapd explicitly rejected 40 MHz because of overlapping BSSes and retained 20 MHz. Both clients recovered with zero missing/unproven clients and two disconnect events. This exposed an early-fallback classification bug in the initial staging APK; the final r12 build waits for width setup to settle, records the constrained width, and keeps normal client verification. The exact early-tick/new-primary sequence passes the executor regression. VHT160 execution and segmented clearance passed injected tests; sustained live 160 MHz operation and throughput have not yet been demonstrated.
+
+To reproduce the browser component check, download the target's `luci-static/resources/form.js`, `ui.js` and its theme's `cascade.css` into a temporary directory, then run `python3 scripts/prepare-browser-check.py RESOURCE_DIR OUTPUT_HTML`. Open the result in an isolated browser profile; its status must read PASS. The generated fixture contains no router credentials and makes no router changes.
 
 ## r11 settings behavior audit
 

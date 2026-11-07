@@ -70,7 +70,8 @@ var actionNames={
  'plan-start':'Joint plan started','radio-repair':'Radio data service recovery','radar-evacuation':'Driver radar evacuation',
  'external-recovery-verified':'External channel change verified','external-recovery-unresolved':'External recovery needs attention',
  'switch-recovery':'Channel change needs recovery','radio-reconnect':'Brief restart for client reconnection','scan-client-unconfirmed':'Scan paused for client recheck',
- 'scan-retry':'Survey batch retried','scan-complete':'Survey completed','scan-partial':'Partial survey saved','scan-client-loss':'Client disappeared during survey','scan-aborted':'Survey batch aborted','error':'Operation deferred or failed'
+ 'scan-retry':'Survey batch retried','scan-complete':'Survey completed','scan-partial':'Partial survey saved','scan-client-loss':'Client disappeared during survey','scan-aborted':'Survey batch aborted','error':'Operation deferred or failed',
+ 'width-constrained':'20 MHz retained during HT40 setup'
 };
 return view.extend({
  load:function(){return Promise.all([uci.load('channel_coordinator'),readHistory()]);},

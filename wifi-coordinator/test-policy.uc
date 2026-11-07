@@ -8,7 +8,7 @@ function tests() {
     eq(switch_methods('auto','auto',false,'radio0','5g',false,0,100).method,'idle_reconfigure');
     eq(switch_methods('auto','auto',false,'radio0','5g',true,200,100).method,'idle_reconfigure');
     eq(switch_methods('auto','auto',false,'radio0','5g',true,200,201).method,'csa');
-    eq(switch_methods('auto','auto',true,'radio1','2g',true,0,100).width_method,'csa');
+    eq(switch_methods('auto','auto',true,'radio1','2g',true,0,100).width_method,'idle_reconfigure');
     let explicit=switch_methods('csa','csa',true,'radio2','5g',false,200,100);
     eq(explicit.method,'csa');eq(explicit.width_method,'csa');eq(explicit.csa_recovery_left,100);
     eq(switch_methods('idle_reconfigure','inherit',false,'radio0','5g',true,0,100).width_method,'idle_reconfigure');
@@ -39,18 +39,18 @@ function tests() {
     }
     eq(channel(2484),14);eq(frequency(14,'2g'),2484);
     eq(join(' ',configured_widths(null,'2g')),'20');
-    eq(join(' ',configured_widths('auto','5g')),'80 40 20');
+    eq(join(' ',configured_widths('auto','5g',[160,80,40,20])),'160 80 40 20');
     eq(join(' ',configured_widths('20 80 20','5g')),'80 20');
-    for(let bad in ['', '40', '20 80']){
+    for(let bad in ['', '80', '20 80']){
         let failed=false;try{configured_widths(bad,'2g');}catch(e){failed=true;}eq(failed,true);
     }
-    let failed=false;try{configured_widths('160','5g');}catch(e){failed=true;}eq(failed,true);
+    let failed=false;try{configured_widths('320','5g');}catch(e){failed=true;}eq(failed,true);
     eq(overlap(group(5180,80),group(5220,80)),1);
     eq(overlap(group(5180,40),group(5220,40)),0);
     eq(overlap(group(2412,20),group(2437,20)),0);
     eq(overlap(group(2412,20),group(2417,20)),0.75);
     eq(group(5180,80).center,5210); eq(group(5240,80).sec,-1);
-    eq(group(5745,80).center,5775); eq(group(2412,40),null);
+    eq(group(5745,80).center,5775); eq(group(2412,40).center,2422);
     eq(delta_busy({time:100,busy:50},{time:200,busy:70}),20);
     eq(delta_busy({time:100,busy:50},{time:100,busy:50}),null);
     eq(delta_busy({time:100,busy:50},{time:200,busy:30}),null);

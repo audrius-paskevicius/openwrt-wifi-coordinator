@@ -26,7 +26,7 @@ function setup(method,occupied){
  let io={cfg,state:st,boot:'test',now:()=>T,save:()=>{},lease:()=>{},release:()=>{},call,
  request:()=>({reg_rules:[{reg_rule_flags:0,freq_range_start:5150000,freq_range_end:5875000,freq_range_max_bw:80000,power_rule_max_eirp:2000}]}),
  config_fingerprint:()=>'stable',phy_caps:()=>caps,allclients:(rs)=>{let c={};for(let r in rs)for(let m in keys(r.authorized))c[m]=true;return c;},
- empty_interface:()=>!length(radio.clients),apply_empty_config:()=>{repairs++;let ch=int(match(content,/channel=([0-9]+)/)[1]),w=int(match(content,/vht_oper_chwidth=([0-9]+)/)[1]);radio.current=group(5000+5*ch,w?80:20);},
+ empty_interface:()=>!length(radio.clients),apply_empty_config:()=>{repairs++;let ch=int(match(content,/channel=([0-9]+)/)[1]),w=int(match(content,/vht_oper_chwidth=([0-9]+)/)?.[1] ?? 0);radio.current=group((radio.band=='2g'?2407:5000)+5*ch,radio.band=='2g'?20:w==2?160:w?80:20);},
  apply_radio_config:()=>{repairs++;if(!ignore){let ch=int(match(content,/channel=([0-9]+)/)[1]),w=int(match(content,/vht_oper_chwidth=([0-9]+)/)[1]);radio.current=group(5000+5*ch,w?80:20);}},
  restore_preparation:()=>{if(!journal)return false;restores++;content=journal.original;radio.current=journal.source;journal=null;return true;},private_json:(p,j)=>{journal=j;},coordination_ready:()=>{},
  dfs_mode:()=>'prepare',history:e=>push(events,e),log:()=>{},quiet_since:{},remember:()=>{},completed:()=>{},
@@ -111,4 +111,24 @@ T+=21;ex.tick(pair);check(ex.pending().kind=='move-wait','failed decisive handof
 T+=1;ex.tick(pair);check(repairs==1&&ex.pending().kind=='verify','stranded disconnected client can reconnect after the channel change');
 radio.clients={client:true};radio.authorized={client:true};radio.client_data.client={rx:30000,tx:30000};T+=70;ex.tick(pair);
 check(!ex.busy()&&events[-1].event=='switch-verified'&&peer.current.freq==5180&&peer.clients.other,'fallback verifies same-AP reconnection without changing the peer radio');
+opt=setup();radio.clients={};radio.authorized={};radio.aps=[{}];content+='vht_capab=[SHORT-GI-80]\n';
+opt.request=()=>({reg_rules:[{reg_rule_flags:0,freq_range_start:5150000,freq_range_end:5875000,freq_range_max_bw:160000,power_rule_max_eirp:2000}]});
+// The executor captures request at creation; widen its existing synthetic rule through a fresh instance.
+ex=create_executor(opt);ex.start(radio,group(5500,160),[radio]);T+=15;ex.tick([radio]);
+check(repairs==1&&radio.current.width==160&&index(content,'vht_oper_chwidth=2')>=0,'160 restart reaches requested width with actual hostapd configuration');
+T+=46;ex.tick([radio]);check(!ex.busy()&&events[-1].event=='switch-verified','160 restart completes verification');
+opt=setup();radio.band='2g';radio.current=group(2412,20);radio.clients={};radio.authorized={};radio.aps=[{}];radio.caps={};
+for(let ch=1;ch<=13;ch++)radio.caps[2407+5*ch]={max_tx_power:2000};
+radio.config.channels=[1,5,9,13];content='channel=1\nht_capab=[LDPC]\nnoscan=0\n';
+opt.request=()=>({reg_rules:[{reg_rule_flags:0,freq_range_start:2400000,freq_range_end:2483500,freq_range_max_bw:40000,power_rule_max_eirp:2000}]});
+ex=create_executor(opt);ex.start(radio,group(2432,40),[radio]);T+=15;ex.tick([radio]);
+check(index(content,'[HT40+]')>=0&&index(content,'noscan=0')>=0,'HT40 requests coexistence-checked setup');
+radio.current=group(2432,20);T+=5;ex.tick([radio]);
+check(ex.pending().kind=='verify'&&ex.pending().target.width==40&&!ex.pending().external,'early20 fallback on a new primary does not become unrelated external recovery');
+T+=41;ex.tick([radio]);
+check(!ex.busy()&&!st.radios.r.failed&&events[-1].event=='switch-verified','hostapd20 fallback verifies service without false connectivity failure');
+check(st.radios.r.rejected[0].target.width==40&&st.radios.r.rejected[0].until==T+900,'coexistence refusal remembered only for evidence freshness period');
+radio.config.width_method='csa';ex.start(radio,group(2412,40),[radio]);T+=15;denied=false;
+try{ex.tick([radio]);}catch(e){denied=index(''+e,'coexistence')>=0;ex.abort(e);}
+check(denied,'explicit CSA cannot bypass HT40 coexistence');
 print('PASS: '+checks+' executor integration and failure cases\n');

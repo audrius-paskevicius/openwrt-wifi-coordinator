@@ -1,6 +1,6 @@
 import * as system_fs from 'fs';
 import * as nl from 'nl80211';
-import {channel,same,overlap,permitted,uses_dfs,dfs_ready,preparation_text,reconfigure_text,same_network,force_signal_ok,private_ipv4,liveness_progress,move_method,quiet_ready} from './policy.uc';
+import {channel,group,same,overlap,permitted,uses_dfs,dfs_ready,preparation_text,reconfigure_text,same_network,force_signal_ok,private_ipv4,liveness_progress,move_method,quiet_ready} from './policy.uc';
 export function data_flow(previous,current){
     if(!previous||!current)return false;
     let reset=current.rx<previous.rx||current.tx<previous.tx;
@@ -28,13 +28,27 @@ function start(r,target,radios) {
 };
 function start_cac(r,g,radios) {
     let rules=request(N.NL80211_CMD_GET_REG,0,{}).reg_rules ?? [];
-    let widthbit=g.width==80?8:g.width==40?4:2;
-    let suitable=filter(radios,h=>h.config.managed&&!h.unsafe&&h.band=='5g'&&(h.radar_widths&widthbit)&&length(h.aps)==1&&
-        (!cfg.dfs_helper||h.name==cfg.dfs_helper)&&dfs_mode(h)=='prepare'&&
-        permitted(g,h.caps,rules,h.config.channels,'prepare')&&
-        preparation_text(fs.readfile('/var/run/hostapd-phy'+h.phy+'.conf'),g));
+    let suitable=[];
+    // Clearance is per-frequency. A narrower helper can prepare a wide block
+    // in pieces, but every piece must become AVAILABLE on the serving PHY too.
+    for(let h in radios){
+        if(!h.config.managed||h.unsafe||h.band!='5g'||length(h.aps)!=1||
+            cfg.dfs_helper&&h.name!=cfg.dfs_helper||dfs_mode(h)!='prepare')continue;
+        let groups=[];
+        for(let w in [160,80,40,20]){
+            let bit=w==160?32:w==80?8:w==40?4:2;
+            if(w>g.width||!(h.radar_widths&bit)||h.config.widths&&index(h.config.widths,w)<0)continue;
+            for(let f in g.members){
+                let part=w==g.width?g:group(f,w);
+                if(!part||length(filter(part.members,m=>index(g.members,m)<0))||dfs_ready(part,r.caps))continue;
+                if(!length(filter(groups,x=>same(x,part))))push(groups,part);
+            }
+        }
+        for(let part in groups)if(permitted(part,h.caps,rules,h.config.channels,'prepare')&&
+            preparation_text(fs.readfile('/var/run/hostapd-phy'+h.phy+'.conf'),part))push(suitable,{...h,cac_part:part});
+    }
     let choices=filter(suitable,h=>!length(h.clients));
-    choices=sort(choices,(a,b)=>(a.name==r.name?1:0)-(b.name==r.name?1:0));
+    choices=sort(choices,(a,b)=>(a.name==r.name?1:0)-(b.name==r.name?1:0)||b.cac_part.width-a.cac_part.width);
     let h=choices[0];
     if(!h){
         let busy=sort(filter(suitable,h=>h.config.occupied=='handoff'&&!length(filter(keys(h.clients),m=>index(cfg.protected_clients,lc(m))>=0))),(a,b)=>
@@ -50,6 +64,7 @@ function start_cac(r,g,radios) {
         }
         die('Waiting for an empty, compatible 5 GHz radio to prepare DFS');
     }
+    g=h.cac_part;
     if(config_fingerprint(h.name)!=h.fingerprint)die('Spare radio settings changed');
     if(!empty_interface(h.ifname)){
         pending.cac_idle_wait=pending.cac_idle_wait ?? now();
@@ -57,11 +72,12 @@ function start_cac(r,g,radios) {
         state.status='Waiting for spare-radio station records to clear before radar preparation';lease(90,state.status);save();return;
     }
     let path='/var/run/hostapd-phy'+h.phy+'.conf';
-    let original=reconfigure_text(fs.readfile(path),h.current,h.band),temporary=preparation_text(original,g);
+    let original=reconfigure_text(fs.readfile(path),h.current,h.band,h.band_caps),temporary=preparation_text(original,g);
     if(!original||!temporary)die('Cannot construct live-channel CAC recovery configuration');
     private_json(JOURNAL,{boot,phy:'phy'+h.phy,ifname:h.ifname,path,original,temporary,source:h.current});
     pending.kind='cac';pending.started=now();pending.helper={name:h.name,phy:h.phy,ifname:h.ifname,source:h.current,fingerprint:h.fingerprint};
     pending.cac_seen=false;
+    pending.cac_target=g;
     state.pending='DFS preparation';state.dfs={phase:'listening',helper:h.name,radio:r.name,channel:channel(g.freq),width:g.width,started:now(),timeout:cfg.cac_timeout};
     state.status='Starting radar check on '+h.name+'; other radios continue serving clients';
     lease(90,'Spare radio is listening for radar');save();
@@ -174,8 +190,8 @@ function reconfigure_idle(r,g) {
     // Explicit opt-in, AP-only HT/VHT configurations, no global network reload.
     if(length(r.clients))die('Idle reconfiguration requires an empty radio');
     if(!empty_interface(r.ifname))return false;
-    let path='/var/run/hostapd-phy'+r.phy+'.conf',original=reconfigure_text(fs.readfile(path),r.current,r.band);
-    let content=reconfigure_text(original,g,r.band);
+    let path='/var/run/hostapd-phy'+r.phy+'.conf',original=reconfigure_text(fs.readfile(path),r.current,r.band,r.band_caps);
+    let content=reconfigure_text(original,g,r.band,r.band_caps);
     if(!content)die('Generated hostapd configuration is not supported for idle reconfiguration');
     let backup=path+'.channel-coordinator-before';
     if(!fs.writefile(backup,original)||!fs.chmod(backup,0600))die('Cannot save runtime configuration backup');
@@ -197,7 +213,7 @@ function reconfigure_reconnect(r,g) {
         pending.before[mac]=true;pending.verify_seconds=cfg.verify_unprobed;
     }
     let path='/var/run/hostapd-phy'+r.phy+'.conf';
-    let original=reconfigure_text(fs.readfile(path),r.current,r.band),temporary=reconfigure_text(original,g,r.band);
+    let original=reconfigure_text(fs.readfile(path),r.current,r.band,r.band_caps),temporary=reconfigure_text(original,g,r.band,r.band_caps);
     if(!original||!temporary)die('Unsupported configuration for brief radio restart');
     if(fs.stat(JOURNAL))die('Another radio recovery journal is active');
     // RAM-only journal: service interruption restores the old live channel.
@@ -276,19 +292,19 @@ function operation(radios) {
         save();return;
     }
     if(pending.kind=='cac'){
-        let h=pending.helper,caps=phy_caps(h.phy),r=filter(radios,x=>x.name==pending.radio)[0];
+        let h=pending.helper,caps=phy_caps(h.phy),r=filter(radios,x=>x.name==pending.radio)[0],g=pending.cac_target;
         state.dfs.elapsed=t-pending.started;
         let live_status;try{live_status=call('hostapd.'+h.ifname,'get_status');}catch(e){}
         state.status=live_status?.dfs?.cac_active?'Listening for radar on '+h.name+'; other radios continue serving clients':
             'Waiting for confirmed radar clearance on '+h.name;
-        if(t-pending.started>20&&live_status?.status=='ENABLED'&&live_status.freq!=pending.target.freq)
+        if(t-pending.started>20&&live_status?.status=='ENABLED'&&live_status.freq!=g.freq)
             die('Radio did not enter the requested DFS channel; restoring its live source channel');
-        if(pending.radar||length(filter(pending.target.members,f=>caps[f]?.dfs_state==1)))die('Radar detected; candidate rejected');
+        if(pending.radar||length(filter(g.members,f=>caps[f]?.dfs_state==1)))die('Radar detected; candidate rejected');
         if(t-pending.started>cfg.cac_timeout)die('Radar check timed out; restoring spare radio');
         let helper=filter(radios,x=>x.name==h.name)[0];
         let targetcaps=r?.caps ?? (pending.radio==h.name?caps:{});
-        if(pending.cac_seen&&helper&&same(helper.current,pending.target)&&dfs_ready(pending.target,caps)&&dfs_ready(pending.target,targetcaps)){
-            history({event:'cac-shared',helper:h.name,radio:pending.radio,channel:channel(pending.target.freq),elapsed:t-pending.started});
+        if(pending.cac_seen&&helper&&same(helper.current,g)&&dfs_ready(g,caps)&&dfs_ready(g,targetcaps)){
+            history({event:'cac-shared',helper:h.name,radio:pending.radio,channel:channel(g.freq),width:g.width,elapsed:t-pending.started});
             restore_preparation();pending.kind='restore';pending.started=t;state.dfs.phase='restoring';
             state.status='Radar check passed; restoring spare radio before handoff';save();
         }
@@ -298,9 +314,9 @@ function operation(radios) {
         let h=filter(radios,x=>x.name==pending.helper.name)[0],r=filter(radios,x=>x.name==pending.radio)[0];
         if(t-pending.started>cfg.cac_timeout)die('Spare radio did not return to its original channel');
         if(h&&same(h.current,pending.helper.source)&&r){
-            if(!dfs_ready(pending.target,r.caps))die('Shared radar clearance is no longer available');
+            if(!dfs_ready(pending.cac_target,r.caps))die('Shared radar clearance is no longer available');
             state.dfs.phase='ready';state.dfs.completed=t;state.status='DFS block prepared; spare radio restored';
-            if(ARGV[0]=='--test-prepare'){
+            if(ARGV[0]=='--test-prepare'&&dfs_ready(pending.target,r.caps)){
                 clear_bans();pending=null;delete state.pending;release();save();io.completed();return;
             }
             pending.kind='move-wait';pending.started=t;save();
@@ -326,6 +342,8 @@ function operation(radios) {
         let rules=request(N.NL80211_CMD_GET_REG,0,{}).reg_rules ?? [];
         let dm=dfs_mode(r);
         if(!permitted(pending.target,r.caps,rules,r.config.channels,dm))die('Target no longer permitted');
+        if(r.config.hardware_widths&&index(r.config.hardware_widths,pending.target.width)<0)die('Target width is not advertised by this radio');
+        if(r.band=='2g'&&pending.target.width==40&&pending.method=='csa')die('HT40 requires restart for hostapd coexistence checks; explicit CSA remains unchanged');
         if(cfg.separate){
             let others=filter(radios,x=>x.name!=r.name),before=0,after=0;
             for(let x in others){before+=overlap(r.current,x.current);after+=overlap(pending.target,x.current);}
@@ -393,6 +411,22 @@ function operation(radios) {
         if(length(progress.failed))pending.last_problem=t;
         let stable=t-(pending.last_problem ?? pending.started)>=30;
         let channel_ok=r&&same(r.current,pending.target);
+        let constrained=r&&r.band=='2g'&&pending.target.width==40&&r.current.width==20&&
+            index(pending.target.members,r.current.freq)>=0&&!pending.external;
+        if(constrained&&t-pending.started<30){
+            state.status='Waiting for HT40 setup to settle before checking the resulting width';save();return;
+        }
+        if(constrained&&!pending.coexistence){
+            // Hostapd may retain 20 MHz after its coexistence scan. Accept only
+            // after client verification; do not keep trying the same HT40 block.
+            let requested=pending.target,s=state.radios[r.name];
+            s.rejected=s.rejected ?? [];
+            push(s.rejected,{target:requested,until:t+(cfg.max_age ?? 900),reason:'20 MHz retained during HT40 setup: coexistence or driver constraint'});
+            while(length(s.rejected)>16)shift(s.rejected);
+            history({event:'width-constrained',radio:r.name,channel:channel(r.current.freq),width:r.current.width,requested_width:40});
+            pending.target=r.current;pending.coexistence=true;channel_ok=true;
+            state.status='HT40 setup retained 20 MHz; checking clients';
+        }
         if(r&&!channel_ok&&!same(r.current,pending.source)&&!pending.external){
             pending.kind='reconcile';pending.started=t;state.pending='external recovery';
             state.status='Driver changed the operating channel; reconciling actual placement';save();return;
@@ -491,7 +525,7 @@ function event(e,radios){
     }
     if(e.cmd!=N.NL80211_CMD_RADAR_DETECT)return;
     let msg=e.msg??{};
-    if(pending?.kind=='cac'&&msg.wiphy==pending.helper.phy&&index(pending.target.members,msg.wiphy_freq)>=0){
+    if(pending?.kind=='cac'&&msg.wiphy==pending.helper.phy&&index(pending.cac_target.members,msg.wiphy_freq)>=0){
         if(msg.radar_event==1)pending.cac_seen=true;
         if(msg.radar_event==0)pending.radar=true;
         return;

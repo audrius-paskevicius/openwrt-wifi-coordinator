@@ -6,7 +6,7 @@ import * as uci from 'uci';
 import * as uloop from 'uloop';
 import {open_history} from './history.uc';
 import {channel, group, same, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample} from './policy.uc';
-import {survey_covers,move_method,configured_channels,configured_widths,frequency,switch_methods,setting_integer} from './policy.uc';
+import {survey_covers,move_method,configured_channels,configured_widths,frequency,switch_methods,setting_integer,hardware_widths,placements,live_width} from './policy.uc';
 import {assess,choose,decide} from './planner.uc';
 import {open_memory} from './radar.uc';
 import {create_survey} from './survey.uc';
@@ -96,7 +96,7 @@ function restore_preparation() {
     if(j.boot!=boot){fs.unlink(JOURNAL);return false;}
     if(!match(j.path ?? '',/^\/var\/run\/hostapd-phy[0-9]+\.conf$/)||!match(j.phy ?? '',/^phy[0-9]+$/))die('Invalid CAC recovery journal');
     let live=filter(request(N.NL80211_CMD_GET_INTERFACE,N.NLM_F_DUMP,{}),x=>x.ifname==(j.ifname ?? j.phy+'-ap0'))[0];
-    let width=live?[20,20,40,80][live.channel_width]:null;
+    let width=live?live_width(live.channel_width):null;
     let on_source=j.source&&live&&same({freq:live.wiphy_freq,center:live.center_freq1 ?? live.wiphy_freq,width},j.source);
     let current=fs.readfile(j.path);
     if(current==j.temporary){
@@ -158,30 +158,37 @@ function coordination_ready() {
             if(c[k])die(`usteer ${k} is active; use passive usteer with Radio Preference or disable that policy first`);
     }
 }
-function rcfg(name,band,caps,csa) {
+function rcfg(name,band,caps,csa,band_caps) {
     let r=cursor.get_all('channel_coordinator',name) ?? {};
     if(r.managed!=null&&index(['0','1'],r.managed)<0)die('Invalid managed setting for '+name);
     let ch=configured_channels(r.channels,band,caps);
-    let widths=configured_widths(r.widths,band);
+    let hardware=hardware_widths(band,band_caps),requested=configured_widths(r.widths,band,hardware);
+    let widths=filter(requested,w=>index(hardware,w)>=0);
     let methods=switch_methods(r.method,r.width_method,wrt,name,band,csa,state.radios[name]?.csa_failed_until,now());
     let occupied=r.occupied_policy ?? 'handoff';
     if(index(['empty','quiet','handoff'],occupied)<0)die('Invalid occupied-radio policy');
-    return {managed:r.managed!='0',occupied,...methods,channels:ch,widths};
+    return {managed:r.managed!='0',occupied,...methods,channels:ch,widths,hardware_widths:hardware,
+        unavailable_widths:filter(requested,w=>index(hardware,w)<0)};
 }
 function inventory() {
     let ws=call('network.wireless','status'), interfaces=request(N.NL80211_CMD_GET_INTERFACE,N.NLM_F_DUMP,{});
     let phys=request(N.NL80211_CMD_GET_WIPHY,N.NLM_F_DUMP,{split_wiphy_dump:true});
     let phyinfo={};
     for(let p in phys ?? []) {
-        let info=phyinfo[p.wiphy] ?? {caps:{},csa:false}; phyinfo[p.wiphy]=info;
+        let info=phyinfo[p.wiphy] ?? {caps:{},csa:false,bands:{}}; phyinfo[p.wiphy]=info;
         if(index(p.supported_commands ?? [],N.NL80211_CMD_CHANNEL_SWITCH)>=0) info.csa=true;
         for(let c in p.interface_combinations ?? [])info.radar_widths=(info.radar_widths ?? 0)|(c.radar_detect_widths ?? 0);
-        for(let band in p.wiphy_bands ?? []) if(band) for(let f in band.freqs ?? []) if(f) info.caps[f.freq]=f;
+        for(let index,band in p.wiphy_bands ?? []) if(band){
+            let first=band.freqs?.[0]?.freq,key=first?(first<3000?'2g':'5g'):(index==0?'2g':'5g');
+            let old=info.bands[key] ?? {};
+            info.bands[key]={ht_capa:band.ht_capa ?? old.ht_capa,vht_capa:band.vht_capa ?? old.vht_capa};
+            for(let f in band.freqs ?? [])if(f)info.caps[f.freq]=f;
+        }
     }
     let out=[];
     for(let name,data in ws) {
         if(!match(name,/^[A-Za-z0-9_-]+$/)||!data.up||data.disabled) continue;
-        let aps=[],unsafe=!match(data.config.htmode ?? '',/^(HT|VHT)(20|40|80)$/);
+        let aps=[],unsafe=!match(data.config.htmode ?? '',/^(HT(20|40[+-]?)|VHT(20|40|80|160))$/);
         for(let i in data.interfaces ?? []) {
             if(i.config?.mode!='ap') { unsafe=true; continue; }
             if(!match(i.ifname ?? '',/^[A-Za-z0-9_.-]+$/)) continue;
@@ -193,7 +200,7 @@ function inventory() {
         let live=null;
         for(let i in interfaces ?? []) if(i.ifname==aps[0].ifname) live=i;
         if(!live) continue;
-        let width=[20,20,40,80][live.channel_width];
+        let width=live_width(live.channel_width);
         if(!width||live.wiphy_freq>=5925) {unsafe=true;width=width ?? 160;}
         let clients={},authorized={},signals={},client_data={},bytes=0,client_capacity=0;
         for(let ap in aps) {
@@ -214,12 +221,13 @@ function inventory() {
         let identities=join(' ',sort(keys(clients)));
         let reading=traffic_sample(prev,rates[name],quiet_since[name],t,bytes,identities,cfg.max_mbps);
         rates[name]=reading.rate;quiet_since[name]=reading.quiet;traffic[name]=reading.sample;
-        let band=live.wiphy_freq<3000?'2g':'5g', g=group(live.wiphy_freq,width) ?? {freq:live.wiphy_freq,center:live.center_freq1,width,members:[live.wiphy_freq],sec:0};
+        let band=live.wiphy_freq<3000?'2g':'5g', g=group(live.wiphy_freq,width,live.center_freq1) ?? {freq:live.wiphy_freq,center:live.center_freq1,width,members:[live.wiphy_freq],sec:0};
         g.center=live.center_freq1 ?? g.center;
-        let p=phyinfo[live.wiphy] ?? {caps:{},csa:false},config=rcfg(name,band,p.caps,p.csa);
+        let p=phyinfo[live.wiphy] ?? {caps:{},csa:false},config=rcfg(name,band,p.caps,p.csa,p.bands?.[band]);
         let reg=request(N.NL80211_CMD_GET_REG,0,{wiphy:live.wiphy});
         if(length(filter(interfaces,i=>i.wiphy==live.wiphy))!=length(aps))unsafe=true;
         push(out,{name,band,aps,ifname:aps[0].ifname,phy:live.wiphy,caps:p.caps,csa:p.csa,
+            band_caps:p.bands?.[band],
             radar_widths:p.radar_widths ?? 0,dfs_region:reg?.dfs_region,
             current:g,clients,authorized,signals,client_data,client_capacity,mbps:rates[name] ?? 0,config,unsafe,
             fingerprint:config_fingerprint(name),
@@ -269,6 +277,8 @@ function sample(radios) {
         s.cooldown_left=max(0,cfg.cooldown-(t-(s.last_move ?? -100000)));
         s.candidate_channels=r.config.channels;
         s.candidate_widths=r.config.widths;
+        s.hardware_widths=r.config.hardware_widths;s.unavailable_widths=r.config.unavailable_widths;
+        s.ht40_constraint=r.band=='2g'&&r.config.width_method=='csa'?'HT40 requires restart for coexistence checks; explicit CSA cannot apply it':null;
     }
     let history_rows=map(radios,r=>{
         let b=evidence[r.name+':'+r.current.freq],signals=values(r.signals);
@@ -277,12 +287,12 @@ function sample(radios) {
             role:pending?.kind=='cac'&&pending.helper.name==r.name?'radar preparation':'serving'};
     });
     if(pending?.kind=='cac'&&!length(filter(history_rows,r=>r.radio==pending.helper.name)))
-        push(history_rows,{radio:pending.helper.name,channel:channel(pending.target.freq),center:pending.target.center,width:pending.target.width,
+        push(history_rows,{radio:pending.helper.name,channel:channel((pending.cac_target ?? pending.target).freq),center:(pending.cac_target ?? pending.target).center,width:(pending.cac_target ?? pending.target).width,
             clients:0,traffic:0,busy:null,signal:null,role:'radar preparation'});
     history_store.record(history_rows);
 }
 function candidates(r,radios,rules) {
-    let s=state.radios[r.name],t=now(),dm=dfs_mode(r),list=[],busy={},maxw=max(...r.config.widths);
+    let s=state.radios[r.name],t=now(),dm=dfs_mode(r),list=[],busy={},maxw=max(r.current.width,...r.config.widths);
     for(let f in scan_result.frequencies){
         let e=evidence[r.name+':'+f] ?? evidence[scan_result.scanners[f]+':'+f];
         let own=length(filter(radios,x=>length(x.clients)&&overlap(group(int(f),20),x.current)>0));
@@ -303,11 +313,11 @@ function candidates(r,radios,rules) {
         t-(s.last_move ?? -100000)<cfg.cooldown?'Minimum residence after verified move':
         t-(s.last_attempt ?? -100000)<cfg.retry_delay?'Short retry delay':null;
     if(s.planning_hold)return [current];
-    for(let w in r.config.widths)for(let ch in r.config.channels){
-        let g=group(frequency(ch,r.band),w);
+    for(let w in r.config.widths)for(let ch in r.config.channels)for(let g in placements(frequency(ch,r.band),w)){
         if(!permitted(g,r.caps,rules,r.config.channels,dm))continue;
         let method=move_method(r.config,r.current,g);
         if(!same(g,current)&&method=='csa'&&!r.csa)continue;
+        if(!same(g,current)&&r.band=='2g'&&g.width==40&&method=='csa')continue;
         if(!same(g,current)&&method=='idle_reconfigure'&&length(filter(keys(r.clients),m=>index(cfg.protected_clients,lc(m))>=0)))continue;
         if(length(filter(s.rejected,x=>same(g,x.target))))continue;
         if(length(filter(g.members,f=>index(scan_result.frequencies,f)<0)))continue;
@@ -344,14 +354,14 @@ evaluate=function(radios){
     save();
 };
 
-function remember_channel(r,p){persist_queue[r.name]={channel:channel(r.current.freq),width:r.current.width,fingerprint:p.fingerprint,band:r.band};}
+function remember_channel(r,p){persist_queue[r.name]={channel:channel(r.current.freq),width:r.current.width,sec:r.current.sec,fingerprint:p.fingerprint,band:r.band};}
 function persist_channels(){
     radar.flush();
     if(!cfg.persist||now()<next_persist||!length(persist_queue)||executor.busy()||scanner.busy())return;
     next_persist=now()+21600;let c=uci.cursor(),changed=false;
     for(let name,p in persist_queue){
         if(config_fingerprint(name)!=p.fingerprint){delete persist_queue[name];continue;}
-        c.set('wireless',name,'channel',''+p.channel);c.set('wireless',name,'htmode',(p.band=='2g'?'HT':'VHT')+p.width);changed=true;
+        c.set('wireless',name,'channel',''+p.channel);c.set('wireless',name,'htmode',(p.band=='2g'?'HT':'VHT')+p.width+(p.band=='2g'&&p.width==40?(p.sec<0?'-':'+'):''));changed=true;
     }
     if(changed&&!c.commit('wireless')){state.persistence_error='Cannot checkpoint verified channels';return;}
     persist_queue={};state.persistence_error=null;
@@ -359,7 +369,7 @@ function persist_channels(){
 function completed(){next_eval=now()+cfg.interval;if(one_shot||ARGV[0]=='--test-switch'||ARGV[0]=='--test-prepare')uloop.end();}
 function record_radar(e){
     let msg=e.msg ?? {},live=filter(discovered,r=>r.phy==msg.wiphy)[0],p=executor?.pending();
-    let width=[20,20,40,80,80,160][msg.channel_width] ?? (p?.helper?.phy==msg.wiphy?p.target.width:live?.current.width) ?? 20;
+    let width=[20,20,40,80,80,160][msg.channel_width] ?? (p?.helper?.phy==msg.wiphy?(p.cac_target ?? p.target).width:live?.current.width) ?? 20;
     let freq=msg.wiphy_freq,center=msg.center_freq1 ?? group(freq,width)?.center ?? freq;
     let event={event:'radar-state',time:time(),phy:msg.wiphy,radar_event:msg.radar_event,freq,center,width,region:live?.dfs_region ?? 2};
     history(event);radar.add(event);state.radar={half_life:cfg.radar_half_life,events:radar.records()};

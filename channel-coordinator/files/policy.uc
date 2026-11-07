@@ -1,9 +1,18 @@
 // Shared channel geometry, regulatory checks and execution helpers.
 export function channel(f) { return f==2484?14:f < 3000 ? int((f - 2407) / 5) : int((f - 5000) / 5); };
 export function frequency(ch,band) { return band=='2g'?(ch==14?2484:2407+5*ch):5000+5*ch; };
-export function configured_widths(setting,band) {
-    let value=trim(setting ?? 'auto'),supported=band=='2g'?[20]:[80,40,20],widths=[];
-    if(value=='auto')return supported;
+export function hardware_widths(band,capabilities) {
+    let widths=[20],ht=capabilities?.ht_capa ?? 0,vht=capabilities?.vht_capa;
+    if(ht&2)push(widths,40);
+    if(band=='5g'&&vht!=null){
+        push(widths,80);
+        if(index([1,2],(vht>>2)&3)>=0)push(widths,160);
+    }
+    return sort(widths,(a,b)=>b-a);
+};
+export function configured_widths(setting,band,hardware) {
+    let value=trim(setting ?? 'auto'),supported=band=='2g'?[40,20]:[160,80,40,20],widths=[];
+    if(value=='auto')return hardware ?? [20];
     if(!match(value,/^[0-9]+(\s+[0-9]+)*$/))die('Use auto or space-separated widths');
     for(let token in split(value,/\s+/)){
         let width=int(token);
@@ -51,10 +60,11 @@ export function switch_methods(method,width_method,wrt,name,band,csa,failed_unti
     let remaining=max(0,(failed_until ?? 0)-t);
     if(remaining>0){automatic='idle_reconfigure';reason='Recent CSA connectivity failure';}
     let effective=method=='auto'?automatic:method;
-    let width=width_method=='inherit'?effective:width_method=='auto'?(wrt&&band=='5g'?'idle_reconfigure':automatic):width_method;
+    let width_restart=band=='2g'||wrt;
+    let width=width_method=='inherit'?effective:width_method=='auto'?(width_restart?'idle_reconfigure':automatic):width_method;
     return {method:effective,width_method:width,requested_method:method,requested_width_method:width_method,
         method_reason:method=='auto'?reason:!csa&&method=='csa'?'Explicit CSA unavailable: driver does not advertise it':'Explicit choice',
-        width_reason:width_method=='auto'?(wrt&&band=='5g'?'Tested width changes require restart':reason):width_method=='inherit'?'Follows selected channel method':!csa&&width_method=='csa'?'Explicit CSA unavailable: driver does not advertise it':'Explicit choice',
+        width_reason:width_method=='auto'?(band=='2g'?'Restart runs the HT40 coexistence check':wrt?'Tested width changes require restart':reason):width_method=='inherit'?'Follows selected channel method':!csa&&width_method=='csa'?'Explicit CSA unavailable: driver does not advertise it':'Explicit choice',
         csa_recovery_left:remaining};
 };
 
@@ -64,8 +74,9 @@ export function setting_integer(value,lo,hi) {
 };
 
 export function move_method(config,source,target) {
-    return source.width!=target.width?(config.width_method ?? config.method):config.method;
+    return source.width!=target.width||target.freq<3000&&target.width==40?(config.width_method ?? config.method):config.method;
 };
+export function live_width(index) { return [20,20,40,80,null,160][index]; };
 export function private_ipv4(ip) {
     if(type(ip)!='string'||!match(ip,/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/))return false;
     let n=map(split(ip,'.'),x=>int(x));
@@ -98,11 +109,16 @@ export function delta_busy(a, b) {
     if (db > dt) return null;
     return 100.0 * db / dt;
 };
-export function group(freq, width) {
-    if (freq < 3000) return width == 20 ? {freq, center: freq, width, members: [freq], sec: 0} : null;
-    let starts = width == 80 ? [5180,5260,5500,5580,5660,5745] :
-        width == 40 ? [5180,5220,5260,5300,5500,5540,5580,5620,5660,5700,5745,5785] : [];
+export function group(freq, width, center) {
     if (width == 20) return {freq, center: freq, width, members: [freq], sec: 0};
+    if(freq<3000){
+        if(width!=40||freq<2412||freq>2472||(freq-2412)%5)return null;
+        let sec=center!=null?(center>freq?1:-1):(freq<=2452?1:-1),other=freq+sec*20;
+        if(center!=null&&center!=freq+sec*10||other<2412||other>2472)return null;
+        return {freq,center:freq+sec*10,width,members:sort([freq,other]),sec};
+    }
+    let starts = width==160?[5180,5500,5745]:width == 80 ? [5180,5260,5500,5580,5660,5745,5825] :
+        width == 40 ? [5180,5220,5260,5300,5500,5540,5580,5620,5660,5700,5745,5785,5825,5865] : [];
     for (let start in starts) if (freq >= start && freq < start + width && (freq - start) % 20 == 0) {
         let members = [];
         for (let f = start; f < start + width; f += 20) push(members, f);
@@ -110,6 +126,10 @@ export function group(freq, width) {
             sec: int((freq - start) / 20) % 2 ? -1 : 1};
     }
     return null;
+};
+export function placements(freq,width) {
+    if(freq<3000&&width==40)return filter([group(freq,width,freq-10),group(freq,width,freq+10)],g=>g!=null);
+    let g=group(freq,width);return g?[g]:[];
 };
 export function dfs_ready(g, caps) {
     return !!g && !length(filter(g.members, f => !caps[f] || caps[f].disabled ||
@@ -119,7 +139,7 @@ export function uses_dfs(g, caps) {
     return !!g && !!length(filter(g.members, f => caps[f]?.radar));
 };
 export function permitted(g, caps, rules, allowed, dfs_mode) {
-    if (!g || g.width > 80 || index(allowed,channel(g.freq))<0) return false;
+    if (!g || index([20,40,80,160],g.width)<0 || index(allowed,channel(g.freq))<0) return false;
     let dfs = dfs_mode == 'available' || dfs_mode == 'prepare';
     for (let f in g.members) {
         let c = caps[f];
@@ -128,6 +148,7 @@ export function permitted(g, caps, rules, allowed, dfs_mode) {
         if (c.radar && (!dfs || index([0,2], c.dfs_state) < 0 ||
             dfs_mode == 'available' && c.dfs_state != 2)) return false;
         if (g.width >= 80 && c.no_80mhz) return false;
+        if (g.width==160 && c.no_160mhz || c.no_20mhz) return false;
     }
     let p = caps[g.freq];
     if (g.sec == 1 && p.no_ht40_plus || g.sec == -1 && p.no_ht40_minus) return false;
@@ -143,6 +164,18 @@ export function permitted(g, caps, rules, allowed, dfs_mode) {
             caps[f].max_tx_power > rule.power_rule_max_eirp) power_ok = false;
         if (power_ok) return true;
     }
+    // AUTO_BW permits a block spanning contiguous regulatory rules. Retain
+    // each member's own power/restriction checks; never bridge a spectrum gap.
+    let automatic=filter(rules,r=>r&&(r.reg_rule_flags&2048)&&
+        !(!dfs&&r.reg_rule_flags&(16|128))&&!(r.reg_rule_flags&128&&!(dfs&&r.reg_rule_flags&16)));
+    let edge=(g.center-g.width/2)*1000,end=(g.center+g.width/2)*1000;
+    for(let rule in sort(automatic,(a,b)=>a.freq_range_start-b.freq_range_start)){
+        if(rule.freq_range_start<=edge&&rule.freq_range_end>edge)edge=rule.freq_range_end;
+    }
+    if(edge<end)return false;
+    for(let f in g.members)if(!length(filter(automatic,r=>r.freq_range_start<=(f-10)*1000&&r.freq_range_end>=(f+10)*1000&&
+        r.freq_range_max_bw>=20000&&caps[f].max_tx_power!=null&&caps[f].max_tx_power<=r.power_rule_max_eirp)))return false;
+    if(length(automatic))return true;
     return false;
 };
 export function neighbor(b) {
@@ -184,8 +217,7 @@ export function pressure(lo, hi, observations) {
 };
 export function survey_covers(rules,r,frequencies,dfs_mode) {
     let required=[];
-    for(let w in r.config.widths)for(let ch in r.config.channels){
-        let g=group(frequency(ch,r.band),w);
+    for(let w in r.config.widths)for(let ch in r.config.channels)for(let g in placements(frequency(ch,r.band),w)){
         if(permitted(g,r.caps,rules,r.config.channels,dfs_mode))for(let f in g.members)push(required,f);
     }
     // Adjacent 2.4GHz networks overlap candidate channels, even when only
@@ -195,9 +227,9 @@ export function survey_covers(rules,r,frequencies,dfs_mode) {
     }
     return length(required)>0&&!length(filter(required,f=>index(frequencies,f)<0));
 };
-export function reconfigure_text(text, g, band) {
-    if(type(text)!='string'||!g||index([20,40,80],g.width)<0)return null;
-    let lines=split(text,'\n'),count=0,ht=0;
+export function reconfigure_text(text, g, band, capabilities) {
+    if(type(text)!='string'||!g||index([20,40,80,160],g.width)<0)return null;
+    let lines=split(text,'\n'),count=0,ht=0,vht=0,op=0,segment=0;
     for(let i,line in lines){
         if(match(line,/^(ieee80211ax|ieee80211be)=1$/)||match(line,/^op_class=[1-9]/))return null;
         if(match(line,/^channel=/)){lines[i]='channel='+channel(g.freq);count++;}
@@ -205,11 +237,20 @@ export function reconfigure_text(text, g, band) {
             line=replace(line,/\[HT40[+-]\]/g,'');
             lines[i]=line+(g.sec?(g.sec>0?'[HT40+]':'[HT40-]'):'');ht++;
         }
-        if(match(line,/^vht_oper_chwidth=/))lines[i]='vht_oper_chwidth='+(g.width==80?1:0);
-        if(match(line,/^vht_oper_centr_freq_seg0_idx=/))lines[i]='vht_oper_centr_freq_seg0_idx='+channel(g.center);
+        if(match(line,/^vht_capab=/)){
+            vht++;line=replace(line,/\[(VHT160|VHT160-80PLUS80|SHORT-GI-160)\]/g,'');
+            lines[i]=line+(g.width==160?'[VHT160]'+((capabilities?.vht_capa ?? 0)&64?'[SHORT-GI-160]':''):'');
+        }
+        if(match(line,/^vht_oper_chwidth=/)){lines[i]='vht_oper_chwidth='+(g.width==160?2:g.width==80?1:0);op++;}
+        if(match(line,/^vht_oper_centr_freq_seg0_idx=/)){lines[i]='vht_oper_centr_freq_seg0_idx='+channel(g.center);segment++;}
         if(match(line,/^vht_oper_centr_freq_seg1_idx=/))lines[i]='vht_oper_centr_freq_seg1_idx=0';
     }
-    if(count!=1||ht!=1||band=='2g'&&g.width!=20)return null;
+    if(count!=1||ht!=1||band=='2g'&&g.width>40||g.width==160&&(vht!=1||op!=1||segment!=1))return null;
+    // A 2.4 GHz HT40 restart must let hostapd run its mandatory coexistence check.
+    if(band=='2g'&&g.width==40){
+        lines=filter(lines,l=>!match(l,/^(noscan|obss_interval)=/));
+        push(lines,'noscan=0','obss_interval=300');
+    }
     return join('\n',lines);
 };
 // Temporary, hidden, single-BSS AP for hostapd-managed CAC. Existing credentials

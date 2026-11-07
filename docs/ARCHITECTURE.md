@@ -12,7 +12,7 @@ Only radios with complete, fresh coverage of their candidate spectrum may move. 
 
 ## Planning and evidence
 
-`policy.uc` supplies geometry, regulatory checks and the neighbor-pressure calculation shared with history graphs. `planner.uc` is the single planning implementation. It evaluates legal 20 MHz channels on 2.4 GHz and 20/40/80 MHz blocks on 5 GHz, with at most four radios and a bounded search of 100,000 nodes.
+`policy.uc` supplies geometry, regulatory checks and the neighbor-pressure calculation shared with history graphs. `planner.uc` is the single planning implementation. It evaluates driver-advertised HT/VHT widths (20/40 MHz on 2.4 GHz and 20/40/80/160 MHz on 5 GHz), with at most four radios and a bounded search of 100,000 nodes. HT40 considers both secondary-channel directions. VHT160 uses standard contiguous blocks, not sliding centers or 80+80. AUTO_BW can join contiguous regulatory ranges while preserving per-member width, power and DFS restrictions.
 
 The `channels` setting defaults to `auto`. Each inventory refresh resolves it from the radio's current nl80211 frequency capabilities, confined to its active band. Disabled frequencies and non-DFS frequencies prohibiting AP initiation are excluded. DFS frequencies remain subject to DFS mode, kernel state and clearance checks. An explicit numeric list restricts primary channels, independently of width: listing 36 can permit an 80 MHz block with primary 36 without also listing 40, 44 and 48. Every member frequency must still pass driver, regulatory and DFS checks. No fixed 1–11 or 5 GHz channel list limits automatic discovery. The controller still supports the HT/VHT bands described above, not 6 GHz.
 
@@ -46,6 +46,12 @@ Switch methods default to Auto, which resolves driver support, known WRT executi
 ## DFS and radar memory
 
 DFS management requires matching global and per-radio ETSI regions. In preparation mode, an empty compatible 5 GHz helper temporarily listens on the target while another radio serves clients. Handoff may empty the helper; preparation does not forcibly restart an occupied helper. Its original AP is restored before the serving radio moves. Clearance must be confirmed on the target radio too; no assumption is made that all drivers share it.
+
+A helper narrower than the proposed block can prepare its uncleared pieces sequentially. Each piece is checked on both PHYs and the helper is restored between checks. The original wide target remains pending; it cannot move until every required member is cleared. Thus an 80 MHz helper can prepare a 160 MHz destination without claiming 160 MHz hardware support.
+
+HT40 setup retains hostapd coexistence checks (`noscan=0`) and periodic overlapping-BSS checks. If setup retains 20 MHz on a member of the requested block, service must still verify. The rejected HT40 placement is remembered for the configured evidence-freshness period, with an explicit reason; it is not mislabeled as failed client connectivity. A verified HT40 checkpoint preserves its secondary direction.
+
+Capability interpretation follows [Linux HT/VHT definitions](https://github.com/torvalds/linux/blob/v6.12/include/linux/ieee80211.h), regulatory range handling follows [cfg80211 AUTO_BW behavior](https://github.com/torvalds/linux/blob/v6.12/net/wireless/reg.c), and hostapd performs [HT40 coexistence and VHT configuration checks](https://github.com/vanhoefm/hostap-wpa3/blob/master/hostapd/hostapd.conf). Kernel and hostapd enforcement remains authoritative.
 
 `radar.uc` remembers at most 128 recent incidents independently of optional graph history. Each detection's weight halves over the configured half-life (default six hours). Overlapping incidents accumulate, capped at a risk of one. This affects planning and the fading channel bands in history; it is not radar probability. Kernel non-occupancy periods and CAC requirements always remain authoritative.
 

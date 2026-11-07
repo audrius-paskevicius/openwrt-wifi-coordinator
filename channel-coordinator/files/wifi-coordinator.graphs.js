@@ -29,7 +29,7 @@ function position(f){return f<3000?f-2400:120+f-5170;}
 function centre(p){
  if(Number.isFinite(p.center))return p.center;
  var f=frequency(p.channel);if(p.width==20)return f;
- var starts=p.width==80?[5180,5260,5500,5580,5660,5745]:p.width==40?[5180,5220,5260,5300,5500,5540,5580,5620,5660,5700,5745,5785]:[];
+ var starts=p.width==160?[5180,5500,5745]:p.width==80?[5180,5260,5500,5580,5660,5745,5825]:p.width==40?[5180,5220,5260,5300,5500,5540,5580,5620,5660,5700,5745,5785,5825,5865]:[];
  var start=starts.find(function(s){return f>=s&&f<s+p.width&&(f-s)%20==0;});
  return start==null?null:start+p.width/2-10;
 }

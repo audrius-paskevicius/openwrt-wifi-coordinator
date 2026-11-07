@@ -26,7 +26,7 @@ const state={updated:100,radios:{radio0:{requested_method:'auto',method:'csa',re
 const source=fs.readFileSync(path.join(root,'channel-coordinator/files/wifi-channels.js'),'utf8');
 const page=new Function('view','form','uci','rpc','fs','poll','help','E','_','L',source)(
  {extend:x=>x},form,uci,{declare:()=>()=>Promise.resolve({})},{read:()=>Promise.resolve(JSON.stringify(state))},
- {add:fn=>polls.push(fn)},{compact:()=>{}},E,x=>x,{resource:x=>x});
+ {add:fn=>polls.push(fn)},{compact:()=>{},sectionStatus:(s,n)=>{s.statusNode=n;}},E,x=>x,{resource:x=>x});
 function option(name,section='main'){const o=options.find(x=>x.option===name&&x.section===section);assert(o,'Missing '+section+'.'+name);return o;}
 module.exports=page.render([null,null,state,{}]).then(async()=>{
  for(const name of ['retry_delay','scan_wait','scan_batch','cac_timeout','csa_count','ban_seconds'])assert(!options.some(x=>x.option===name));
@@ -41,7 +41,9 @@ module.exports=page.render([null,null,state,{}]).then(async()=>{
  assert.notEqual(option('channels','radio1').validate('', '15'),true);
  assert.notEqual(option('channels','radio0').validate('', '36x'),true);
  assert.equal(option('widths','radio0').validate('', '20 80'),true);
- assert.notEqual(option('widths','radio1').validate('', '40'),true);
+ assert.equal(option('widths','radio1').validate('', '40'),true);
+ assert.equal(option('widths','radio0').validate('', '160 80'),true);
+ assert.notEqual(option('widths','radio1').validate('', '80'),true);
  assert.deepEqual(option('scan_gap').dependencies,[['scan_policy','paced']]);
  assert.deepEqual(option('scan_duty').dependencies,[['scan_policy','paced']]);
  assert.deepEqual(option('dfs_helper').dependencies,[['dfs_mode','prepare']]);
@@ -51,7 +53,7 @@ module.exports=page.render([null,null,state,{}]).then(async()=>{
  assert.equal(option('max_mbps').datatype,'range(0.01,1000)');
  assert.equal(option('verify_unprobed').tab,'advanced');
  assert.equal(option('scanner').tab,'advanced');
- const status=sections.find(x=>x.name==='radio1').description;
+ const status=sections.find(x=>x.name==='radio1').statusNode;
  assert(JSON.stringify(status).includes('channel 13 / 20 MHz'));
  assert(JSON.stringify(status).includes('2 minutes remaining'));
  await polls[0]();

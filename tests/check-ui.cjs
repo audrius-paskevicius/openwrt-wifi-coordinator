@@ -15,3 +15,4 @@ console.log(`PASS: ${files.length} LuCI/graph JavaScript syntax checks`);
 require('./history-cache.cjs');
 require('./help.cjs');
 require('./settings.cjs');
+require('./graph-widths.cjs');

@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""Build an isolated browser integration fixture using the target router's LuCI.
+
+Usage: python3 scripts/prepare-browser-check.py RESOURCE_DIR OUTPUT_HTML
+RESOURCE_DIR contains form.js, ui.js and cascade.css downloaded from LuCI.
+No router configuration, credentials or browser profile are used by the fixture.
+"""
+import json
+import sys
+from pathlib import Path
+
+root = Path(__file__).resolve().parent.parent
+resources = Path(sys.argv[1])
+output = Path(sys.argv[2])
+
+def portion(text, begin, end):
+    start = text.index(begin)
+    return text[start:text.index(end, start)]
+
+form = (resources / 'form.js').read_text(encoding='utf-8')
+ui = (resources / 'ui.js').read_text(encoding='utf-8')
+methods = {
+    'frame': portion(form, 'renderFrame(section_id,in_table,option_index,nodes){', ',renderWidget(section_id,option_index,cfgvalue){'),
+    'section': portion(form[form.index('const CBINamedSection='):], 'renderContents(data){', ',render(){'),
+    'show': portion(ui, 'showTooltip(ev){', ',hideTooltip(ev){'),
+    'hide': portion(ui, 'hideTooltip(ev){', ',addNotification(')
+}
+sources = {name: (root / file).read_text(encoding='utf-8') for name, file in [
+    ('help', 'channel-coordinator/files/wifi-coordinator.help.js'),
+    ('channels', 'channel-coordinator/files/wifi-channels.js'),
+    ('clients', 'radio-prefer/files/wifi-clients.js'),
+    ('history', 'channel-coordinator/files/wifi-history.js')
+]}
+payload = json.dumps({'methods': methods, 'sources': sources}).replace('</', '<\\/')
+style = (resources / 'cascade.css').read_text(encoding='utf-8') + '\n' + (root / 'wifi-coordinator/wifi-coordinator.css').read_text(encoding='utf-8')
+script = r'''
+const result=document.getElementById('result');
+function assert(ok,message){if(!ok)throw Error(message);}
+String.prototype.format=function(...args){let i=0;return this.replace(/%s/g,()=>args[i++]);};
+function E(tag,attrs,children){
+ const node=document.createElement(tag);
+ Object.entries(attrs||{}).forEach(([k,v])=>{if(v==null)return;if(typeof v==='function')node.addEventListener(k,v);else node.setAttribute(k,typeof v==='object'?JSON.stringify(v):v);});
+ function add(x){if(x==null)return;if(Array.isArray(x))x.forEach(add);else if(x instanceof Node)node.appendChild(x);else node.insertAdjacentHTML('beforeend',String(x));}
+ add(children);return node;
+}
+const dom={append:(n,x)=>n.appendChild(x),bindClassInstance:()=>{}};
+const L={Class:{extend:o=>o},resource:()=>'',bind:(f,self,...a)=>f.bind(self,...a)};
+const _=x=>x;
+const findParent=(n,s)=>n&&n.closest?n.closest(s):null;
+const tooltipDiv=document.body.appendChild(E('div',{'class':'cbi-tooltip'}));let tooltipTimeout=null;
+const ui={...eval('({'+payload.methods.show+'})'),...eval('({'+payload.methods.hide+'})')};
+// These are the actual UI module's document-level hover/focus registrations.
+document.addEventListener('mouseover',ui.showTooltip.bind(ui),true);
+document.addEventListener('mouseout',ui.hideTooltip.bind(ui),true);
+document.addEventListener('focus',ui.showTooltip.bind(ui),true);
+document.addEventListener('blur',ui.hideTooltip.bind(ui),true);
+const help=new Function('E','L','_','document','ui','window',payload.sources.help)(E,L,_,document,ui,window);
+const renderFrame=eval('({'+payload.methods.frame+'})').renderFrame;
+const renderContents=eval('({'+payload.methods.section+'})').renderContents;
+const maps=[],polls=[];
+class Option{
+ constructor(section,type,name,title,description){Object.assign(this,{section,map:section.map,type,option:name,title,description,values:[],dependencies:[]});}
+ value(key,label){this.values.push([key,label]);}
+ depends(key,value){this.dependencies.push([key,value]);}
+ transformDepList(){return [];}
+ cbid(sid){return this.map.config+'.'+sid+'.'+this.option;}
+ handleValueChange(){}
+ render(){const widget=this.values.length?E('select',{},this.values.map(v=>E('option',{value:v[0]},v[1]))):E('input',{type:this.type==='flag'?'checkbox':'text',value:this.default||''});return renderFrame.call(this,this.section.section,false,0,widget);}
+}
+class Section{
+ constructor(map,name,type,title,description){Object.assign(this,{map,section:name,sectiontype:type,title,description,children:[]});}
+ tab(){}
+ option(...args){const o=new Option(this,...args);this.children.push(o);return o;}
+ taboption(tab,...args){return this.option(...args);}
+ renderContents(data){return renderContents.call(this,data);}
+ render(){return this.renderContents([{},this.children.map(o=>o.render())]);}
+}
+class FormMap{
+ constructor(config,title,description){Object.assign(this,{config,title,description,children:[]});maps.push(this);}
+ section(type,...args){const s=new Section(this,...args);this.children.push(s);return s;}
+ checkDepends(){}
+ render(){return Promise.resolve(E('div',{'class':'cbi-map'},[E('h2',{},this.title),E('div',{},this.description),...this.children.map(s=>s.render())]));}
+}
+const form={Map:FormMap,NamedSection:Section,Value:'text',ListValue:'select',Flag:'flag',DynamicList:'list'};
+const radios=[{'.name':'radio0',band:'5g'},{'.name':'radio1',band:'2g'},{'.name':'radio2',band:'5g'}];
+const state={updated:100,radios:{radio0:{requested_method:'auto',method:'csa',requested_width_method:'auto',width_method:'idle_reconfigure',method_reason:'Driver advertises CSA',width_reason:'Width changes require restart',rejected:[{until:700,target:{freq:5500,width:80},reason:'Synthetic connectivity failure'}]},radio1:{},radio2:{}}};
+const uci={sections:()=>radios,get:(c,s,k)=>k==='history_hours'?'200':true};
+const rpc={declare:()=>()=>Promise.resolve({})};
+const fs={read:()=>Promise.resolve(JSON.stringify(state))};
+const poll={add:fn=>polls.push(fn)};
+const view={extend:x=>x};
+const graphs={};
+function page(name){return new Function('view','form','uci','rpc','fs','poll','help','E','_','L','graphs',payload.sources[name])(view,form,uci,rpc,fs,poll,help,E,_,L,graphs);}
+function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));assert(tooltipDiv.style.opacity==='1','hover must open native tooltip');assert(tooltipDiv.textContent.includes(node.dataset.tooltip),'hover must expose full explanation');assert(tooltipDiv.getBoundingClientRect().right<=innerWidth+1,'tooltip must fit viewport');}
+(async()=>{
+ for(const name of ['channels','clients','history']){
+  const pane=await page(name).render(name==='history'?[null,{}]:[null,null,state,{}]);
+  // Fixture uses locally embedded style, never navigates to the router.
+  pane.querySelectorAll('link').forEach(n=>n.remove());
+  document.getElementById('pages').appendChild(pane);
+ }
+ const fields=maps.flatMap(m=>m.children.flatMap(s=>s.children));
+ const explanations=document.querySelectorAll('.cbi-value-description .wc-setting-help');
+ assert(explanations.length===fields.filter(o=>o.description).length,'every setting description must survive the native form renderer');
+ for(const node of explanations){assert(node.getBoundingClientRect().height>0,'short help must be visible');tooltip(node);}
+ let node=explanations[0];
+ node.parentElement.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));assert(tooltipDiv.textContent.includes(node.dataset.tooltip),'theme question icon must open help');
+ node.focus();assert(tooltipDiv.style.opacity==='1','keyboard focus must open help');
+ node.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert(tooltipDiv.style.opacity==='0','Escape must dismiss help');
+ node.click();assert(tooltipDiv.style.opacity==='1','tap must open help');node.click();assert(tooltipDiv.style.opacity==='0','second tap must close help');
+ const statuses=document.querySelectorAll('.cbi-section-descr .wc-caption');assert(statuses.length===3,'all three applied-method descriptions must render');
+ assert(statuses[0].textContent.includes('Synthetic connectivity failure'),'temporary exclusions must be visible');
+ const comparison=document.querySelector('details');comparison.open=true;
+ const unsaved=document.querySelector('input[type="text"]');unsaved.value='unsaved edit';
+ await polls[0]();assert(statuses[0].isConnected,'status must remain attached after polling');
+ assert(comparison.open,'comparison panel must stay expanded during refresh');
+ assert(unsaved.value==='unsaved edit','polling must preserve unsaved input');
+ const map=maps[0],fresh=await map.render();document.getElementById('pages').appendChild(fresh);
+ const after=fresh.querySelector('.wc-setting-help');tooltip(after);after.click();assert(tooltipDiv.style.opacity==='1','delegation must survive form rerender');
+ result.textContent='PASS: '+explanations.length+' setting descriptions rendered through actual LuCI Value/NamedSection methods; native hover, icon hover, focus, tap, Escape, status polling and form rerender passed.';
+ result.dataset.status='pass';
+ // Leave one useful example visible in the screenshot.
+ window.scrollTo(0,0);const first=document.querySelector('.wc-setting-help');first.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));
+})().catch(e=>{result.textContent='FAIL: '+e.stack;result.dataset.status='fail';});
+'''
+output.write_text('<!doctype html><meta charset="utf-8"><title>LuCI integration check</title><style>' + style + '\nbody{padding:24px}#result{position:sticky;top:0;z-index:2000;background:#fff;color:#111;padding:12px;white-space:pre-wrap}</style><pre id="result">RUNNING</pre><main id="pages"></main><script>const payload=' + payload + ';\n' + script + '</script>', encoding='utf-8')
+print('Prepared native LuCI browser fixture: ' + str(output))

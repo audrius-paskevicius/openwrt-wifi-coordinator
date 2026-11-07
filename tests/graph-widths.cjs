@@ -1,0 +1,11 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const graph=new Function('baseclass','chartlib',fs.readFileSync(path.join(__dirname,'../channel-coordinator/files/wifi-coordinator.graphs.js'),'utf8'))({extend:x=>x},{});
+assert.equal(graph.geometry({channel:100,width:160}).center,5570);
+assert.equal(graph.geometry({channel:36,width:160}).center,5250);
+assert.equal(graph.geometry({channel:5,width:40,center:2422}).center,2422);
+assert.equal(graph.geometry({channel:5,width:40,center:2442}).center,2442);
+assert.equal(graph.geometry({channel:5,width:40,center:2442}).high-graph.geometry({channel:5,width:40,center:2442}).low,40);
+assert.equal(graph.colour('radio1',1),'#f05a00');assert.equal(graph.patternName('radio1',1),'vertical lines');
+assert.equal(graph.colour('radio2',2),'#005dff');
+console.log('PASS: 160/40 MHz chart geometry and retained radio colours/pattern legend');

@@ -1,6 +1,6 @@
 import * as system_fs from 'fs';
 import * as nl from 'nl80211';
-import {group,permitted,channel,frequency,neighbor,quiet_ready} from './policy.uc';
+import {group,placements,permitted,channel,frequency,neighbor,quiet_ready} from './policy.uc';
 export function scan_cost(r,duration) {
     if(!length(r.clients))return 0;
     // Link rates are a service-capacity proxy, not measured goodput. Preserve
@@ -48,8 +48,7 @@ function scan(radios) {
     // Cover adjacent 2.4 GHz channels as well, not merely the three candidate centers.
     for(let r in radios) if(r.config.managed) {
         let valid=[],dm=dfs_mode(r);
-        for(let w in r.config.widths)for(let ch in r.config.channels){
-            let f=frequency(ch,r.band),g=group(f,w);
+        for(let w in r.config.widths)for(let ch in r.config.channels)for(let g in placements(frequency(ch,r.band),w)){
             if(permitted(g,r.caps,rules,r.config.channels,dm))for(let m in g.members)if(index(valid,m)<0)push(valid,m);
         }
         for(let f in valid)if(index(required,f)<0)push(required,f);
