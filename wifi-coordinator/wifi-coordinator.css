@@ -39,7 +39,9 @@
 .wifi-coordinator .wc-line-key { display: inline-block; width: 24px; border-top: 2.5px solid; vertical-align: middle; margin-right: 7px; }
 .wifi-coordinator .wc-legend { margin: 10px 0 16px; }
 .wifi-coordinator .wc-spectrum-keys { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 32px; margin: 12px 0; }
-.wifi-coordinator .wc-survey-key, .wifi-coordinator .wc-radar-key { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 18px; line-height: 18px; }
+.wifi-coordinator .wc-survey-key, .wifi-coordinator .wc-radar-key { display: grid; grid-template-columns: max-content auto; grid-template-rows: 12px auto; column-gap: 18px; line-height: 18px; }
+.wifi-coordinator .wc-survey-key > :first-child, .wifi-coordinator .wc-radar-key > :first-child { grid-area: 1 / 1; align-self: center; }
+.wifi-coordinator .wc-survey-ramp, .wifi-coordinator .wc-radar-ramp { grid-area: 1 / 2 / 3 / 3; }
 .wifi-coordinator .wc-survey-ramp { width: 180px; max-width: 100%; }
 .wifi-coordinator .wc-radar-ramp { width: 380px; max-width: 100%; }
 .wifi-coordinator .wc-grey-scale, .wifi-coordinator .wc-amber-scale { height: 12px; }

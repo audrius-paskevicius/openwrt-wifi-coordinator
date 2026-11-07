@@ -107,7 +107,7 @@ return view.extend({
    var radarHalf=Number(h.radar&&h.radar.half_life)||3600;
    function elapsedLabel(seconds){return seconds>=3600?+(seconds/3600).toFixed(1)+' h':+(seconds/60).toFixed(1)+' min';}
    var radarKey=E('div',{'class':'wc-radar-key','title':'Amber marks radar detections. Memory halves every '+elapsedLabel(radarHalf)+'. Percentages describe avoidance strength, not probability. Radar clearance rules still apply.'},[
-    E('strong',{},_('Radar memory')),
+    E('span',{},_('Radar memory')),
     E('div',{'class':'wc-radar-ramp'},[
      E('div',{'class':'wc-amber-scale','aria-hidden':'true'}),
      E('div',{'class':'wc-radar-ticks'},[0,1,2,3].map(function(n){return E('span',{},(n?elapsedLabel(n*radarHalf):_('Detection'))+' / '+[100,50,25,12.5][n]+'%');}))
