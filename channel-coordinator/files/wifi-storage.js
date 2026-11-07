@@ -55,8 +55,9 @@ return view.extend({
   var exportSection=E('section',{'class':'wc-export'},[
    E('h3',{},_('Export history')),
    E('p',{'class':'wc-caption','title':'Read-only download: no temporary export file or flash writes. The file includes UTC timestamps, units and a final completeness report. Survey context and radar memory may start before the selected window. Original interval boundaries are preserved.'},_('Download graph data and actions directly.')),
-   E('p',{},[E('label',{'for':'wc-export-period'},_('Period: ')),exportPeriod,' ',E('button',{type:'button','class':'cbi-button cbi-button-action',click:function(){download('json');}},_('Download all data (JSON)'))]),
-   E('p',{},[E('label',{'for':'wc-export-dataset'},_('CSV data: ')),exportDataset,' ',E('button',{type:'button','class':'cbi-button cbi-button-action',click:function(){download('csv');}},_('Download CSV'))]),
+   E('p',{},[E('label',{'for':'wc-export-period'},_('Period: ')),exportPeriod]),
+   E('p',{},[E('label',{'for':'wc-export-dataset'},_('CSV data: ')),exportDataset,' ',E('button',{type:'button','class':'cbi-button cbi-button-action','data-export-format':'csv','aria-label':_('Download CSV data'),click:function(){download('csv');}},_('Download'))]),
+   E('p',{},[_('JSON data: All graph data and actions '),E('button',{type:'button','class':'cbi-button cbi-button-action','data-export-format':'json','aria-label':_('Download JSON data'),click:function(){download('json');}},_('Download'))]),
    E('iframe',{name:'wc-history-download',title:_('Export download status'),'class':'wc-export-status'})
   ]);
   return m.render().then(function(node){return E('div',{'class':'wifi-coordinator'},[

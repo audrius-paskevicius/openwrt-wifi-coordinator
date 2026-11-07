@@ -1,12 +1,16 @@
 # Validation
 
-Source release: **0.6.0-r38**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.6.0-r39**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 35 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r39 export row layout
+
+The period selector occupies its own row. CSV comes next with a dataset selector and Download button; JSON follows with the explanation All graph data and actions and its own Download button. Accessible button names retain the format. The same selected period applies to both. This changes presentation only. Portable source/UI and LuCI browser component checks passed. Authenticated Chrome confirmed the installed row order and button formats; a screenshot was reviewed. The signed package installed without restarting Wi-Fi services.
 
 ## r38 consistent section typography
 

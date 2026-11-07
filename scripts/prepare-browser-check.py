@@ -108,11 +108,11 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  const downloads=[];HTMLFormElement.prototype.submit=function(){downloads.push({action:this.getAttribute('action'),method:this.method,target:this.target,fields:Object.fromEntries(new FormData(this))});};
  const exportSection=document.querySelector('.wc-export');
  assert(exportSection.previousElementSibling.classList.contains('cbi-map'),'export follows retention');
- document.querySelector('#wc-export-period').value='6';exportSection.querySelectorAll('button')[0].click();
+ document.querySelector('#wc-export-period').value='6';exportSection.querySelector('[data-export-format=json]').click();
  assert(downloads[0].method==='post'&&downloads[0].fields.format==='json'&&downloads[0].fields.hours==='6','JSON uses selected window in native POST');
  assert(downloads[0].fields.sessionid==='synthetic-session'&&!downloads[0].action.includes('session'),'session is only in POST body');
  document.querySelector('#wc-export-period').value='all';document.querySelector('#wc-export-dataset').value='actions';
- exportSection.querySelectorAll('button')[1].click();
+ exportSection.querySelector('[data-export-format=csv]').click();
  assert(downloads[1].fields.hours==='0'&&downloads[1].fields.dataset==='actions'&&downloads[1].fields.format==='csv','CSV all-retained selection');
  assert(!document.querySelector('form'),'temporary submission form removed');
  const fields=maps.flatMap(m=>m.children.flatMap(s=>s.children));

@@ -2,8 +2,10 @@
 
 Open **Network / Wi-Fi Coordinator / Storage & export**, then **Export history** below History retention. Its independent Period selector offers All retained history (the default) and durations up to the saved retention limit. Changing Show on the History tab does not change the export period. Downloads do not change recording, retention, radio settings or channel planning.
 
-- **JSON** downloads all five datasets in one structured file.
-- **CSV** downloads one selected dataset: channel placements, traffic summaries, spectrum surveys, radar detections or actions.
+- **CSV data** selects channel placements, traffic summaries, spectrum surveys, radar detections or actions, followed by its Download button.
+- **JSON data** downloads all graph data and actions in one structured file using its separate Download button.
+
+The Period selector above these rows applies to both downloads.
 
 The router sends the response directly to the browser download manager. It creates no export file and performs no flash writes. Existing history remains in its normal RAM buffer and flash archive. The exporter holds a fixed RAM snapshot, one bounded archive batch, a lightweight deduplication index for one dataset, and a small output buffer. Index memory grows with the number of retained records; the entire archive or completed download is never assembled in memory. Closing a download stops processing when the next output write detects the closed connection.
 
