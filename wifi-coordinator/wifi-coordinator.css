@@ -1,4 +1,11 @@
 .wifi-coordinator { line-height: 1.5; }
+/* LuCI form maps emit h2 titles even inside a page with its own h2.
+   Treat those titles as peers of the hand-rendered section headings. */
+.wifi-coordinator .cbi-map > h2,
+.wifi-coordinator h3 {
+  font-size: 18px; font-weight: 700; line-height: 1.4;
+  margin: 16px 0 8px;
+}
 .wifi-coordinator .wc-status {
   margin: 18px 0 12px; padding: 10px 14px;
   border: 1px solid #b9d7c0; border-left: 4px solid #39854b;
