@@ -5,6 +5,7 @@
 'require rpc';
 'require fs';
 'require poll';
+'require wifi-coordinator.help as help';
 
 var services=rpc.declare({object:'service',method:'list',params:['name'],expect:{'':{}}});
 function readState(){return fs.read('/tmp/radio-prefer-state.json').then(JSON.parse).catch(function(){return {};});}
@@ -61,6 +62,7 @@ return view.extend({
   value('settle_time','Wait after a client connects (seconds)',30,'range(10,300)','Lets a new connection settle before asking the client to measure or roam again.');
   value('cooldown','Wait between recommendations (seconds)',300,'range(60,3600)','300 is five minutes per client. This avoids repeatedly disturbing a device that declines to move.');
   value('max_attempts','Maximum recommendations per episode',3,'range(1,10)','After this many attempts, requests pause for this count multiplied by the recommendation interval. The budget also resets after one minute on the preferred radio. Declining a move does not block future recommendations forever.');
+  help.compact(m);
   return m.render().then(function(node){return E('div',{'class':'wifi-coordinator'},[
    E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),intro,node]);});
  }

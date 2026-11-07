@@ -1,5 +1,37 @@
 // Shared channel geometry, regulatory checks and execution helpers.
-export function channel(f) { return f < 3000 ? int((f - 2407) / 5) : int((f - 5000) / 5); };
+export function channel(f) { return f==2484?14:f < 3000 ? int((f - 2407) / 5) : int((f - 5000) / 5); };
+export function frequency(ch,band) { return band=='2g'?(ch==14?2484:2407+5*ch):5000+5*ch; };
+export function configured_widths(setting,band) {
+    let value=trim(setting ?? 'auto'),supported=band=='2g'?[20]:[80,40,20],widths=[];
+    if(value=='auto')return supported;
+    if(!match(value,/^[0-9]+(\s+[0-9]+)*$/))die('Use auto or space-separated widths');
+    for(let token in split(value,/\s+/)){
+        let width=int(token);
+        if(index(supported,width)<0)die('Unsupported channel width');
+        if(index(widths,width)<0)push(widths,width);
+    }
+    return sort(widths,(a,b)=>b-a);
+};
+export function configured_channels(setting,band,caps) {
+    let value=trim(setting ?? 'auto'),channels=[];
+    if(value=='auto'){
+        for(let key,c in caps){
+            let f=int(key),ch=channel(f);
+            if(c.disabled||c.no_ir&&!c.radar)continue;
+            if(band=='2g'?(f<2412||f>2484):(f<5005||f>=5925))continue;
+            if(frequency(ch,band)!=f)continue;
+            push(channels,ch);
+        }
+    }else{
+        if(!match(value,/^[0-9]+(\s+[0-9]+)*$/))die('Use auto or space-separated channel numbers');
+        for(let token in split(value,/\s+/)){
+            let ch=int(token);
+            if(ch<1||ch>(band=='2g'?14:184))die('Invalid channel number');
+            if(index(channels,ch)<0)push(channels,ch);
+        }
+    }
+    return sort(channels,(a,b)=>a-b);
+};
 export function overlap(a, b) {
     let lo = max(a.center - a.width / 2, b.center - b.width / 2);
     let hi = min(a.center + a.width / 2, b.center + b.width / 2);
@@ -65,11 +97,11 @@ export function uses_dfs(g, caps) {
     return !!g && !!length(filter(g.members, f => caps[f]?.radar));
 };
 export function permitted(g, caps, rules, allowed, dfs_mode) {
-    if (!g || g.width > 80) return false;
+    if (!g || g.width > 80 || index(allowed,channel(g.freq))<0) return false;
     let dfs = dfs_mode == 'available' || dfs_mode == 'prepare';
     for (let f in g.members) {
         let c = caps[f];
-        if (!c || c.disabled || index(allowed, channel(f)) < 0) return false;
+        if (!c || c.disabled) return false;
         if (c.no_ir && !(dfs && c.radar)) return false;
         if (c.radar && (!dfs || index([0,2], c.dfs_state) < 0 ||
             dfs_mode == 'available' && c.dfs_state != 2)) return false;
@@ -131,7 +163,7 @@ export function pressure(lo, hi, observations) {
 export function survey_covers(rules,r,frequencies,dfs_mode) {
     let required=[];
     for(let w in r.config.widths)for(let ch in r.config.channels){
-        let g=group(r.band=='2g'?2407+ch*5:5000+ch*5,w);
+        let g=group(frequency(ch,r.band),w);
         if(permitted(g,r.caps,rules,r.config.channels,dfs_mode))for(let f in g.members)push(required,f);
     }
     // Adjacent 2.4GHz networks overlap candidate channels, even when only

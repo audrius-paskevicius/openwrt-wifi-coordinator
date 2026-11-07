@@ -1,7 +1,32 @@
-import {overlap,group,delta_busy,permitted,neighbor,pressure,reconfigure_text,dfs_ready,uses_dfs,preparation_text,quiet_ready,same_network,force_signal_ok} from '../channel-coordinator/files/policy.uc';
+import {overlap,group,delta_busy,permitted,neighbor,pressure,reconfigure_text,dfs_ready,uses_dfs,preparation_text,quiet_ready,same_network,force_signal_ok,configured_channels,configured_widths,channel,frequency} from '../channel-coordinator/files/policy.uc';
 function tests() {
     let n = 0;
     function eq(a, b) { if (a != b) die(sprintf('FAIL %J != %J\n',a,b)); n++; }
+    let live={};for(let ch=1;ch<=13;ch++)live[frequency(ch,'2g')]={};
+    live[2484]={disabled:true};live[5180]={};live[5260]={radar:true,no_ir:true,dfs_state:0};
+    live[5745]={disabled:true};live[5825]={};live[5845]={no_ir:true};live[5955]={};
+    eq(join(' ',configured_channels(null,'2g',live)),'1 2 3 4 5 6 7 8 9 10 11 12 13');
+    eq(join(' ',configured_channels('auto','5g',live)),'36 52 165');
+    eq(join(' ',configured_channels(' 11 1 6 6 ','2g',live)),'1 6 11');
+    eq(length(configured_channels('auto','2g',{})),0);
+    live[2467].disabled=true;
+    eq(index(configured_channels('auto','2g',live),12),-1);
+    live[2467].disabled=false;
+    eq(index(configured_channels('auto','2g',live),12)>=0,true);
+    live[5825].disabled=true;
+    eq(index(configured_channels('auto','5g',live),165),-1);
+    for(let bad in ['', 'automatic', '1x', '1,6,11', '0', '15']){
+        let failed=false;try{configured_channels(bad,'2g',live);}catch(e){failed=true;}
+        eq(failed,true);
+    }
+    eq(channel(2484),14);eq(frequency(14,'2g'),2484);
+    eq(join(' ',configured_widths(null,'2g')),'20');
+    eq(join(' ',configured_widths('auto','5g')),'80 40 20');
+    eq(join(' ',configured_widths('20 80 20','5g')),'80 20');
+    for(let bad in ['', '40', '20 80']){
+        let failed=false;try{configured_widths(bad,'2g');}catch(e){failed=true;}eq(failed,true);
+    }
+    let failed=false;try{configured_widths('160','5g');}catch(e){failed=true;}eq(failed,true);
     eq(overlap(group(5180,80),group(5220,80)),1);
     eq(overlap(group(5180,40),group(5220,40)),0);
     eq(overlap(group(2412,20),group(2437,20)),0);
@@ -23,7 +48,11 @@ function tests() {
     caps[5180].no_ir=false; caps[5180].max_tx_power=3000;
     eq(permitted(group(5180,40),caps,rules,[36,40,44,48]),false);
     caps[5180].max_tx_power=2300;
-    eq(permitted(group(5180,80),caps,rules,[36,40]),false);
+    eq(permitted(group(5180,80),caps,rules,[36]),true);
+    eq(permitted(group(5200,80),caps,rules,[36]),false);
+    caps[5240].disabled=true;
+    eq(permitted(group(5180,80),caps,rules,[36]),false);
+    caps[5240].disabled=false;
     eq(neighbor({frequency:5180,signal_mbm:-5000,information_elements:[]}).width,20);
     eq(neighbor({frequency:5180,signal_mbm:0}),null);
     eq(neighbor({frequency:5180,signal_mbm:-5000,information_elements:[{type:192,data:chr(1)+chr(42)+chr(50)}]}).width,160);

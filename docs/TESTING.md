@@ -1,8 +1,19 @@
 # Validation
 
-Source release: **0.6.0-r8**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. The cleanup release was tested in isolation, then installed on that router. Earlier RF experiments are listed separately below.
+Source release: **0.6.0-r10**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
 
-## Automated checks
+## r10 automatic channel discovery and compact help
+
+- 87 geometry/regulatory/policy checks passed, covering automatic discovery, channels 12/13 and 165, band isolation, disabled frequencies, no-initiation restrictions, DFS inclusion, capability changes, numeric overrides, automatic width selection, unsupported widths, invalid settings and channel-14 frequency conversion. Primary-only lists allow wider blocks while still rejecting disallowed secondary frequencies and unlisted primaries.
+- The 97 planner/radar/survey cases, 40 executor cases and five recovery-helper cases passed again. Controller entry-point compilation, shell syntax, six JavaScript syntax checks and nine UI/cache cases passed.
+- Shared help-control tests cover nested settings, native LuCI tooltip attributes, retained full text, click/tap, keyboard activation, Escape, accessible text, viewport fit and repeated rendering. LuCI supplies hover and focus behavior. These are DOM-stub interaction tests, not a full visual browser test.
+- An isolated UCI fixture confirmed missing lists become `auto` while an explicit `1 6 11` list remains unchanged.
+- Read-only discovery against live driver capabilities resolved different lists for each PHY. Radio1 offered 1–13; radio2 additionally exposed 5 GHz channels absent from the former fixed list, including 165. Radio0 did not advertise 165 as enabled.
+- The signed APK and extracted application files were verified against source. The simulated upgrade changed only Wi-Fi Coordinator; no dependency changes were needed.
+- Live installation set both channels and widths to `auto` on all three radios and applied the documented WRT3200ACM switching defaults. Both controllers and usteer were running afterward; all four clients remained present at the final check. The three views, new help module and stylesheet returned HTTP 200.
+- During rollout, the expanded pool completed a 41-frequency survey and selected channel 13 on radio1. Client verification failed; the existing recovery path returned it to channel 10, restored both clients and temporarily excluded channel 13 for six hours. Automatic lists remain unrestricted by a fixed 1–11 cap. This is recovery evidence, not proof that every advertised channel works with every client.
+
+## Baseline automated checks (r8)
 
 The development validation passed:
 

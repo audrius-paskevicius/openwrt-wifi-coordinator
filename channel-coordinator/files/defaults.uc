@@ -13,8 +13,8 @@ for(let r in radios){
     let name=r['.name'],two=r.band=='2g';
     if(!c.get_all('channel_coordinator',name))c.set('channel_coordinator',name,'radio');
     let defaults={managed:'1',occupied_policy:'handoff',method:wrt&&name=='radio2'?'idle_reconfigure':'csa',
-        channels:two?'1 2 3 4 5 6 7 8 9 10 11 12 13':'36 40 44 48 52 56 60 64 100 104 108 112 116 120 124 128 132 136 140 144 149 153 157 161',
-        widths:two?'20':'80 40 20'};
+        channels:'auto',
+        widths:'auto'};
     if(wrt&&!two)defaults.width_method='idle_reconfigure';
     for(let key,value in defaults)if(c.get('channel_coordinator',name,key)==null)c.set('channel_coordinator',name,key,value);
 }

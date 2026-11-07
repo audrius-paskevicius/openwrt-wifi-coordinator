@@ -5,9 +5,9 @@
 'require rpc';
 'require fs';
 'require poll';
+'require wifi-coordinator.help as help';
 
 var service = rpc.declare({object:'service',method:'list',params:['name'],expect:{'':{}}});
-var all5 = '36 40 44 48 52 56 60 64 100 104 108 112 116 120 124 128 132 136 140 144 149 153 157 161';
 function radioName(r) { return r['.name']+' ('+(r.band=='2g'?'2.4':'5')+' GHz)'; }
 function readState() { return fs.read('/tmp/channel-coordinator-state.json').then(JSON.parse).catch(function(){return {};}); }
 function statusText(st, services) {
@@ -55,6 +55,8 @@ return view.extend({
     E('p',{},_('Sharing shows overlap with the other radios where they are now. The final plan can differ, but an immediate move cannot increase sharing when separation is enabled. The table sorts by current sharing, then cost; the joint plan also prioritizes usable width. Legal transmit power breaks otherwise equal choices. Unmeasured or prohibited channels are not candidates.')),
     E('div',{},p.alternatives.map(function(a){return E('div',{},[
      E('h4',{},a.radio+(a.hold?' — '+a.hold:'')),
+     E('p',{},_('Current channel pool: ')+(((st.radios||{})[a.radio]||{}).candidate_channels||[]).join(' ')),
+     E('p',{},_('Widths to compare: ')+(((st.radios||{})[a.radio]||{}).candidate_widths||[]).join(' / ')+' MHz'),
      ...((a.rejected||[]).length?[E('p',{},'Temporarily excluded after failed connectivity checks: '+a.rejected.map(function(x){return ((x.target.freq-5000)/5>0?(x.target.freq-5000)/5:(x.target.freq-2407)/5)+' / '+x.target.width+' MHz';}).join(', ')+'. Each exclusion lasts six hours.')]:[]),
      E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[
       E('thead',{},E('tr',{},['Channel / width','Cost','Estimated congestion','Estimated usable width','Sharing','Radar memory','Evidence uncertainty'].map(function(x){return E('th',{},x);}))),
@@ -137,11 +139,12 @@ return view.extend({
    v.value('csa',_('Announce a channel switch (CSA)'));v.value('idle_reconfigure',_('Restart this radio'));v.default='csa';v.rmempty=false;
    v=q.option(form.ListValue,'width_method',_('When channel width also changes'),_('Some drivers announce frequency changes correctly but fail to change width. Reconfiguration normally requires clients to leave first; the brief-reconnect option permits the fallback with clients attached. Frequency-only moves can still use CSA.'));
    v.value('',_('Use the channel-change method'));v.value('csa',_('Announce a channel switch (CSA)'));v.value('idle_reconfigure',_('Restart this radio'));v.optional=true;
-   v=q.option(form.Value,'channels',_('Candidate primary channels'),_('Space-separated 20 MHz channel numbers. Every member of a wider block must be included. The kernel capabilities, regulatory limits and selected DFS mode further restrict this list. More numbers do not create sliding 80 MHz centre positions.'));
-   v.default=two?'1 2 3 4 5 6 7 8 9 10 11 12 13':all5;v.validate=function(section,x){return /^(\d+\s*)+$/.test(x)?true:_('Enter channel numbers separated by spaces.');};v.rmempty=false;
-   v=q.option(form.Value,'widths',_('Candidate widths (MHz)'),_('80 gives more peak capacity; 40 or 20 may avoid congestion. Enter several widths to compare them. The score favours wider channels but does not directly measure client throughput.'));
-   v.default=two?'20':'80 40 20';v.validate=function(section,x){return (two?/^20$/:/^(20|40|80)(\s+(20|40|80))*$/).test(x)?true:_('Use 20 on 2.4 GHz; 20, 40 or 80 on 5 GHz.');};v.rmempty=false;
+   v=q.option(form.Value,'channels',_('Candidate primary channels'),_('Auto uses all driver-allowed primary channels. Or enter channel numbers separated by spaces. Width is chosen separately; driver and regulatory limits always apply.'));
+   v.default='auto';v.placeholder='auto';v.validate=function(section,x){return /^(auto|\d+(\s+\d+)*)$/.test(x.trim())?true:_('Enter auto or channel numbers separated by spaces.');};v.rmempty=false;
+   v=q.option(form.Value,'widths',_('Candidate widths (MHz)'),_('Auto compares all widths supported by this coordinator: 20 MHz on 2.4 GHz, and 20/40/80 MHz on 5 GHz. Or enter widths separated by spaces. Primary channels are selected separately. Driver and regulatory limits still apply. Wider channels are preferred where usable; scores estimate capacity, not measured speed.'));
+   v.default='auto';v.placeholder='auto';v.validate=function(section,x){return (two?/^(auto|20)$/:/^(auto|(20|40|80)(\s+(20|40|80))*)$/).test(x.trim())?true:_('Enter auto, 20 on 2.4 GHz, or widths from 20 40 80 on 5 GHz.');};v.rmempty=false;
   });
+  help.compact(m);
   return m.render().then(function(formNode){return E('div',{'class':'wifi-coordinator'},[
    E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),intro,formNode]);});
  }

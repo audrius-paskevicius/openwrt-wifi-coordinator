@@ -50,6 +50,14 @@ Radio Preference keeps usteer's competing steering rules passive while using its
 
 The package does not create networks, replace Wi-Fi credentials, or change the LAN/WAN topology. WRT3200ACM/WRT32X-specific defaults select the known restart paths and synchronize the auxiliary driver's country hint with an already consistent configured country.
 
+Candidate primary channels default to `auto` for every radio. The daemon derives the list from that radio's live driver capabilities in its current band, so changes in country or driver restrictions are reflected without saving another static list. Regulatory rules, supported widths, DFS clearance and recovery exclusions still apply. Existing explicit lists are preserved during package upgrades; set each radio's **Candidate primary channels** to `auto` to remove an old restriction. This expands eligibility, not an instruction to move immediately.
+
+Manual lists restrict primary channels only. Width is selected separately: for example, primary 36 may use a legal 80 MHz block even if 40, 44 and 48 are not explicitly listed. All secondary frequencies still require driver and regulatory eligibility.
+
+Both channel and width settings are plain text fields accepting `auto` or space-separated numbers. Widths default to `auto`, comparing all coordinator-supported widths: 20 MHz on 2.4 GHz and 20/40/80 MHz on 5 GHz, further constrained by the driver and regulatory rules. Existing explicit widths remain unchanged during upgrades unless the administrator selects `auto`.
+
+On the tested WRT3200ACM, default occupied-client handling is Automatic on all radios. Channel changes use CSA on radio0/radio1 and a per-radio restart on radio2. Width changes use a restart on both 5 GHz radios; radio1 inherits its channel-change method. Temporary failure recovery can override these configured methods. Other hardware uses generic CSA defaults and requires validation.
+
 ## Client handling
 
 Automatic channel changes follow one rule on every managed radio:
@@ -64,6 +72,8 @@ The shared setting **Change channel even if handoff cannot finish** is under **P
 ## Configuration and history
 
 Configuration lives in `/etc/config/channel_coordinator` and `/etc/config/radio_prefer`. Use LuCI for explanations of each setting. Fresh normal Radio Preference uses gentle recommendations; strong mode is an administrator choice and still does not set an AP disconnect timer.
+
+Every setting uses the same native LuCI help behavior: a short explanation is always visible; hover or focus that text for full details, or click/tap to open them. Click again or press Escape to close. The existing LuCI styling and help icon are retained.
 
 History retention ranges from 1 to 200 hours. Recent records use a 1 MiB RAM buffer; immutable flash batches are written at most once every six hours during normal operation, keeping at least 4 MiB of flash free. There is no fixed archive-size cap. Heavy activity or failed offloads can shorten retained history when the RAM buffer fills. Orderly shutdown checkpoints pending history and radar memory. Unexpected power loss can lose unsaved recent data. Disabling recording pauses new history; **Clear recorded history** explicitly deletes recorded graphs, surveys, and actions while preserving radar-avoidance memory. Only current `batch-*.json` history archives are supported; legacy `history.json` archives are not imported. See [architecture](ARCHITECTURE.md) for scoring, timing and storage details.
 

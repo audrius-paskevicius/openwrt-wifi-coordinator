@@ -6,7 +6,7 @@ import * as uci from 'uci';
 import * as uloop from 'uloop';
 import {open_history} from './history.uc';
 import {channel, group, same, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample} from './policy.uc';
-import {survey_covers,move_method} from './policy.uc';
+import {survey_covers,move_method,configured_channels,configured_widths,frequency} from './policy.uc';
 import {assess,choose,decide} from './planner.uc';
 import {open_memory} from './radar.uc';
 import {create_survey} from './survey.uc';
@@ -154,14 +154,10 @@ function coordination_ready() {
             if(c[k])die(`usteer ${k} is active; use passive usteer with Radio Preference or disable that policy first`);
     }
 }
-function rcfg(name,band) {
+function rcfg(name,band,caps) {
     let r=cursor.get_all('channel_coordinator',name) ?? {};
-    let ch=split(r.channels ?? (band=='2g'?'1 2 3 4 5 6 7 8 9 10 11 12 13':'36 40 44 48 52 56 60 64 100 104 108 112 116 120 124 128 132 136 140 144 149 153 157 161'),/\s+/);
-    let widths=split(r.widths ?? (band=='2g'?'20':'80'),/\s+/);
-    ch=map(filter(ch,x=>length(x)>0),x=>int(x)); widths=map(filter(widths,x=>length(x)>0),x=>int(x));
-    if(!length(ch)||length(ch)>32||!length(widths)||length(widths)>3) die(`Invalid channel/width list for ${name}`);
-    for(let c in ch) if(c<1||c>177) die(`Invalid channel for ${name}`);
-    for(let w in widths) if(index(band=='2g'?[20]:[20,40,80],w)<0) die(`Unsupported width for ${name}`);
+    let ch=configured_channels(r.channels,band,caps);
+    let widths=configured_widths(r.widths,band);
     let method=r.method ?? 'csa';
     if(index(['csa','idle_reconfigure'],method)<0)die(`Invalid switch method for ${name}`);
     let width_method=r.width_method ?? method;
@@ -218,7 +214,7 @@ function inventory() {
         rates[name]=reading.rate;quiet_since[name]=reading.quiet;traffic[name]=reading.sample;
         let band=live.wiphy_freq<3000?'2g':'5g', g=group(live.wiphy_freq,width) ?? {freq:live.wiphy_freq,center:live.center_freq1,width,members:[live.wiphy_freq],sec:0};
         g.center=live.center_freq1 ?? g.center;
-        let config=rcfg(name,band), p=phyinfo[live.wiphy] ?? {caps:{},csa:false};
+        let p=phyinfo[live.wiphy] ?? {caps:{},csa:false},config=rcfg(name,band,p.caps);
         if((state.radios[name]?.csa_failed_until ?? 0)>now())config.method='idle_reconfigure';
         let reg=request(N.NL80211_CMD_GET_REG,0,{wiphy:live.wiphy});
         if(length(filter(interfaces,i=>i.wiphy==live.wiphy))!=length(aps))unsafe=true;
@@ -265,6 +261,8 @@ function sample(radios) {
         s.dfs_region=r.dfs_region;s.dfs=uses_dfs(r.current,r.caps);s.dfs_ready=dfs_ready(r.current,r.caps);
         s.quiet_seconds=quiet_since[r.name]==null?0:t-quiet_since[r.name];s.occupied_policy=r.config.occupied;
         s.cooldown_left=max(0,cfg.cooldown-(t-(s.last_move ?? -100000)));
+        s.candidate_channels=r.config.channels;
+        s.candidate_widths=r.config.widths;
     }
     let history_rows=map(radios,r=>{
         let b=evidence[r.name+':'+r.current.freq],signals=values(r.signals);
@@ -300,7 +298,7 @@ function candidates(r,radios,rules) {
         t-(s.last_attempt ?? -100000)<cfg.retry_delay?'Short retry delay':null;
     if(s.planning_hold)return [current];
     for(let w in r.config.widths)for(let ch in r.config.channels){
-        let g=group(r.band=='2g'?2407+5*ch:5000+5*ch,w);
+        let g=group(frequency(ch,r.band),w);
         if(!permitted(g,r.caps,rules,r.config.channels,dm))continue;
         let method=move_method(r.config,r.current,g);
         if(!same(g,current)&&method=='csa'&&!r.csa)continue;

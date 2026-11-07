@@ -27,6 +27,7 @@ done
 mkdir -p "$ROOT/www/luci-static/resources/wifi-coordinator"
 cp "$CC/files/wifi-coordinator.chart.js" "$ROOT/www/luci-static/resources/wifi-coordinator/chart.js"
 cp "$CC/files/wifi-coordinator.graphs.js" "$ROOT/www/luci-static/resources/wifi-coordinator/graphs.js"
+cp "$CC/files/wifi-coordinator.help.js" "$ROOT/www/luci-static/resources/wifi-coordinator/help.js"
 cp "$CC/files/Chart.js-LICENSE.txt" "$ROOT/usr/share/channel-coordinator/"
 cp "$BASE/wifi-coordinator.css" "$ROOT/www/luci-static/resources/view/"
 cp "$BASE/menu.json" "$ROOT/usr/share/luci/menu.d/luci-app-wifi-coordinator.json"

@@ -1,6 +1,6 @@
 import * as system_fs from 'fs';
 import * as nl from 'nl80211';
-import {group,permitted,channel,neighbor,quiet_ready} from './policy.uc';
+import {group,permitted,channel,frequency,neighbor,quiet_ready} from './policy.uc';
 export function scan_cost(r,duration) {
     if(!length(r.clients))return 0;
     // Link rates are a service-capacity proxy, not measured goodput. Preserve
@@ -49,12 +49,12 @@ function scan(radios) {
     for(let r in radios) if(r.config.managed) {
         let valid=[],dm=dfs_mode(r);
         for(let w in r.config.widths)for(let ch in r.config.channels){
-            let f=r.band=='2g'?2407+5*ch:5000+5*ch,g=group(f,w);
+            let f=frequency(ch,r.band),g=group(f,w);
             if(permitted(g,r.caps,rules,r.config.channels,dm))for(let m in g.members)if(index(valid,m)<0)push(valid,m);
         }
         for(let f in valid)if(index(required,f)<0)push(required,f);
-        let channels=r.band=='2g'?[1,2,3,4,5,6,7,8,9,10,11,12,13]:map(valid,f=>channel(f));
-        for(let ch in channels) {let f=r.band=='2g'?2407+5*ch:5000+5*ch;if(index(freqs,f)<0)push(freqs,f);}
+        let channels=r.band=='2g'?[1,2,3,4,5,6,7,8,9,10,11,12,13,14]:map(valid,f=>channel(f));
+        for(let ch in channels) {let f=frequency(ch,r.band);if(index(freqs,f)<0)push(freqs,f);}
     }
     freqs=filter(freqs,f=>length(filter(radios,r=>r.caps[f]&&!r.caps[f].disabled))>0);
     // Adjacent channels improve visibility but must not require interrupting an

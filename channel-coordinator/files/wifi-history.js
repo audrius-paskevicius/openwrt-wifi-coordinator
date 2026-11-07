@@ -4,6 +4,7 @@
 'require uci';
 'require fs';
 'require poll';
+'require wifi-coordinator.help as help';
 'require wifi-coordinator.graphs as graphs';
 function historyKey(k,x){
  if(k=='periods')return JSON.stringify([x.radio,x.start,x.channel,x.center,x.width,x.role]);
@@ -156,6 +157,7 @@ return view.extend({
   var configured=retentionChoices.slice();if(configured.indexOf(retain)<0)configured.push(retain);configured.sort(function(a,b){return a-b;}).forEach(function(h){o.value(String(h),h+' hour'+(h==1?'':'s'));});
   o.onchange=function(ev,section,value){setRetention(value);redraw(history);};
   o=s.option(form.Flag,'clear_history',_('Clear recorded history'),_('Delete recorded graphs, surveys and actions from RAM and flash when settings are applied. This switch resets itself. Recording follows the setting above; radar-avoidance memory is preserved.'));o.default='0';o.rmempty=false;
+  help.compact(m);
   return m.render().then(function(node){redraw(history);return E('div',{'class':'wifi-coordinator'},[
    E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),E('h2',{},_('Wi-Fi Coordinator: history')),E('p',{},[_('Show: '),selector]),display,node
   ]);});

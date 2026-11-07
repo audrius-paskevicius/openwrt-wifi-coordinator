@@ -51,6 +51,9 @@
 .wifi-coordinator .wc-log-wrap { max-height: 340px; }
 .wifi-coordinator .cbi-section-node-tabbed > [data-tab-active="false"] { display: none; }
 .wifi-coordinator .cbi-value-description { max-width: 65em; line-height: 1.5; }
+.wifi-coordinator .wc-setting-help { cursor: help; }
+.wifi-coordinator .wc-setting-help:focus-visible { outline: 1px dotted currentColor; outline-offset: 2px; }
+.cbi-tooltip.wc-help-tooltip { max-width: min(32em, calc(100vw - 16px)); white-space: normal; }
 @media (prefers-color-scheme: dark) {
   .wifi-coordinator .wc-table { background: #1c252d; color: #edf1f4; }
   .wifi-coordinator .wc-table th, .wifi-coordinator .wc-summary { background: #26313a; color: #edf1f4; }

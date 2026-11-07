@@ -8,12 +8,14 @@ The package combines channel planning, Radio Preference, and a LuCI interface un
 
 - Surveys the surrounding spectrum with paced scans and serving gaps.
 - Plans channels and widths jointly, preferring separate spectrum and usable wide channels: 20 MHz on 2.4 GHz; 20/40/80 MHz on 5 GHz.
+- Defaults to live driver-derived channel lists for every radio; optional explicit lists restrict selection.
 - Keeps evidence for each alternative even when different channels take turns ranking first.
 - Uses live channel-switch announcements where supported. Otherwise it tries a compatible client handoff, then briefly restarts only the changing radio if clients remain.
 - Checks reconnection and service after a change, with rollback and temporary exclusions after failures.
 - Coordinates DFS preparation without bypassing kernel radar restrictions. Recent radar detections add a decaying planning penalty.
 - Records channel placement, spectrum surveys, traffic summaries, and actions. Recent history stays in RAM; older history moves to flash in six-hour batches. Orderly shutdown saves pending records.
 - Draws history locally with bundled Chart.js; no CDN is required.
+- Shows short help beside every setting, with full explanations on hover, focus or click/tap.
 
 **This is an experimental third-party package, not an official OpenWrt package.** Spectrum scores are estimates, not measured throughput. Brief reconnects can interrupt calls, streams, or other traffic. The live validation is specific to the hardware above; other routers need validation.
 
