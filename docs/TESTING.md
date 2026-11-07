@@ -1,6 +1,10 @@
 # Validation
 
-Source release: **0.6.0-r12**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+Source release: **0.6.0-r13**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each release are distinguished below; earlier RF experiments are listed separately.
+
+## r13 tooltip readability
+
+Opaque light/dark tooltip surfaces, a border, padding and a subtle shadow distinguish settings help from the page beneath it. The existing native LuCI browser fixture passes all 56 descriptions and interaction checks; its rendered light and dark tooltips were visually inspected. This release changes presentation only.
 
 ## r12 help integration and hardware width discovery
 
