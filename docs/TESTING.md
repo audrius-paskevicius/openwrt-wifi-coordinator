@@ -1,12 +1,16 @@
 # Validation
 
-Source release: **0.6.0-r23**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release.
+Source release: **0.6.0-r24**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 35 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r24 compact spectrum legends
+
+Neighbour activity and radar memory share one horizontal legend row when space permits. On narrow screens, the groups wrap rather than overlap. The radar ramp, decay values and hover explanations are unchanged. This is a layout-only change. Portable source/UI checks and the native LuCI fixture passed (55 descriptions). A browser-rendered legend preview confirmed the side-by-side layout. The signed APK verified, extracted files matched source, and installation upgraded only this package. Both services resumed without a safety stop; router internet probes succeeded (3/3).
 
 ## r23 one-hour radar memory
 

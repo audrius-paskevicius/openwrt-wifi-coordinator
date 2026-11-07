@@ -116,9 +116,8 @@ return view.extend({
    var nodes=[E('h3',{},_('Where each radio spent its time')),
     E('p',{'class':'wc-caption','title':'Each declared band shows its standard channel plan. Displayed channels may not be permitted locally or supported by your radio. Dashed outlines indicate radar listening.'},_('Ribbons show each radio’s channel and width. // marks gaps in spectrum. Hover or tap for details.')),
     E('div',{'class':'wc-chart wc-spectrum-chart'},channelCanvas),legend(true),
-    E('div',{'class':'wc-survey-key','title':'Darker grey means more or stronger overlapping networks, adjusted for advertised load. This is a congestion estimate, not measured airtime. Hover over the graph for measurement times.'},['Neighbour activity ',E('span',{'class':'wc-grey-scale','aria-hidden':'true'}),' lower → higher']),
+    E('div',{'class':'wc-spectrum-keys'},[E('div',{'class':'wc-survey-key','title':'Darker grey means more or stronger overlapping networks, adjusted for advertised load. This is a congestion estimate, not measured airtime. Hover over the graph for measurement times.'},['Neighbour activity ',E('span',{'class':'wc-grey-scale','aria-hidden':'true'}),' lower → higher']),radarKey]),
     ...(surveys.length?[]:[E('p',{'class':'wc-caption'},_('Survey background appears after the next scan.'))]),
-    radarKey,
     E('h3',{},_('Observed traffic over time')),
     E('p',{'class':'wc-caption'},_('Upload + download, averaged over five minutes. This shows usage, not a speed test.')),
     E('div',{'class':'wc-chart wc-traffic-chart'},trafficCanvas),legend()];
