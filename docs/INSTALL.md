@@ -4,7 +4,7 @@
 
 Read [the full disclaimer](../DISCLAIMER.txt) before installing. The package prints it during installation and includes it at `/usr/share/channel-coordinator/DISCLAIMER.txt`.
 
-The bold **AI-generated software. No warranties. Use entirely at your own risk.** tab beside Channels, Clients, History and Storage & export always provides the full text. The other pages have no recurring banner. First use in a browser requires acknowledgement before displaying that page's controls. The browser remembers the exact text for this router; unchanged notices stay acknowledged across package upgrades. Clearing browser storage, using another browser or router address, or changing the disclaimer requires acknowledgement again. If browser storage is unavailable, acknowledgement lasts only while the loaded page module remains active. This does not change running services or write acknowledgement data to router flash.
+The bold **Experimental, AI-generated software. Use at your own risk.** tab beside Channels, Clients, History and Storage & export always provides the full text. The other pages have no recurring banner. First use in a browser requires acknowledgement before displaying that page's controls. The browser remembers the exact text for this router; unchanged notices stay acknowledged across package upgrades. Clearing browser storage, using another browser or router address, or changing the disclaimer requires acknowledgement again. If browser storage is unavailable, acknowledgement lasts only while the loaded page module remains active. This does not change running services or write acknowledgement data to router flash.
 
 ## Requirements
 

@@ -1,12 +1,18 @@
 # Validation
 
-Source release: **0.6.0-r42**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.6.0-r43**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 35 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r43 revised software disclaimer
+
+Replaced the canonical disclaimer with the revised experimental-software notice, including the limits of AI-generated implementation, possible harm, legally limited warranty/liability exclusions, and user recovery responsibilities. The README, release notice, packaged text, installation output and LuCI notice use the same wording. The tab label now reads **Experimental, AI-generated software. Use at your own risk.** Existing browser acknowledgements expire when the revised text is first loaded.
+
+Portable source/documentation and UI checks passed, including canonical wording, first-use acknowledgement and changed-text checks. The signed APK verified with both the build tool and the installed OpenWrt package manager; all 40 extracted files matched intended source or generated content, and release checksums matched. The package was installed on the development router without restarting controller processes; network and coordinator configuration hashes remained unchanged. Installed disclaimer and menu files matched the verified package. Controller simulations and live radio-switch tests were not repeated for this notice-only update.
 
 ## r42 documentation alignment and release audit
 

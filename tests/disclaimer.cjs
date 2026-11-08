@@ -24,7 +24,7 @@ module.exports=(async()=>{
  assert(JSON.stringify(f.api.page()).includes(text.trim().split('\n\n')[4]),'dedicated disclaimer page contains full text');
  const menu=JSON.parse(fs.readFileSync(path.join(root,'wifi-coordinator/menu.json'),'utf8'));
  assert.equal(menu['admin/network/wifi_coordinator/disclaimer'].action.path,'wifi-disclaimer');
- assert.equal(menu['admin/network/wifi_coordinator/disclaimer'].title,'AI-generated software. No warranties. Use entirely at your own risk.');
+ assert.equal(menu['admin/network/wifi_coordinator/disclaimer'].title,'Experimental, AI-generated software. Use at your own risk.');
  const tab=fs.readFileSync(path.join(root,'channel-coordinator/files/wifi-disclaimer.js'),'utf8');
  const view=new Function('view','disclaimer',tab)({extend:x=>x},f.api);
  const direct=await view.render();assert(JSON.stringify(direct).includes(text.trim().split('\n\n')[1]));
