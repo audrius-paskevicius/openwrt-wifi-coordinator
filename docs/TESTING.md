@@ -1,12 +1,22 @@
 # Validation
 
-Source release: **0.6.0-r46**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.6.0-r47**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
-Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 51 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
+Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 51 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r47 history refresh recovery
+
+A failed archive-directory request was treated like an empty listing, evicting browser-cached batches. The reader now preserves that cache on failure, retains the last successful recent-history and controller snapshots, and retries transport interruptions twice with short delays. A refresh warning distinguishes stale or incomplete browser data from corrupt or inaccessible files. Successful refreshes clear the warning; confirmed deletions still clear cached records. Concurrent callers share one refresh.
+
+Portable source/UI checks passed, including the existing 51 history/cache assertions and 30 new interruption/recovery cases using the production reader. Cases cover aborted requests, timeouts, initial outages, retry limits, cache preservation, restored connectivity, permission errors, invalid JSON/record arrays, confirmed deletion and overlapping refreshes. The router's nine archived batches were readable during investigation. The error message alone did not establish the cause of the interrupted browser request.
+
+This revision changes the History reader and presentation only. The controller algorithms and history recorder are unchanged; the full native controller/storage simulation was not repeated for this UI correction.
+
+The signed APK verified, all 40 packaged files matched source/generated content, and release hashes matched. After installation, an HTTP read of the router's History JavaScript exactly matched the updated source. Automatic operation resumed without a halt, and network, firewall, DHCP and both coordinator configuration hashes were unchanged. The interruption cases use simulated request failures; no live wireless interruption was deliberately induced.
 
 ## r46 HT40 fallback retry correction
 

@@ -12,7 +12,15 @@ function historyKey(k,x){
  if(k=='surveys')return String(x.cycle==null?x.time:x.cycle);
  return JSON.stringify(x);
 }
-var archiveCache=new Map();
+var archiveCache=new Map(),recentCache=new Map(),archiveFiles=null,historyRead=null;
+function missingHistory(e){return e.name=='NotFoundError'||/No such file/i.test(e.message||'');}
+function interruptedHistory(e){return /^(AbortError|NetworkError|TimeoutError)$/.test(e.name||'')||/XHR request (aborted|timed out)|network request failed|failed to fetch/i.test(e.message||'');}
+async function historyRequest(request){
+ for(var attempt=0;;attempt++){
+  try{return await request();}
+  catch(e){if(!interruptedHistory(e)||attempt>=2)throw e;await new Promise(function(resolve){setTimeout(resolve,attempt?750:250);});}
+ }
+}
 function radarHistory(events,periods,memory){
  // Planner memory is bounded and checkpointed separately from graph history.
  // Reconstruct detections from all retained batches, never from CAC/NOP events.
@@ -40,26 +48,57 @@ function radarHistory(events,periods,memory){
  });
  return result;
 }
-async function readHistory(){
- var errors=[],directory='/etc/wifi-coordinator/';
+function readHistory(){
+ // A slow refresh and another caller must not race to replace or prune caches.
+ if(!historyRead)historyRead=loadHistory().finally(function(){historyRead=null;});
+ return historyRead;
+}
+async function loadHistory(){
+ var errors=[],directory='/etc/wifi-coordinator/',interrupted=false,usedCache=false;
  // History can exceed the ubus file-read limit before its six-hour offload.
  // LuCI's streaming reader uses the same session and file ACLs without that cap.
- async function read(path){try{var raw=await fs.read_direct(path,'text'),h=JSON.parse(raw);h.file_bytes=new TextEncoder().encode(raw).length;return h;}catch(e){if(e.name!='NotFoundError'&&!/No such file/i.test(e.message||''))errors.push('Cannot read '+path+': '+(e.message||e));return {};}}
- var files=await fs.list(directory).catch(function(e){if(e.name!='NotFoundError'&&!/No such file/i.test(e.message||''))errors.push('Cannot list history: '+(e.message||e));return [];});
- files=files.filter(function(f){return f.type=='file'&&/^batch-[0-9]+\.json$/.test(f.name);}).sort(function(a,b){return a.name.localeCompare(b.name);});
- var names=new Set(files.map(function(f){return f.name;}));archiveCache.forEach(function(v,k){if(!names.has(k))archiveCache.delete(k);});
+ async function read(path,recent){
+  try{
+   var raw=await historyRequest(function(){return fs.read_direct(path,'text');}),h=JSON.parse(raw);
+   if(!h||typeof h!='object'||Array.isArray(h))throw Error('Invalid history data');
+   if(['periods','samples','events','surveys'].some(function(k){return h[k]!=null&&!Array.isArray(h[k]);}))throw Error('Invalid history records');
+   h.file_bytes=new TextEncoder().encode(raw).length;if(recent)recentCache.set(path,h);return h;
+  }catch(e){
+   if(missingHistory(e)){if(recent)recentCache.delete(path);return {};}
+   var cached=recent&&recentCache.get(path);
+   if(interruptedHistory(e))interrupted=true;
+   else errors.push('Cannot read '+path+': '+(e.message||e)+(cached?'. Showing previously loaded data.':''));
+   if(cached)usedCache=true;return cached||{};
+  }
+ }
+ var files,listed=false;
+ try{
+  files=await historyRequest(function(){return fs.list(directory);});
+  files=files.filter(function(f){return f.type=='file'&&/^batch-[0-9]+\.json$/.test(f.name);}).sort(function(a,b){return a.name.localeCompare(b.name);});
+  listed=true;
+ }catch(e){
+  if(missingHistory(e)){files=[];listed=true;}
+  else{
+   if(interruptedHistory(e))interrupted=true;else errors.push('Cannot list history: '+(e.message||e));
+   files=archiveFiles||[];if(archiveCache.size)usedCache=true;
+  }
+ }
+ // Only a successful listing (including a confirmed missing directory) can
+ // establish deletion. A failed request must never empty the archive cache.
+ if(listed){archiveFiles=files;var names=new Set(files.map(function(f){return f.name;}));archiveCache.forEach(function(v,k){if(!names.has(k))archiveCache.delete(k);});}
  var parts=[];
  // Closed batches are immutable: fetch once, then reuse them on minute refreshes.
  for(var i=0;i<files.length;i+=4){await Promise.all(files.slice(i,i+4).map(async function(f){if(!archiveCache.has(f.name)){var h=await read(directory+f.name);if(h.file_bytes)archiveCache.set(f.name,h);}}));}
  files.forEach(function(f){if(archiveCache.has(f.name))parts.push(archiveCache.get(f.name));});
- var ram=await read('/tmp/wifi-coordinator-history.json'),out=Object.assign({},ram),archiveBytes=parts.reduce(function(n,h){return n+(h.file_bytes||0);},0),saved=parts.reduce(function(n,h){return Math.max(n,h.saved||0);},0);
+ var ram=await read('/tmp/wifi-coordinator-history.json',true),out=Object.assign({},ram),archiveBytes=parts.reduce(function(n,h){return n+(h.file_bytes||0);},0),saved=parts.reduce(function(n,h){return Math.max(n,h.saved||0);},0);
  parts.push(ram);
  ['periods','samples','events','surveys'].forEach(function(k){var records=new Map();
   parts.forEach(function(part){(part[k]||[]).forEach(function(x){var id=historyKey(k,x),old=records.get(id),at=function(s){return s.updated||s.end||s.time;};if(!old||at(x)>=at(old))records.set(id,x);});});
   out[k]=Array.from(records.values()).sort(function(a,b){return (a.start||a.time)-(b.start||b.time);});
  });
  out.ram_bytes=ram.file_bytes||0;out.archive_bytes=archiveBytes;out.archive_files=files.length;out.read_errors=errors;
- var controller=await read('/tmp/channel-coordinator-state.json');out.radar=Object.assign({},controller.radar,{events:radarHistory(out.events,out.periods,controller.radar&&controller.radar.events)});out.declared_bands=controller.declared_bands||[];
+ var controller=await read('/tmp/channel-coordinator-state.json',true);out.radar=Object.assign({},controller.radar,{events:radarHistory(out.events,out.periods,controller.radar&&controller.radar.events)});out.declared_bands=controller.declared_bands||[];
+ out.refresh_warning=interrupted?(usedCache?'Refresh interrupted; showing previously loaded history where available. Retrying automatically.':'Refresh interrupted; history is not fully loaded. Retrying automatically.'):null;
  out.archive_saved=ram.archive_saved||saved;return out;
 }
 function stamp(t){return timefmt.stamp(t);}
@@ -128,6 +167,7 @@ return view.extend({
    var surveys=(h.surveys||[]).slice().sort(function(a,b){return a.time-b.time;});
    var radioNames=Array.from(new Set(periods.map(function(p){return p.radio;}).concat(samples.map(function(s){return s.radio;})))).sort();
    var warnings=(h.read_errors||[]).map(function(e){return E('p',{'class':'alert-message warning'},'History is incomplete. '+e);});
+   if(h.refresh_warning)warnings.unshift(E('p',{'class':'alert-message warning'},h.refresh_warning));
    if(!radioNames.length){display.replaceChildren.apply(display,warnings.concat([E('p',{'class':'wc-status'},'History is collecting, or has been disabled. Recent history is in RAM; archived history survives reboot.')]));return;}
    var start=Math.min(now-1,Math.max(cutoff,Math.min.apply(null,periods.map(function(p){return p.start;}).concat(samples.map(function(s){return s.time;}),surveys.map(function(s){return s.time;})))));
    var channelCanvas=E('canvas',{'role':'img','aria-label':'Channel and width of each radio over time'});

@@ -89,6 +89,8 @@ History retention ranges from 1 to 200 hours. Recent records use a 1 MiB RAM buf
 
 The **History** tab contains graphs, summaries and recent actions. **Storage & export** contains retention settings, collapsed **History storage** diagnostics and downloads. History's **Show** selector and exports' **Period** selector are independent, and each is capped by the saved retention setting. Exports default to **All retained history**. CSV downloads one selected dataset; JSON includes placements, traffic, surveys, current planner radar memory and selected-period actions. The radar dataset alone need not reproduce the graph's reconstructed radar shading. Both formats stream directly without creating an export file on the router. See [export formats, privacy and completeness](EXPORT.md).
 
+The History page retries interrupted requests twice before showing a refresh warning. Previously loaded data remains visible where available; the warning clears after a successful refresh. The page refreshes every minute. An interruption message does not establish that saved history was lost. Permission errors and corrupt files are reported separately. Hard-refresh an already open LuCI page after upgrading to load the updated reader.
+
 History loading uses LuCI's authenticated streaming reader for RAM and archive files larger than the ordinary ubus read limit. Read errors appear above the graphs. Opening **History storage** survives refreshes. The survey background carries each last observation forward until another measurement replaces it; hover for its actual measurement time.
 
 ## Stop or remove

@@ -16,6 +16,7 @@ const files = [
 for (const file of files) new Function(fs.readFileSync(path.join(root, file), 'utf8'));
 console.log(`PASS: ${files.length} LuCI/graph JavaScript syntax checks`);
 require('./history-cache.cjs');
+require('./history-refresh.cjs');
 require('./help.cjs');
 require('./settings.cjs');
 require('./graph-widths.cjs');
