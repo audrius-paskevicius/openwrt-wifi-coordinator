@@ -133,6 +133,30 @@ check(st.radios.r.width_limit.actual==20&&st.radios.r.width_limit.requested==40&
 radio.config.width_method='csa';ex.start(radio,group(2412,40),[radio]);T+=15;denied=false;
 try{ex.tick([radio]);}catch(e){denied=index(''+e,'coexistence')>=0;ex.abort(e);}
 check(denied,'explicit CSA cannot bypass HT40 coexistence');
+// Recheck live exclusions after planning, before any handoff or restart.
+for(let scenario in [
+ {freq:2472,width:40,failed:2472,blocked:true},
+ {freq:2452,width:40,failed:2472,blocked:true},
+ {freq:2472,width:40,failed:2452,blocked:true},
+ {freq:2472,width:20,failed:2472,blocked:true},
+ {freq:2412,width:40,failed:2472,blocked:false},
+ {freq:2452,width:20,failed:2472,blocked:false},
+ {freq:2472,width:40,failed:2472,expired:true,blocked:false},
+ {freq:2472,width:20,failed:2472,failed_width:40,blocked:false}
+]){
+ opt=setup();radio.band='2g';radio.current=group(2442,20);radio.clients={};radio.authorized={};radio.aps=[{}];radio.caps={};
+ for(let ch=1;ch<=13;ch++)radio.caps[2407+5*ch]={max_tx_power:2000};
+ radio.config.channels=[1,5,9,13];content='channel=7\nht_capab=[LDPC]\nnoscan=0\n';
+ opt.request=()=>({reg_rules:[{reg_rule_flags:0,freq_range_start:2400000,freq_range_end:2483500,freq_range_max_bw:40000,power_rule_max_eirp:2000}]});
+ ex=create_executor(opt);ex.start(radio,group(scenario.freq,scenario.width),[radio]);
+ // Inject after start to model a restriction absent from the earlier proposal.
+ st.radios.r.rejected=[{target:group(scenario.failed,scenario.failed_width ?? 20),kind:'client',until:T+(scenario.expired?0:21600)}];
+ T+=15;denied=false;
+ try{ex.tick([radio]);}catch(e){denied=index(''+e,'active failure restriction')>=0;ex.abort(e);}
+ check(denied==scenario.blocked,'executor honors fallback exclusion scope and expiry');
+ check(scenario.blocked?repairs==0&&!length(filter(calls,c=>c.method=='switch_chan'))&&!journal&&!st.radios.r.failed:
+  repairs+length(filter(calls,c=>c.method=='switch_chan'))==1,'blocked fallback does not disrupt AP; eligible placement still executes');
+}
 // Fresh evidence, rather than a single client's behavior, determines scope.
 let live={samples:{a:{one:{rx:0,tx:0}}},good:{},probes:{one:'192.168.50.2'}};
 let a={name:'a',authorized:{one:true},client_data:{one:{rx:10000,tx:10000}},current:group(5580,80),aps:[{status:{status:'ENABLED'}}]};

@@ -1,4 +1,4 @@
-import {group,same,same_block,overlap,survey_covers,move_method,placements,frequency,permitted} from '../channel-coordinator/files/policy.uc';
+import {group,same,same_block,overlap,survey_covers,move_method,placements,frequency,permitted,placement_rejected} from '../channel-coordinator/files/policy.uc';
 import {assess,spatial_streams} from '../channel-coordinator/files/planner.uc';
 let state={radios:{r:{width_limit:{actual:20,requested:40,until:1000}}}},T=100;
 function now(){return T;}function dfs_mode(){return 'off';}

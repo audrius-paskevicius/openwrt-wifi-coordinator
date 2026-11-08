@@ -5,7 +5,7 @@ import * as ubus from 'ubus';
 import * as uci from 'uci';
 import * as uloop from 'uloop';
 import {open_history} from './history.uc';
-import {channel, group, same, same_block, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample,declared_bands,dfs_policy} from './policy.uc';
+import {channel, group, same, same_block, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample,declared_bands,dfs_policy,placement_rejected} from './policy.uc';
 import {survey_covers,move_method,configured_channels,configured_widths,frequency,switch_methods,setting_integer,hardware_widths,placements,live_width} from './policy.uc';
 import {assess,choose,decide,spatial_streams} from './planner.uc';
 import {open_memory} from './radar.uc';
@@ -358,7 +358,7 @@ function candidates(r,radios,rules) {
         if(!same(g,current)&&method=='csa'&&!r.csa)continue;
         if(!same(g,current)&&r.band=='2g'&&g.width==40&&method=='csa')continue;
         if(!same(g,current)&&method=='idle_reconfigure'&&length(filter(keys(r.clients),m=>index(cfg.protected_clients,lc(m))>=0)))continue;
-        if(length(filter(s.rejected,x=>same_block(g,x.target))))continue;
+        if(placement_rejected(g,s.rejected,r.band,t))continue;
         if(length(filter(g.members,f=>index(scan_result.frequencies,f)<0)))continue;
         if(length(filter(list,x=>same(x,g))))continue;
         push(list,same(g,current)?current:rated(g));

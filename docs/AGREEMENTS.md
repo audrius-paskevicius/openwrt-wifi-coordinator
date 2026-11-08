@@ -1,6 +1,6 @@
 # Agreement review, 8 November 2026
 
-This review compares the requested behavior with the r45 implementation and deployment evidence. It distinguishes an implementation from proof of universal radio performance.
+This review compares the requested behavior with the current implementation and deployment evidence. It distinguishes an implementation from proof of universal radio performance.
 
 ## Current behavior review
 

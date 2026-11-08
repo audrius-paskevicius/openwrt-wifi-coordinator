@@ -1,7 +1,15 @@
-import {declared_bands,overlap,group,delta_busy,permitted,neighbor,pressure,reconfigure_text,dfs_ready,uses_dfs,preparation_text,quiet_ready,same_network,force_signal_ok,configured_channels,configured_widths,channel,frequency,switch_methods,setting_integer,dfs_policy,configured_country} from '../channel-coordinator/files/policy.uc';
+import {declared_bands,overlap,group,delta_busy,permitted,neighbor,pressure,reconfigure_text,dfs_ready,uses_dfs,preparation_text,quiet_ready,same_network,force_signal_ok,configured_channels,configured_widths,channel,frequency,switch_methods,setting_integer,dfs_policy,configured_country,placement_rejected} from '../channel-coordinator/files/policy.uc';
 function tests() {
     let n = 0;
     function eq(a, b) { if (a != b) die(sprintf('FAIL %J != %J\n',a,b)); n++; }
+    eq(placement_rejected(group(2472,40),null,'2g',100),false);
+    eq(placement_rejected(group(2472,40),[{target:group(2472,20),until:200}],'2g',100),true);
+    eq(placement_rejected(group(2452,40),[{target:group(2472,20),until:200}],'2g',100),true);
+    eq(placement_rejected(group(2472,40),[{target:group(2462,20),until:200}],'2g',100),false);
+    eq(placement_rejected(group(2472,40),[{target:group(2472,20),until:100}],'2g',100),false);
+    eq(placement_rejected(group(2472,20),[{target:group(2472,40),until:200}],'2g',100),false);
+    eq(placement_rejected(group(5500,40),[{target:group(5500,20),until:200}],'5g',100),false);
+    eq(placement_rejected(group(5520,40),[{target:group(5500,40),until:200}],'5g',100),true);
     for(let region in [1,2,3]){
         eq(dfs_policy('prepare',region,region).mode,'prepare');
         eq(dfs_policy('available',region,region).mode,'available');

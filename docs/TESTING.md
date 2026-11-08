@@ -1,12 +1,24 @@
 # Validation
 
-Source release: **0.6.0-r45**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.6.0-r46**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes the current 51 history/cache assertions. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r46 HT40 fallback retry correction
+
+On November 8, r45 twice selected channel 13/40 MHz, retained channel 13/20 MHz during setup, and then recorded a missing client. The latest attempt began at 09:53:05 CET; rollback to channel 7 was verified at 09:54:53. The 40 MHz width refusal lasted one evidence-freshness interval, while the actual 20 MHz client failure lasted six hours. Expiry of the shorter restriction allowed another wide request to bypass the remaining narrow-placement failure.
+
+The planner now excludes a 2.4 GHz HT40 request when either possible 20 MHz fallback has an active failure restriction. The executor rechecks this before handoff or a channel command. Reversing the primary cannot bypass it. A width refusal alone still permits 20 MHz; unrelated blocks remain eligible, and expiry restores the affected candidates. Recovery can still restore the previous serving placement. DFS policy is unchanged.
+
+Portable source/UI checks passed, including 51 history/cache assertions. The complete isolated OpenWrt suite passed: 144 policy checks, 15 actual candidate-generation checks, 1,118 executor cases, 1,023 restart-recovery checks, and the DFS, service, radar, persistence, history and export suites. The 668 storage checks retained all 7,203 samples and 2,401 surveys across 200 hours. Regression cases cover the two different expiry times, both HT40 primary directions, restrictions added after planning, unaffected alternatives, and width-only refusal without client failure.
+
+The signed APK verified with the native package manager, and all 40 extracted files matched source/generated content. Release checksums, disclaimer and public key matched. These tests verify retry handling; they do not establish why the original client failed on channel 13.
+
+After installation, the controller resumed automatic scanning with radio1 on channel 7/20 MHz and two associated clients. The installed policy was evaluated read-only against the router's retained failures after the old channel 13/40 MHz pause had expired: channel 13/20, channel 13/40 and reversed-primary channel 9/40 remained excluded by the active 20 MHz failure, while channel 1/40 was not excluded by those records. Installed controller files matched the build. Network, firewall, DHCP and both coordinator configuration hashes were unchanged.
 
 ## r45 restore opportunistic DFS
 

@@ -66,7 +66,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `scan_gap` | Paced only: minimum serving time between occupied-radio visits; duty may require a longer gap. |
 | `scan_type` | Passive or active where legal. Restricted frequencies always use passive listening, with an explicit status reason. |
 | `scanner` | Advanced: Auto or a fixed scanner. A fixed scanner is never silently substituted; unreachable bands can therefore remain unmeasured. |
-| `max_age` | Advanced: freshness ceiling for evidence; also bounds the cross-primary retry pause after HT40 setup retains 20 MHz. The active width constraint and remaining time are shown. Too short for a full scan can prevent decisions; unknown spectrum is never assumed clear. |
+| `max_age` | Advanced: freshness ceiling for evidence; also bounds the cross-primary retry pause after HT40 setup retains 20 MHz. The active width constraint and remaining time are shown. An actual service failure at 20 MHz has its own restriction, which also excludes HT40 requests that could fall back to it. Too short for a full scan can prevent decisions; unknown spectrum is never assumed clear. |
 | `separate_radios` | Whether separation ranks before total estimated service, or overlap becomes a cost penalty. Distinct priorities, not interchangeable thresholds. |
 | `overlap_penalty` | Shown only when strict separation is disabled: allows the administrator to trade overlap against other costs. |
 

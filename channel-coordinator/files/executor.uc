@@ -1,6 +1,6 @@
 import * as system_fs from 'fs';
 import * as nl from 'nl80211';
-import {channel,group,same,same_block,overlap,permitted,uses_dfs,dfs_ready,preparation_text,reconfigure_text,same_network,force_signal_ok,private_ipv4,liveness_progress,move_method,quiet_ready} from './policy.uc';
+import {channel,group,same,same_block,overlap,permitted,uses_dfs,dfs_ready,preparation_text,reconfigure_text,same_network,force_signal_ok,private_ipv4,liveness_progress,move_method,quiet_ready,placement_rejected} from './policy.uc';
 export function data_flow(previous,current){
     if(!previous||!current)return false;
     let reset=current.rx<previous.rx||current.tx<previous.tx;
@@ -489,6 +489,8 @@ function operation(radios) {
         coordination_ready();
         let r=filter(radios,x=>x.name==pending.radio)[0];
         if(!r||r.fingerprint!=pending.fingerprint||config_fingerprint(r.name)!=pending.fingerprint||!same(r.current,pending.source))die('Radio settings changed; proposed move cancelled');
+        if(!pending.repair_attempted&&placement_rejected(pending.target,state.radios[r.name].rejected,r.band,t))
+            die('Placement deferred: target or HT40 fallback has an active failure restriction');
         let rules=request(N.NL80211_CMD_GET_REG,0,{}).reg_rules ?? [];
         let dm=dfs_mode(r);
         if(!permitted(pending.target,r.caps,rules,r.config.channels,dm))die('Target no longer permitted');

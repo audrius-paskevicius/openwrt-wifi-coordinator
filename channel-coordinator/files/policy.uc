@@ -71,6 +71,13 @@ export function overlap(a, b) {
 };
 export function same_block(a, b) { return a.center == b.center && a.width == b.width; };
 export function same(a, b) { return a.freq == b.freq && same_block(a,b); };
+export function placement_rejected(g, rejected, band, t) {
+    // HT40 coexistence can retain 20 MHz on either member (see executor).
+    // A wider request must not bypass an active failure on that fallback.
+    return length(filter(rejected ?? [],e=>e.until>t&&(same_block(g,e.target)||
+        band=='2g'&&g.width==40&&e.target.width==20&&
+        index(g.members,e.target.freq)>=0)))>0;
+};
 export function quiet_ready(since, now, seconds) {
     return since != null && now >= since && now-since >= seconds;
 };
