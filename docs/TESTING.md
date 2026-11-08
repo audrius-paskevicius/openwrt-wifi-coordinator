@@ -1,6 +1,6 @@
 # Validation
 
-Source release: **0.6.0-r44**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.6.0-r45**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
@@ -8,7 +8,21 @@ Run the portable source/documentation checks with `python3 scripts/check-project
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
 
+## r45 restore opportunistic DFS
+
+Removed r44's private-driver-field veto over DFS placements and helper preparation. The project again uses available DFS spectrum under the kernel's country, CAC and non-occupancy rules. Country-aware operation and the radar-history/snapshot fixes remain. The intended behavior, including accepting occasional radar interruptions and reconsidering cleared spectrum, is recorded in [the agreements](AGREEMENTS.md). The [driver investigation](DFS-DRIVER.md) corrects the earlier overstatement: an unset private debug field did not establish a broken detector.
+
+Portable source/UI checks passed, including all 51 history/cache assertions. Targeted OpenWrt tests passed: 136 policy/regulatory checks, 15 actual DFS-runtime and reuse cases, 40 width/segmented-CAC cases, 103 planner/radar/survey cases, 1,102 executor cases, 11 radar-storage cases, and five radar-snapshot lifecycle cases. The new sequence checks usable-but-uncleared 160 MHz eligibility, required CAC, exclusion when any member reports radar, renewed eligibility after kernel expiry, and fading radar penalties allowing wide quiet spectrum to outrank a non-DFS fallback. The actual runtime test fails if it attempts private-driver inspection. Unchanged archive/storage simulations were not repeated for this policy correction.
+
+The signed APK verified; all 40 extracted files and release hashes matched source/generated content. Installed Channels JavaScript matched the final source over HTTP. These checks do not certify physical radar sensitivity, and no radar signal or synthetic radar detection was generated.
+
+A live coordinated-CAC check used empty radio0 to prepare channel 132/40 MHz for radio2. Hostapd logged CAC start at 09:20:17 CET on November 8 and successful completion at 09:21:18. Both PHYs reported clearance; the coordinator recorded `cac-shared`, restored radio0 to channel 161/80 MHz, cleared its temporary journal, and finished without a halt. During the check radio2 remained enabled on channel 52/80 MHz with two associated clients; its byte counters advanced between samples. This establishes the helper workflow on this installation, not lossless client traffic or RF detection sensitivity. Network, firewall and DHCP configuration hashes remained unchanged.
+
+After automatic operation resumed, the planner selected channel 124/160 MHz for radio0 from a fresh survey and completed the move without a forced target. Service verification reported zero missing clients, zero unproven clients and zero recorded disconnect events. The verified channel/width was saved, restoring the pre-r44 startup placement; candidate channel and width pools remain automatic.
+
 ## r44 radar history and country-aware DFS checks
+
+Historical note: the extra mwlwifi restriction described in this revision was removed in r45. Its successful tests established implementation of that restriction, not that the private driver field justified it.
 
 History now merges retained radar detections with planner memory, preserving old shading after pruning or reboot checkpoints and deduplicating shared PHY reports. The daemon refreshes its radar snapshot after pruning so service restarts do not resurrect expired entries. DFS eligibility follows matching known kernel regions rather than assuming ETSI, and a known mwlwifi driver's missing or mismatched internal region blocks new DFS placements and CAC-helper use. Wireless configuration reloads also refresh the coordinator and country hint. No country is invented for historical records with unknown region.
 

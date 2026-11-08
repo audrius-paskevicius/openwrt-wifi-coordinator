@@ -1,6 +1,8 @@
-import {dfs_policy} from '../channel-coordinator/files/policy.uc';
-let region=2,report='dfs_region: 0\n',driver='../../drivers/mwlwifi',directory=true,reads=0;
+import {dfs_policy,group,permitted,dfs_ready} from '../channel-coordinator/files/policy.uc';
+import {assess} from '../channel-coordinator/files/planner.uc';
+let region=2,reads=0;
 let cfg={dfs_mode:'prepare'},state={radios:{r:{}}},N={NL80211_CMD_GET_REG:1};
-let fs={readfile:path=>{reads++;return report;},readlink:path=>driver,stat:path=>directory};
-function request(){return {dfs_region:region};}
+// Any attempted private-driver inspection fails the actual runtime test.
+let fs={readfile:()=>die('Unexpected debugfs dependency'),readlink:()=>die('Unexpected sysfs dependency'),stat:()=>die('Unexpected private-driver dependency')};
+function request(){reads++;return {dfs_region:region};}
 let r={name:'r',phy:0,band:'5g',dfs_region:2};

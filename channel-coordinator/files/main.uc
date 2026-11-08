@@ -275,9 +275,7 @@ function phy_caps(phy) {
 function dfs_mode(r) {
     if(r.band!='5g'){if(state.radios[r.name])state.radios[r.name].dfs_constraint=null;return 'off';}
     let reg=request(N.NL80211_CMD_GET_REG,0,{});
-    let path='/sys/kernel/debug/ieee80211/phy'+r.phy+'/mwlwifi';
-    let driver=fs.readlink('/sys/class/ieee80211/phy'+r.phy+'/device/driver') ?? '';
-    let result=dfs_policy(cfg.dfs_mode,reg.dfs_region,r.dfs_region,fs.readfile(path+'/dfs_radar'),!!fs.stat(path)||!!match(driver,/\/mwlwifi$/));
+    let result=dfs_policy(cfg.dfs_mode,reg.dfs_region,r.dfs_region);
     if(state.radios[r.name])state.radios[r.name].dfs_constraint=result.reason;
     return result.mode;
 }

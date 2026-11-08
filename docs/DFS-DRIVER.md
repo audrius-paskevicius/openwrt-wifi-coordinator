@@ -1,4 +1,4 @@
-# WRT3200ACM DFS investigation
+# WRT3200ACM DFS investigation and opportunistic operation
 
 The r44 history fix restores radar shading from retained detection events,
 independently of the planner's bounded and separately checkpointed memory. CAC
@@ -29,23 +29,32 @@ including two 160 MHz incidents at 11:37:42 and 12:05:15 CET on November 7 with
 evacuation records. Shared PHY notifications do not prove independent detection
 by both radios. No radar signals or debugfs radar simulations were generated.
 
-## Mitigation and country changes
+## Correction in r45
 
-r44 blocks new DFS placements and CAC-helper use on a mwlwifi radio whose
-internal radar region is missing or differs from the kernel region. The known
-driver is identified through sysfs as well as debugfs, so an unavailable debugfs
-report does not silently pass this check. Other drivers still use their kernel
-regulatory reports. An explanation appears in the affected radio's status.
+r44 incorrectly promoted the private driver's debug field into an application
+veto over kernel-authorized DFS operation. It blocked both candidate placements
+and helper preparation on the main radio. That restriction conflicted with the
+project's intended opportunistic behavior and is removed in r45.
 
-The development router's main radio is moved to a permitted non-DFS block, with
-a non-DFS channel and width saved for startup. Channel and width candidate lists
-remain automatic: the restriction checks every member of a block against live
-driver/regulatory rules, rather than assuming a particular country's channels.
-The auxiliary radio retains DFS eligibility when its own checks pass.
+The coordinator again considers all kernel-permitted channels and widths,
+including DFS and 160 MHz where supported. Prepare mode can use an empty helper
+for CAC while another radio serves clients. The target radio must itself show
+kernel clearance before use. Radar exclusion remains mandatory; a block becomes
+eligible for reconsideration when the kernel permits it. Remembered radar risk
+decays rather than becoming a permanent exclusion. No non-DFS preference is added.
 
-The guard restricts coordinator choices; it does not rewrite arbitrary existing
-AP configurations. An administrator applying it to another router must also move
-an already-operating affected AP off DFS and save suitable startup settings.
+The source inspection explains the unset debug value but does not establish how
+the closed firmware interprets the profile command on this factory-locked model.
+The [upstream maintainer's explanation](https://github.com/kaloz/mwlwifi/issues/172#issuecomment-315896364)
+also distinguishes the firmware's programmed region from driver country mapping;
+it does not validate every radar profile. The earlier conclusion that the field
+justified a blanket DFS ban was too strong. Restoring the normal kernel contract
+is not a claim that firmware radar sensitivity has been certified or repaired.
+
+No kernel/firmware replacement, country override, simulated radar event, or
+fabricated CAC clearance is part of this correction.
+
+## Country changes
 
 When moving countries, set the actual country on **every radio** in OpenWrt's
 wireless settings, Save & Apply, and reboot this WRT hardware. Wireless reloads
@@ -57,7 +66,5 @@ and cannot permit a forbidden channel. Missing or conflicting DFS regions block
 DFS. FCC, ETSI and Japan region matching is tested in software; live validation
 remains limited to the Swedish development installation.
 
-This mitigation does not repair the driver or certify its detector. Restoring
-DFS/160 MHz on the affected radio requires a reviewed driver/firmware correction
-and hardware validation. Do not change country to evade restrictions or write
-debugfs controls to fabricate CAC clearance.
+The project does not change regulatory databases, shorten mandatory exclusion
+periods, or use private debug controls to force clearance.

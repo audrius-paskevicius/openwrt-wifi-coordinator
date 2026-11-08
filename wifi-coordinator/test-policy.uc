@@ -3,16 +3,14 @@ function tests() {
     let n = 0;
     function eq(a, b) { if (a != b) die(sprintf('FAIL %J != %J\n',a,b)); n++; }
     for(let region in [1,2,3]){
-        eq(dfs_policy('prepare',region,region,null,false).mode,'prepare');
-        eq(dfs_policy('available',region,region,'dfs_region: '+region+'\n',true).mode,'available');
-        eq(dfs_policy('prepare',region,region,'dfs_region: 0\n',true).mode,'off');
-        eq(dfs_policy('prepare',region,region,null,true).mode,'off');
+        eq(dfs_policy('prepare',region,region).mode,'prepare');
+        eq(dfs_policy('available',region,region).mode,'available');
+        eq(dfs_policy('off',region,region).mode,'off');
     }
-    eq(dfs_policy('prepare',2,1,null,false).mode,'off');
-    eq(dfs_policy('prepare',0,0,null,false).mode,'off');
-    eq(dfs_policy('prepare',null,null,null,false).mode,'off');
-    eq(dfs_policy('prepare',2,2,'dfs_region: 1\n',true).mode,'off');
-    eq(dfs_policy('off',2,2,'dfs_region: 0\n',true).reason,null);
+    eq(dfs_policy('prepare',2,1).mode,'off');
+    eq(dfs_policy('prepare',0,0).mode,'off');
+    eq(dfs_policy('prepare',null,null).mode,'off');
+    eq(dfs_policy('off',2,2).reason,null);
     for(let country in ['SE','US','JP','DE'])eq(configured_country([{country},{country}]),country);
     eq(configured_country([{country:'SE'},{country:'US'}]),null);
     eq(configured_country([{country:'SE'},{}]),null);

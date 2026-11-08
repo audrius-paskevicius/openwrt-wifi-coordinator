@@ -10,6 +10,13 @@ Width Auto follows advertised HT/VHT capabilities. The tested router advertises 
 
 ## Agreements retained
 
+The operating goal is opportunistic use of available spectrum, including DFS.
+Occasional radar-triggered interruptions are an accepted tradeoff. Prepare mode
+may clear an eligible block on an empty helper while another radio serves clients,
+use the block after clearance, and reconsider it after a radar exclusion expires.
+There is no non-DFS-only preference or private-debug-field veto. Kernel country
+rules, CAC, non-occupancy periods and service verification remain mandatory.
+
 | Request | Current implementation / evidence |
 | --- | --- |
 | One self-contained installable project | One signed APK includes both cooperating services, five LuCI pages (Channels, Clients, History, Storage & export and the disclaimer tab) and bundled Chart.js. Source, build scripts, tests and dependency instructions are published together. Required OpenWrt runtime packages are resolved separately by apk. |
