@@ -3,7 +3,7 @@
 Open **Network / Wi-Fi Coordinator / Storage & export**, then **Export history** below History retention. Its independent Period selector offers All retained history (the default) and durations up to the saved retention limit. Changing Show on the History tab does not change the export period. Downloads do not change recording, retention, radio settings or channel planning.
 
 - **CSV data** selects channel placements, traffic summaries, spectrum surveys, radar detections or actions, followed by its Download button.
-- **JSON data** downloads all graph data and actions in one structured file using its separate Download button.
+- **JSON data** downloads all five datasets below in one structured file using its separate Download button.
 
 The Period selector above these rows applies to both downloads.
 
@@ -13,7 +13,9 @@ The router sends the response directly to the browser download manager. It creat
 
 Every export has a fixed request-time cutoff, the saved retention limit, package/schema versions, units and UTC timestamps. ISO timestamps end in `Z`; original Unix seconds are also retained. These are UTC even when the page displays local time. Rows are emitted in source order; sort by `start` or `time` if chronological ordering is required.
 
-Placements and five-minute traffic summaries retain their original interval boundaries. An overlapping interval may begin before the selected window; no estimated partial-bucket traffic is invented. Surveys include the earlier retained observations needed to establish each frequency bin at the beginning of the window. Radar detections come from current radar memory, which is independent of graph retention and may be older. The exported radar half-life lets consumers reconstruct decay.
+Placements and five-minute traffic summaries retain their original interval boundaries. An overlapping interval may begin before the selected window; no estimated partial-bucket traffic is invented. Surveys include the earlier retained observations needed to establish each frequency bin at the beginning of the window.
+
+The `radar` dataset (and radar CSV) contains only current planner memory, capped at 128 incidents. It is independent of graph retention and the selected export period, and may contain older detections. The History graph also reconstructs detections from all retained actions, so this dataset alone need not reproduce its radar shading. JSON `actions` and action CSV include raw radar notifications within the selected period: only `event: "radar-state"` with `radar_event: 0` represents a detection. Shared reports for the same region/block within five seconds represent one incident; CAC completion and exclusion expiry are not detections. The exported half-life supplies the decay rate. A detection before the export window that has left planner memory can still affect the graph but be absent from the download. Choosing **All retained history** includes the retained action context.
 
 This is a best-effort snapshot, not a lock on the recorder. The RAM snapshot and archive listing are fixed at request start; closed archive batches are immutable. An archive removed or unreadable during download produces an explicit warning. **Check the final completeness result**: a truncated file without that result is not a completed export. A complete export means all selected sources were read, not that the router recorded every moment. Metadata also reports previously dropped RAM records.
 
@@ -28,8 +30,8 @@ Top-level metadata includes `format`, `version`, `package_version`, `exported_at
 | `periods` | Radio, primary channel, centre frequency, width, role and residence interval |
 | `traffic` | Original five-minute sums/counts/peaks plus derived mean Mbit/s and measured busy-airtime percent |
 | `surveys` | Compact frequency-bin levels and their measurement-time offsets |
-| `radar` | Detection time, centre frequency, width, region, PHYs and weight |
-| `actions` | Retained action codes and their recorded details |
+| `radar` | Current planner-memory incidents: detection time, centre frequency, width, region, PHYs and weight |
+| `actions` | Action codes and recorded details within the selected period, including raw radar notifications |
 
 `result` ends the document with `complete`, `warnings` and record `counts`. Survey counts count frames, not individual bins.
 

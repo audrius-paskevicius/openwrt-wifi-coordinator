@@ -42,6 +42,11 @@ for CAC while another radio serves clients. The target radio must itself show
 kernel clearance before use. Radar exclusion remains mandatory; a block becomes
 eligible for reconsideration when the kernel permits it. Remembered radar risk
 decays rather than becoming a permanent exclusion. No non-DFS preference is added.
+Fresh survey evidence, service scoring and active recovery restrictions still
+determine whether to move; exclusion expiry does not promise immediate reuse.
+The [r45 live test](TESTING.md#r45-restore-opportunistic-dfs) confirmed helper CAC
+while another radio served clients, followed by an automatic 160 MHz placement.
+It does not certify RF radar sensitivity.
 
 The source inspection explains the unset debug value but does not establish how
 the closed firmware interprets the profile command on this factory-locked model.
@@ -57,10 +62,13 @@ fabricated CAC clearance is part of this correction.
 ## Country changes
 
 When moving countries, set the actual country on **every radio** in OpenWrt's
-wireless settings, Save & Apply, and reboot this WRT hardware. Wireless reloads
+wireless settings, check that saved startup channels and widths are valid there,
+Save & Apply, and reboot this WRT hardware. The coordinator needs working APs;
+automatic candidate pools do not repair an invalid startup placement. Wireless reloads
 refresh the coordinator and its auxiliary-driver country hint; that module hint
 only takes effect when the driver loads. The project does not infer location,
 override factory country locks, or make unsupported hardware legal elsewhere.
+Custom auxiliary-driver module settings are preserved and need separate review.
 Automatic pools follow the new live rules; explicit pools remain restrictions
 and cannot permit a forbidden channel. Missing or conflicting DFS regions block
 DFS. FCC, ETSI and Japan region matching is tested in software; live validation

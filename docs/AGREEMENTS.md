@@ -1,6 +1,6 @@
-# Agreement review, 7 November 2026
+# Agreement review, 8 November 2026
 
-This review compares the requested behavior with the implementation and deployment evidence. It distinguishes an implementation from proof of universal radio performance.
+This review compares the requested behavior with the r45 implementation and deployment evidence. It distinguishes an implementation from proof of universal radio performance.
 
 ## Current behavior review
 
@@ -16,6 +16,8 @@ may clear an eligible block on an empty helper while another radio serves client
 use the block after clearance, and reconsider it after a radar exclusion expires.
 There is no non-DFS-only preference or private-debug-field veto. Kernel country
 rules, CAC, non-occupancy periods and service verification remain mandatory.
+Eligibility does not promise an immediate return: fresh survey evidence, service
+scoring and any active recovery restrictions still govern the next move.
 
 | Request | Current implementation / evidence |
 | --- | --- |
@@ -39,7 +41,7 @@ rules, CAC, non-occupancy periods and service verification remain mandatory.
 | Download graph data and actions without router export files | Authenticated POST downloads stream JSON or dataset-specific CSV. They use bounded source batches and a per-dataset deduplication index, with no temporary export file or export-related flash writes. CSV and JSON have separate Download rows; both use the export Period selector. See [formats and completeness checks](EXPORT.md). |
 | ISO-style dates and uncluttered graph captions | Graph ticks use browser-local 24-hour time. Dates appear only for windows spanning at least 24 hours and crossing local midnight. No Time axis label or standalone timezone caption. Full timestamps include date and seconds; exported timestamps are UTC. |
 | Recent RAM history, older flash archive; infrequent writes | Immutable batches are offloaded every six hours. Original five-minute summaries, surveys and actions retain their detail. Flash has no arbitrary 256 KiB cap; writes reserve free space. RAM is bounded at 1 MiB. Authenticated streaming reads avoid the ordinary ubus file-size limit; read errors are visible. Storage diagnostics stay collapsed unless opened. |
-| Reboot survival; pause and clear are separate | Orderly shutdown checkpoints pending history and radar memory. Ordinary service restarts reuse RAM. Disabling recording pauses it; explicit clearing deletes graph history/actions. Recent actions share the selected retention. |
+| Reboot survival; pause and clear are separate | Orderly shutdown checkpoints pending history and radar memory. Ordinary service restarts reuse RAM. Disabling recording pauses it; explicit clearing deletes recorded history/actions but preserves planner radar memory, which can still appear as shading. Recent actions share the selected retention. |
 | Refresh must preserve expanded comparison and editing | The comparison details element is reused, and polling updates status without rebuilding the form. The native-browser fixture checks expansion and unsaved input preservation. |
 | No credentials in the public project | Portable source checks reject recognizable private-key and GitHub-token patterns; release audits also inspect the extracted APK and compare its files with the intended source. Router configuration and signing secrets remain outside the repository. |
 

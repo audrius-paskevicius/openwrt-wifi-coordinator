@@ -28,7 +28,7 @@ The five tabs are **Channels**, **Clients**, **History**, **Storage & export**, 
 - Keeps evidence for each alternative even when different channels take turns ranking first.
 - Uses live channel-switch announcements where supported. Otherwise it tries a compatible client handoff, then briefly restarts only the changing radio if clients remain.
 - Checks reconnection and service after a change, with rollback and temporary exclusions after failures.
-- Coordinates DFS preparation without bypassing kernel radar restrictions. Recent radar detections add a planning penalty with a one-hour default half-life, separate from mandatory DFS restrictions.
+- Uses eligible DFS spectrum opportunistically, preparing it on an empty compatible helper while another radio serves clients when possible. Recent radar detections add a planning penalty with a one-hour default half-life, separate from mandatory kernel clearance and exclusion periods.
 - Records channel placement, spectrum surveys, traffic summaries, and actions. Recent history stays in RAM; older history moves to flash in six-hour batches. Orderly shutdown saves pending records.
 - Draws history locally with bundled Chart.js; no CDN is required.
 - Streams authenticated JSON and CSV [history downloads](docs/EXPORT.md) without creating export files or writing flash.
@@ -105,7 +105,7 @@ This source distribution contains no router passwords, Wi-Fi credentials, privat
 
 - The current manager supports AP-only HT/VHT arrangements and a bounded joint search of up to four radios. It does not claim validated HE/EHT, MLO, or multi-interface support.
 - Client roaming decisions remain client-dependent. Protected clients and explicit quiet-only/empty-only policies override the automatic reconnect fallback.
-- Regulatory eligibility comes from the running kernel. DFS management currently requires matching global/per-radio ETSI regions. Radar memory never overrides a non-occupancy period or a required CAC.
+- Regulatory eligibility comes from the running kernel. DFS management requires matching, known global/per-radio regions (FCC, ETSI or Japan). Radar memory never overrides a non-occupancy period or a required CAC. Expiry makes spectrum eligible for reconsideration; fresh survey evidence and service scoring still determine whether to move. See the [DFS investigation and country guidance](docs/DFS-DRIVER.md).
 - Firmware-upgrade preservation entries are included, but a full firmware-upgrade cycle has not been validated. Reinstall a compatible package and dependencies as needed.
 - On WRT3200ACM/WRT32X, the country helper copies the administrator's common radio country into the auxiliary driver's module setting when appropriate. It never chooses a country for you; a changed module setting needs a reboot.
 

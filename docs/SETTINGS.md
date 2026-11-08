@@ -43,7 +43,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | Key | Why keep it / precise scope |
 | --- | --- |
 | `enabled` | Stops this controller; distinct from observation, which still scans and proposes. Client steering has its own switch. |
-| `mode` | Observe versus automatic channel changes. Does not control preferred-radio steering. |
+| `mode` | Observe versus automatic planner-initiated channel changes. Observe still allows interrupted-operation recovery and kernel radar evacuation. Does not control preferred-radio steering. |
 | `interval` | Administrator's scan-overhead budget: minimum wait after completed surveys/operations, including close comparisons. Startup begins after 15 seconds. |
 | `improvement` | Minimum service-index gain to admit a new capacity plan, including widening. Admitted multi-step plans do not repay this margin while remaining benefit is positive. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
 | `min_dwell` | Avoids repeated moves after successful verification. Independent of survey frequency. |
@@ -58,7 +58,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `verify_unprobed` | Advanced: observation time for clients without usable ICMP probes (150–600 seconds). Handles differing client sleep/probe behavior. |
 | `handoff_target_min` | Advanced: weakest measured destination allowed for forced handoff. |
 | `handoff_source_min` | Advanced: proximity requirement when destination cannot be measured. Co-located radio estimate, not a promised destination signal. |
-| `dfs_mode` | Exclude, use already cleared channels, or prepare using an empty helper while other radios serve clients. Prepare supports opportunistic DFS reuse after required clearance and kernel exclusion expiry. Requires matching, known global/per-radio DFS regions under the configured country. |
+| `dfs_mode` | Exclude DFS candidates, use already cleared channels, or prepare using an empty helper while other radios serve clients. Exclude does not force an existing DFS AP to leave its channel. Prepare supports opportunistic reuse after required clearance and kernel exclusion expiry; fresh evidence and service scoring still determine moves. Requires matching, known global/per-radio DFS regions (FCC, ETSI or Japan) under the configured country. |
 | `dfs_helper` | Optional explicit helper for installations with unequal radio coverage. Only shown for Prepare. Only that helper is eligible. If it cannot prepare the target, preparation is deferred rather than silently selecting another radio. |
 | `radar_half_life` | Default 3600 seconds (one hour): interruption-history weight halves each hour. Independent of mandatory kernel non-occupancy time. |
 | `scan_policy` | Paced, empty-only or sustained-quiet scanning: direct disruption/coverage tradeoff. |
