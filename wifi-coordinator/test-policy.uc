@@ -1,7 +1,24 @@
-import {declared_bands,overlap,group,delta_busy,permitted,neighbor,pressure,reconfigure_text,dfs_ready,uses_dfs,preparation_text,quiet_ready,same_network,force_signal_ok,configured_channels,configured_widths,channel,frequency,switch_methods,setting_integer} from '../channel-coordinator/files/policy.uc';
+import {declared_bands,overlap,group,delta_busy,permitted,neighbor,pressure,reconfigure_text,dfs_ready,uses_dfs,preparation_text,quiet_ready,same_network,force_signal_ok,configured_channels,configured_widths,channel,frequency,switch_methods,setting_integer,dfs_policy,configured_country} from '../channel-coordinator/files/policy.uc';
 function tests() {
     let n = 0;
     function eq(a, b) { if (a != b) die(sprintf('FAIL %J != %J\n',a,b)); n++; }
+    for(let region in [1,2,3]){
+        eq(dfs_policy('prepare',region,region,null,false).mode,'prepare');
+        eq(dfs_policy('available',region,region,'dfs_region: '+region+'\n',true).mode,'available');
+        eq(dfs_policy('prepare',region,region,'dfs_region: 0\n',true).mode,'off');
+        eq(dfs_policy('prepare',region,region,null,true).mode,'off');
+    }
+    eq(dfs_policy('prepare',2,1,null,false).mode,'off');
+    eq(dfs_policy('prepare',0,0,null,false).mode,'off');
+    eq(dfs_policy('prepare',null,null,null,false).mode,'off');
+    eq(dfs_policy('prepare',2,2,'dfs_region: 1\n',true).mode,'off');
+    eq(dfs_policy('off',2,2,'dfs_region: 0\n',true).reason,null);
+    for(let country in ['SE','US','JP','DE'])eq(configured_country([{country},{country}]),country);
+    eq(configured_country([{country:'SE'},{country:'US'}]),null);
+    eq(configured_country([{country:'SE'},{}]),null);
+    eq(configured_country([]),null);
+    eq(configured_country([{country:'00'}]),null);
+    eq(configured_country([{country:'se'}]),null);
     eq(join(' ',declared_bands([{wiphy_bands:[null,{freqs:[{freq:5180,disabled:true}]}]}])),'5g');
     eq(join(' ',declared_bands([{wiphy_bands:[{freqs:[{freq:2412}]},null]},{wiphy_bands:[null,{freqs:[{freq:5180}]}]}])),'2g 5g');
     eq(join(' ',declared_bands([{wiphy_bands:[null,{vht_capa:0}]},{wiphy_bands:[null,{freqs:[{freq:5745}]}]}])),'5g');

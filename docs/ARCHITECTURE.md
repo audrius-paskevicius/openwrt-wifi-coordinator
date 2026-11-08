@@ -56,7 +56,7 @@ Switch methods default to Auto, which resolves driver support, known WRT executi
 
 ## DFS and radar memory
 
-DFS management requires matching global and per-radio ETSI regions. In preparation mode, an empty compatible 5 GHz helper temporarily listens on the target. Another radio is preferred; the target radio itself can act as helper if empty and eligible. Other radios remain available to serve clients. Handoff may empty the helper; preparation does not forcibly restart an occupied helper. Its original AP is restored before the serving radio moves. Clearance must be confirmed on the target radio too; no assumption is made that all drivers share it.
+DFS management requires matching, known global and per-radio DFS regions (FCC, ETSI or Japan), following the configured country and live kernel rules. A known mwlwifi driver's internal radar region must also match; missing reports block its DFS use. In preparation mode, an empty compatible 5 GHz helper temporarily listens on the target. Another radio is preferred; the target radio itself can act as helper if empty and eligible. Other radios remain available to serve clients. Handoff may empty the helper; preparation does not forcibly restart an occupied helper. Its original AP is restored before the serving radio moves. Clearance must be confirmed on the target radio too; no assumption is made that all drivers share it.
 
 A helper narrower than the proposed block can prepare its uncleared pieces sequentially. Each piece is checked on both PHYs and the helper is restored between checks. The original wide target remains pending; it cannot move until every required member is cleared. Thus an 80 MHz helper can prepare a 160 MHz destination without claiming 160 MHz hardware support.
 
@@ -64,7 +64,9 @@ HT40 setup retains hostapd coexistence checks (`noscan=0`) and periodic overlapp
 
 Capability interpretation follows [Linux HT/VHT definitions](https://github.com/torvalds/linux/blob/v6.12/include/linux/ieee80211.h), regulatory range handling follows [cfg80211 AUTO_BW behavior](https://github.com/torvalds/linux/blob/v6.12/net/wireless/reg.c), and hostapd performs [HT40 coexistence and VHT configuration checks](https://github.com/vanhoefm/hostap-wpa3/blob/master/hostapd/hostapd.conf). Kernel and hostapd enforcement remains authoritative.
 
-`radar.uc` remembers at most 128 recent incidents independently of optional graph history. Each detection's weight halves over the configured half-life (default one hour). Overlapping incidents accumulate, capped at a risk of one. This affects planning and the fading channel bands in history; it is not radar probability. Kernel non-occupancy periods and CAC requirements always remain authoritative.
+`radar.uc` remembers at most 128 recent incidents independently of optional graph history. Each detection's weight halves over the configured half-life (default one hour). Overlapping incidents accumulate, capped at a risk of one. This affects planning; it is not radar probability. Kernel non-occupancy periods and CAC requirements always remain authoritative.
+
+History reconstructs fading radar bands from retained archive/RAM detection events plus current planner memory, using the configured half-life. It does not inherit the planner's 128-incident limit or lose old shading when a planner checkpoint prunes records. Shared PHY reports for the same region/block within five seconds count once. CAC completion and non-occupancy expiry do not create radar bands. Legacy detections use known incident geometry or a unique contemporaneous channel block; ambiguous records show only the reported primary's 20 MHz. See the [WRT3200ACM driver investigation and mitigation](DFS-DRIVER.md) for the separate hardware limitation.
 
 ## History, persistence and privacy
 

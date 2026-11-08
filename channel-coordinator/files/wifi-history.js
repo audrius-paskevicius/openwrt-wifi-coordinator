@@ -13,6 +13,33 @@ function historyKey(k,x){
  return JSON.stringify(x);
 }
 var archiveCache=new Map();
+function radarHistory(events,periods,memory){
+ // Planner memory is bounded and checkpointed separately from graph history.
+ // Reconstruct detections from all retained batches, never from CAC/NOP events.
+ var rows=(memory||[]).map(function(e){return Object.assign({},e,{phys:(e.phys||[]).slice()});});
+ (events||[]).forEach(function(e){
+  if(e.event!='radar-state'||e.radar_event!==0)return;
+  var center=e.center,width=e.width,region=e.region==null?null:e.region;
+  if(!Number.isFinite(center)||!(width>0)){
+   var matches=(memory||[]).filter(function(p){return Math.abs(p.time-e.time)<=5&&(e.region==null||e.region==p.region)&&Number.isFinite(p.center)&&p.width>0&&e.freq>=p.center-p.width/2&&e.freq<p.center+p.width/2;});
+   if(!matches.length)matches=(periods||[]).filter(function(p){return p.start<=e.time&&p.end+5>=e.time&&Number.isFinite(p.center)&&p.width>0&&e.freq>=p.center-p.width/2&&e.freq<p.center+p.width/2;});
+   // Legacy records lack geometry. Use a unique contemporaneous block; if
+   // ambiguous, show only the reported primary instead of inventing a width.
+   var blocks=new Map(matches.map(function(p){return [p.center+':'+p.width,p];}));
+   var p=blocks.size==1?Array.from(blocks.values())[0]:null;
+   center=p?p.center:e.freq;width=p?p.width:20;if(region==null&&p&&p.region!=null)region=p.region;
+  }
+  rows.push({time:e.time,center:center,width:width,region:region,phys:e.phy==null?[]:[e.phy],weight:1});
+ });
+ var result=[],blocks=new Map();
+ rows.sort(function(a,b){return a.time-b.time;}).forEach(function(e){
+  if(!Number.isFinite(e.time)||!(e.time>0)||!Number.isFinite(e.center)||e.center<5000||e.center>=5925||!(e.width>0&&e.width<=160))return;
+  var key=[e.region,e.center,e.width].join(':'),old=blocks.get(key);
+  if(old&&e.time-old.time<=5){e.phys.forEach(function(phy){if(old.phys.indexOf(phy)<0)old.phys.push(phy);});return;}
+  blocks.set(key,e);result.push(e);
+ });
+ return result;
+}
 async function readHistory(){
  var errors=[],directory='/etc/wifi-coordinator/';
  // History can exceed the ubus file-read limit before its six-hour offload.
@@ -32,7 +59,7 @@ async function readHistory(){
   out[k]=Array.from(records.values()).sort(function(a,b){return (a.start||a.time)-(b.start||b.time);});
  });
  out.ram_bytes=ram.file_bytes||0;out.archive_bytes=archiveBytes;out.archive_files=files.length;out.read_errors=errors;
- var controller=await read('/tmp/channel-coordinator-state.json');out.radar=controller.radar||{events:[]};out.declared_bands=controller.declared_bands||[];
+ var controller=await read('/tmp/channel-coordinator-state.json');out.radar=Object.assign({},controller.radar,{events:radarHistory(out.events,out.periods,controller.radar&&controller.radar.events)});out.declared_bands=controller.declared_bands||[];
  out.archive_saved=ram.archive_saved||saved;return out;
 }
 function stamp(t){return timefmt.stamp(t);}

@@ -58,7 +58,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `verify_unprobed` | Advanced: observation time for clients without usable ICMP probes (150–600 seconds). Handles differing client sleep/probe behavior. |
 | `handoff_target_min` | Advanced: weakest measured destination allowed for forced handoff. |
 | `handoff_source_min` | Advanced: proximity requirement when destination cannot be measured. Co-located radio estimate, not a promised destination signal. |
-| `dfs_mode` | Exclude, use already cleared channels, or prepare using a spare. Requires matching global/per-radio ETSI regions; a conflict is reported. |
+| `dfs_mode` | Exclude, use already cleared channels, or prepare using a spare. Requires matching, known global/per-radio DFS regions under the configured country. An exposed mwlwifi internal radar-region mismatch also blocks DFS; the reason is reported. |
 | `dfs_helper` | Optional explicit helper for installations with unequal radio coverage. Only shown for Prepare. Only that helper is eligible. If it cannot prepare the target, preparation is deferred rather than silently selecting another radio. |
 | `radar_half_life` | Default 3600 seconds (one hour): interruption-history weight halves each hour. Independent of mandatory kernel non-occupancy time. |
 | `scan_policy` | Paced, empty-only or sustained-quiet scanning: direct disruption/coverage tradeoff. |

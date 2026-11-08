@@ -1,4 +1,20 @@
 // Shared channel geometry, regulatory checks and execution helpers.
+export function dfs_policy(mode,global_region,radio_region,driver_report,driver_present) {
+    if(mode=='off')return {mode:'off',reason:null};
+    if(index([1,2,3],global_region)<0||radio_region!=global_region)
+        return {mode:'off',reason:'DFS blocked: global and radio DFS regions must be known and match'};
+    if(driver_present){
+        let m=match(driver_report ?? '',/dfs_region:\s*([0-9]+)/);
+        if(!m||int(m[1])!=global_region)
+            return {mode:'off',reason:'DFS blocked: mwlwifi internal radar region is unknown or differs from the kernel region'};
+    }
+    return {mode,reason:null};
+};
+export function configured_country(radios) {
+    let countries=[];
+    for(let r in radios)if(index(countries,r.country ?? '')<0)push(countries,r.country ?? '');
+    return length(countries)==1&&match(countries[0],/^[A-Z]{2}$/)?countries[0]:null;
+};
 // Display bands come from PHY declarations, including disabled frequencies.
 // They deliberately do not depend on active APs, configured pools or history.
 export function declared_bands(phys) {

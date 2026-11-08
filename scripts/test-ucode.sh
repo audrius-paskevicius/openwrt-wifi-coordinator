@@ -10,6 +10,7 @@ mkdir "$LOCK" 2>/dev/null || { echo 'Another test run owns the test lock.' >&2; 
 trap 'rmdir "$LOCK"' EXIT HUP INT TERM
 cd "$BASE"
 ucode wifi-coordinator/test-policy.uc
+ucode wifi-coordinator/test-dfs-runtime.uc
 ucode wifi-coordinator/test-widths.uc
 ucode radio-prefer/files/main.uc --self-test
 ucode radio-prefer/files/coordination.uc --self-test
@@ -22,6 +23,7 @@ ucode wifi-coordinator/test-reconnect-recovery.uc
 ucode wifi-coordinator/test-comparison-snapshot.uc
 ucode wifi-coordinator/test-width-limit.uc
 ucode wifi-coordinator/test-radar-storage.uc
+ucode wifi-coordinator/test-radar-snapshot.uc
 ucode wifi-coordinator/test-history.uc
 ucode wifi-coordinator/test-history-export.uc
 ucode wifi-coordinator/test-history-storage.uc

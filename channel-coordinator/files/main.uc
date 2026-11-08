@@ -5,7 +5,7 @@ import * as ubus from 'ubus';
 import * as uci from 'uci';
 import * as uloop from 'uloop';
 import {open_history} from './history.uc';
-import {channel, group, same, same_block, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample,declared_bands} from './policy.uc';
+import {channel, group, same, same_block, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample,declared_bands,dfs_policy} from './policy.uc';
 import {survey_covers,move_method,configured_channels,configured_widths,frequency,switch_methods,setting_integer,hardware_widths,placements,live_width} from './policy.uc';
 import {assess,choose,decide,spatial_streams} from './planner.uc';
 import {open_memory} from './radar.uc';
@@ -168,7 +168,7 @@ let radar=open_memory('/etc/wifi-coordinator/radar-memory.json',cfg.radar_half_l
 // ucode resolves function references at declaration time, unlike JavaScript.
 let evaluate,timer;
 if(one_shot){cfg.mode='observe';next_eval=now()+1;}
-function save() { state.updated=now(); state.mode=cfg.mode; state.next_evaluation=next_eval;state.persist_queue=persist_queue;state.next_persist=next_persist;atomic(STATE,state); }
+function save() { state.updated=now(); state.mode=cfg.mode; state.next_evaluation=next_eval;state.persist_queue=persist_queue;state.next_persist=next_persist;state.radar={half_life:cfg.radar_half_life,events:radar.records()};atomic(STATE,state); }
 function lease(seconds,reason,reserved) { atomic(LEASE,{boot,until:now()+seconds,reason,reserved}); }
 function release() { fs.unlink(LEASE); }
 function history(event) { let e={time:time(),...event};push(state.history,e);history_store.event(e);while(length(state.history)>30)shift(state.history); }
@@ -273,10 +273,13 @@ function phy_caps(phy) {
     return caps;
 }
 function dfs_mode(r) {
+    if(r.band!='5g'){if(state.radios[r.name])state.radios[r.name].dfs_constraint=null;return 'off';}
     let reg=request(N.NL80211_CMD_GET_REG,0,{});
-    let effective=reg.dfs_region==2 && r.dfs_region==2 ? cfg.dfs_mode : 'off';
-    if(state.radios[r.name])state.radios[r.name].dfs_constraint=cfg.dfs_mode!='off'&&effective=='off'?'DFS blocked: global and radio ETSI regions must match':null;
-    return effective;
+    let path='/sys/kernel/debug/ieee80211/phy'+r.phy+'/mwlwifi';
+    let driver=fs.readlink('/sys/class/ieee80211/phy'+r.phy+'/device/driver') ?? '';
+    let result=dfs_policy(cfg.dfs_mode,reg.dfs_region,r.dfs_region,fs.readfile(path+'/dfs_radar'),!!fs.stat(path)||!!match(driver,/\/mwlwifi$/));
+    if(state.radios[r.name])state.radios[r.name].dfs_constraint=result.reason;
+    return result.mode;
 }
 function sample(radios) {
     prune_client_avoids();
@@ -412,7 +415,7 @@ function record_radar(e){
     let msg=e.msg ?? {},live=filter(discovered,r=>r.phy==msg.wiphy)[0],p=executor?.pending();
     let width=[20,20,40,80,80,160][msg.channel_width] ?? (p?.helper?.phy==msg.wiphy?(p.cac_target ?? p.target).width:live?.current.width) ?? 20;
     let freq=msg.wiphy_freq,center=msg.center_freq1 ?? group(freq,width)?.center ?? freq;
-    let event={event:'radar-state',time:time(),phy:msg.wiphy,radar_event:msg.radar_event,freq,center,width,region:live?.dfs_region ?? 2};
+    let event={event:'radar-state',time:time(),phy:msg.wiphy,radar_event:msg.radar_event,freq,center,width,region:live?.dfs_region ?? null};
     history(event);radar.add(event);state.radar={half_life:cfg.radar_half_life,events:radar.records()};
     if(msg.radar_event==0){intent=null;admission=null;if(scanner?.busy())scanner.cancel('Radar event invalidated survey');}
     executor.event(e,discovered);
@@ -431,7 +434,7 @@ for(let e in old_history.events ?? state.history ?? [])if(e.event=='radar-state'
         let matches=filter(old_history.periods ?? [],p=>p.start<=e.time&&p.end+5>=e.time&&p.center&&e.freq>=p.center-p.width/2&&e.freq<p.center+p.width/2);
         g=length(matches)?{center:matches[0].center,width:matches[0].width}:group(e.freq,20);
     }
-    if(g)radar.add({...e,...g,region:e.region ?? 2});
+    if(g)radar.add({...e,...g,region:e.region ?? null});
 }
 old_history=null;
 state.radar={half_life:cfg.radar_half_life,events:radar.records()};

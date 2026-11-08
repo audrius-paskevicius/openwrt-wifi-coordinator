@@ -28,6 +28,14 @@ storage = storage.replace("system('sync')", "0")
 write("history-storage-test.uc", storage)
 
 main = read(production / "main.uc")
+start = main.index("function dfs_mode(r)")
+end = main.index("function sample(", start)
+write("test-dfs-runtime.uc", read(root / "tests/dfs-runtime-header.uc") + "\n" +
+      main[start:end] + "\n" + read(root / "tests/dfs-runtime-cases.uc"))
+start = main.index("function save()")
+end = main.index("function lease(", start)
+write("test-radar-snapshot.uc", read(root / "tests/radar-snapshot-header.uc") + "\n" +
+      main[start:end] + "\n" + read(root / "tests/radar-snapshot-cases.uc"))
 start = main.index("let client_avoids=")
 end = main.index("if(state.pending", start)
 write("test-client-memory.uc", "let T=100,boot='test',writes=0,CLIENT_AVOIDS='/tmp/test-client-avoids';\n" +

@@ -58,6 +58,8 @@ Fresh installation also enables DFS preparation and uses a one-hour radar-memory
 
 The package does not create networks, replace Wi-Fi credentials, or change the LAN/WAN topology. WRT3200ACM/WRT32X-specific defaults select the known restart paths and synchronize the auxiliary driver's country hint with an already consistent configured country.
 
+When moving countries, set the actual country on every radio, Save & Apply, and reboot WRT3200ACM/WRT32X hardware so its auxiliary driver loads the updated country hint. Wireless reloads refresh the coordinator. Automatic channel pools follow current kernel rules; explicit lists cannot override those rules. Factory country locks remain in force. See the [DFS driver limitation and mitigation](DFS-DRIVER.md) before relying on DFS on affected mwlwifi hardware.
+
 Candidate primary channels default to `auto` for every radio. The daemon derives the list from that radio's live driver capabilities in its current band, so changes in country or driver restrictions are reflected without saving another static list. Regulatory rules, supported widths, DFS clearance and recovery exclusions still apply. Existing explicit lists are preserved during package upgrades; set each radio's **Candidate primary channels** to `auto` to remove an old restriction. This expands eligibility, not an instruction to move immediately.
 
 Manual lists restrict primary channels only. Width is selected separately: for example, primary 36 may use a legal 80 MHz block even if 40, 44 and 48 are not explicitly listed. All secondary frequencies still require driver and regulatory eligibility.

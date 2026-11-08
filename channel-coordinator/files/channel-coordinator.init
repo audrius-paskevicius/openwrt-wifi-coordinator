@@ -20,7 +20,7 @@ service_stopped() {
  rm -f /tmp/channel-coordinator-lease.json
 }
 reload_service() { restart; }
-service_triggers() { procd_add_reload_trigger channel_coordinator; }
+service_triggers() { procd_add_reload_trigger channel_coordinator wireless; }
 
 shutdown() {
  local pids pid waited=0 alive

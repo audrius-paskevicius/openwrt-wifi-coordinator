@@ -6,6 +6,8 @@ wifi-coordinator/test-reconnect-recovery.uc
 wifi-coordinator/test-comparison-snapshot.uc
 wifi-coordinator/test-width-limit.uc
 wifi-coordinator/test-client-memory.uc
+wifi-coordinator/test-radar-snapshot.uc
+wifi-coordinator/test-dfs-runtime.uc
 __pycache__/
 *.pyc
 *.log
