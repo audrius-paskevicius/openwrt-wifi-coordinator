@@ -5,7 +5,7 @@ const LIST={periods:'periods',traffic:'samples',surveys:'surveys',actions:'event
 const FIELDS={
  periods:['radio','channel','center','width','role','start','end'],
  traffic:['time','end','source','radio','channel','width','role','n','traffic_sum','traffic_peak','clients_peak','busy_sum','busy_n','signal_min'],
- actions:['time','event','kind','affected','retry_seconds','preflight','stage','radio','from','to','channel','width','center','region','clients','clients_missing','clients_unproven','disconnect_events','helper','elapsed','ban_seconds','radar_event','freq','phy','neighbors','missing_count','scanned_frequencies','missing_frequencies','reason'],
+ actions:['time','event','operation','kind','affected','retry_seconds','preflight','stage','radio','from','to','channel','width','center','region','clients','clients_missing','clients_unproven','disconnect_events','forced_disconnects','returned','elsewhere','absent','total','declined','response','mode','helper','elapsed','ban_seconds','radar_event','freq','phy','neighbors','missing_count','scanned_frequencies','missing_frequencies','reason'],
  radar:['time','center','width','region','phys','weight'],
  surveys:['time','cycle','updated']
 };

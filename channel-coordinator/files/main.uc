@@ -11,6 +11,8 @@ import {assess,choose,decide,spatial_streams} from './planner.uc';
 import {open_memory} from './radar.uc';
 import {create_survey} from './survey.uc';
 import {create_executor} from './executor.uc';
+import {reservations,action_valid,create_returns} from './controller.uc';
+import {create_preference} from '../../radio-prefer/files/steering.uc';
 import {begin_restart_check,check_restart,schedule_recovery} from './recovery.uc';
 
 const N=nl.const, STATE='/tmp/channel-coordinator-state.json', LEASE='/tmp/channel-coordinator-lease.json', JOURNAL='/tmp/channel-coordinator-cac.json';
@@ -128,6 +130,9 @@ if(ARGV[0]=='--recover'){
     }
     exit(0);
 }
+let method_identity=board+'|'+trim(fs.readfile('/etc/openwrt_release') ?? '')+'|'+trim(fs.readfile('/proc/version') ?? '');
+let method_limits=readjson('/etc/wifi-coordinator/methods.json',{});
+if(method_limits.identity!=method_identity)method_limits={identity:method_identity,radios:{}};
 let state=readjson(STATE,{});
 if(state.boot!=boot) state={boot,radios:{},history:[],last_move:0};
 let client_avoids=readjson(CLIENT_AVOIDS,{});
@@ -151,7 +156,7 @@ function avoid_client(radio,mac,g,until){
     private_json(CLIENT_AVOIDS,client_avoids);
 }
 if(state.pending&&state.pending!='scan') begin_restart_check(state,now());
-if(fs.stat(JOURNAL)){
+if(fs.stat(JOURNAL)&&ARGV[0]!='--inspect'){
     try{restore_preparation();begin_restart_check(state,now());}
     catch(err){state.halted='Restart recovery needs attention: '+err;delete state.restart_check;}
 }
@@ -161,24 +166,27 @@ if(raw.clear_stop=='1'&&!length(ARGV)){
     delete state.halted;delete state.restart_check;for(let name,r in state.radios)delete r.failed;
     cursor.set('channel_coordinator','main','clear_stop','0');cursor.commit('channel_coordinator');
 }
+let steering,returns,steering_ready=false,steering_error=null,last_steering=0,urgent_eval=false;
 let evidence={}, previous={}, traffic={}, rates={}, quiet_since={}, discovered=[], next_eval=now()+15,scanner,executor;
-let scan_result=null, one_shot=ARGV[0]=='--evaluate',estimate_cache={},admission=null,intent=null;
+let scan_result=null, band_surveys={},one_shot=ARGV[0]=='--evaluate',estimate_cache={},admission=null,intent=null;
 let persist_queue=state.persist_queue ?? {},next_persist=state.next_persist ?? now()+21600;
 let radar=open_memory('/etc/wifi-coordinator/radar-memory.json',cfg.radar_half_life,time,now,state.radar?.events);
 // ucode resolves function references at declaration time, unlike JavaScript.
 let evaluate,timer;
 if(one_shot){cfg.mode='observe';next_eval=now()+1;}
+let manual_switch=ARGV[0]=='--test-switch',manual_done=false;
+if(manual_switch||ARGV[0]=='--test-prepare')cfg.mode='observe';
 function save() { state.updated=now(); state.mode=cfg.mode; state.next_evaluation=next_eval;state.persist_queue=persist_queue;state.next_persist=next_persist;state.radar={half_life:cfg.radar_half_life,events:radar.records()};atomic(STATE,state); }
-function lease(seconds,reason,reserved) { atomic(LEASE,{boot,until:now()+seconds,reason,reserved}); }
-function release() { fs.unlink(LEASE); }
+// Reservations are owned in memory by this process; no cross-daemon lease.
+function lease(seconds,reason,reserved) {}
+function release() {}
 function history(event) { let e={time:time(),...event};push(state.history,e);history_store.event(e);while(length(state.history)>30)shift(state.history); }
 function coordination_ready() {
     let services=call('service','list');
     function running(name) { for(let k,v in services[name]?.instances ?? {}) if(v.running)return true;return false; }
     for(let name in ['wifi-auto-channel','dawn','linksys-steering'])
         if(running(name))die(`Stop competing service ${name} before channel coordination`);
-    if(running('radio-prefer')&&trim(fs.readfile('/usr/share/radio-prefer/integration-version') ?? '')!='1')
-        die('A compatible Radio Preference coordination protocol is required for scan/switch handoff');
+    if(running('radio-prefer'))die('Legacy Radio Preference process still running; stop it before starting the shared controller');
     if(running('usteer')){
         let c=call('usteer','get_config');
         for(let k in ['assoc_steering','probe_steering','min_connect_snr','min_snr','roam_scan_snr','roam_trigger_snr','load_kick_enabled','band_steering_interval'])
@@ -192,6 +200,11 @@ function rcfg(name,band,caps,csa,band_caps) {
     let hardware=hardware_widths(band,band_caps),requested=configured_widths(r.widths,band,hardware);
     let widths=filter(requested,w=>index(hardware,w)>=0);
     let methods=switch_methods(r.method,r.width_method,wrt,name,band,csa,state.radios[name]?.csa_failed_until,now());
+    if(method_limits.radios?.[name]?.csa && (r.method ?? 'auto')=='auto'){
+        methods.method='idle_reconfigure';methods.method_reason='CSA unsupported by this hardware/software; retained until it changes';
+        methods.csa_unsupported=true;
+        if((r.width_method ?? 'auto')=='inherit')methods.width_method=methods.method;
+    }
     let occupied=r.occupied_policy ?? 'handoff';
     if(index(['empty','quiet','handoff'],occupied)<0)die('Invalid occupied-radio policy');
     return {managed:r.managed!='0',occupied,...methods,channels:ch,widths,hardware_widths:hardware,
@@ -327,7 +340,7 @@ function sample(radios) {
             clients:0,traffic:0,busy:null,signal:null,role:'radar preparation'});
     history_store.record(history_rows);
 }
-function candidates(r,radios,rules) {
+function candidates(r,radios,rules,revalidate) {
     let s=state.radios[r.name],t=now(),dm=dfs_mode(r),list=[],busy={},maxw=max(r.current.width,...r.config.widths);
     for(let f in scan_result.frequencies){
         let e=evidence[r.name+':'+f] ?? evidence[scan_result.scanners[f]+':'+f];
@@ -338,18 +351,21 @@ function candidates(r,radios,rules) {
     function rated(g){
         let key=r.name+':'+g.freq+':'+g.center+':'+g.width;
         let caps=r.band=='2g'?{ht_mcs_set:r.band_caps?.ht_mcs_set}:r.band_caps;
-        let q=assess(g,snapshot,maxw,radar.records(),time(),cfg.radar_half_life,r.dfs_region,estimate_cache[key],spatial_streams(caps));
-        estimate_cache[key]=q;
+        let cached=estimate_cache[key],stamp=scan_result.stamps?.[r.band] ?? scan_result.at;
+        let previous=cached&&cached.stamp==stamp?cached.previous:cached?.current;
+        let q=assess(g,snapshot,maxw,radar.records(),time(),cfg.radar_half_life,r.dfs_region,previous,spatial_streams(caps));
+        estimate_cache[key]={stamp,previous,current:q};
         let powers=map(g.members,f=>r.caps[f]?.max_tx_power ?? 0);
         return {...q,max_width:maxw,power:min(...powers)};
     }
     let current=rated(r.current);
     s.rejected=filter(s.rejected ?? [],x=>x.until>t);
     s.planning_hold=!r.config.managed?'Excluded from planning':r.unsafe?'Unsupported or inactive configuration':s.failed||s.unavailable?(s.recovery_status ?? 'Automatic recovery check pending'):
+        index(returns?.radios() ?? [],r.name)>=0?'Bounded preferred-radio return observation':
         s.recheck_until>t?'Previous service restored; waiting for fresh client evidence':
         !survey_covers(rules,r,scan_result.frequencies,dm)?'Incomplete fresh survey':
-        t-(s.last_move ?? -100000)<cfg.cooldown?'Minimum residence after verified move':
-        t-(s.last_attempt ?? -100000)<cfg.retry_delay?'Short retry delay':null;
+        !revalidate&&t-(s.last_move ?? -100000)<cfg.cooldown?'Minimum residence after verified move':
+        !revalidate&&t-(s.last_attempt ?? -100000)<cfg.retry_delay?'Short retry delay':null;
     if(s.planning_hold)return [current];
     for(let w in r.config.widths)for(let ch in r.config.channels)for(let g in placements(frequency(ch,r.band),w)){
         if(s.width_limit?.until>t&&w>s.width_limit.actual)continue;
@@ -371,7 +387,7 @@ evaluate=function(radios){
     next_eval=now()+cfg.interval;
     if(!scan_result||now()-scan_result.at>cfg.max_age){state.status='Waiting for a fresh survey';save();return;}
     let rules=request(N.NL80211_CMD_GET_REG,0,{}).reg_rules ?? [],models=[];
-    for(let r in radios){let choices=candidates(r,radios,rules),s=state.radios[r.name];push(models,{name:r.name,current:filter(choices,g=>same(g,r.current))[0],candidates:choices,last_action:max(s.last_attempt ?? 0,s.last_move ?? 0)});}
+    for(let r in radios){let choices=candidates(r,radios,rules),s=state.radios[r.name];push(models,{name:r.name,current:filter(choices,g=>same(g,r.current))[0],candidates:choices,clients:length(r.clients),config:r.config,last_action:max(s.last_attempt ?? 0,s.last_move ?? 0)});}
     let result=choose(models,cfg),decision=decide(result,models,admission,scan_result.at,cfg,intent?.until>now()?intent.signature:null);
     admission=decision.signature?decision:null;
     let changes=[];for(let i,r in radios)if(!same(r.current,result.choices[i]))push(changes,{radio:r.name,from:channel(r.current.freq),to:channel(result.choices[i].freq),width:result.choices[i].width});
@@ -388,10 +404,10 @@ evaluate=function(radios){
     state.status=decision.reason;
     if(decision.action=='hold')intent=null;
     // A close comparison collects evidence on the configured schedule, never earlier.
-    if(!state.halted&&cfg.mode=='automatic'&&decision.action=='move'){
+    if(cfg.enabled&&!state.halted&&!executor.busy()&&cfg.mode=='automatic'&&decision.action=='move'){
         intent={signature:decision.signature,until:now()+cfg.max_age};
-        history({event:'plan-start',radio:models[decision.next.index].name,to:channel(decision.next.target.freq),width:decision.next.target.width,reason:decision.reason});
         executor.start(radios[decision.next.index],decision.next.target,radios);
+        history({event:'plan-start',operation:executor.pending().id,radio:models[decision.next.index].name,to:channel(decision.next.target.freq),width:decision.next.target.width,reason:decision.reason});
     }
     save();
 };
@@ -408,21 +424,98 @@ function persist_channels(){
     if(changed&&!c.commit('wireless')){state.persistence_error='Cannot checkpoint verified channels';return;}
     persist_queue={};state.persistence_error=null;
 }
-function completed(){next_eval=now()+cfg.interval;if(one_shot||ARGV[0]=='--test-switch'||ARGV[0]=='--test-prepare')uloop.end();}
+function completed(){
+    next_eval=now()+(urgent_eval?1:cfg.interval);
+    if(manual_switch)manual_done=true;
+    else if(one_shot||ARGV[0]=='--test-prepare')uloop.end();
+}
 function record_radar(e){
     let msg=e.msg ?? {},live=filter(discovered,r=>r.phy==msg.wiphy)[0],p=executor?.pending();
     let width=[20,20,40,80,80,160][msg.channel_width] ?? (p?.helper?.phy==msg.wiphy?(p.cac_target ?? p.target).width:live?.current.width) ?? 20;
     let freq=msg.wiphy_freq,center=msg.center_freq1 ?? group(freq,width)?.center ?? freq;
     let event={event:'radar-state',time:time(),phy:msg.wiphy,radar_event:msg.radar_event,freq,center,width,region:live?.dfs_region ?? null};
     history(event);radar.add(event);state.radar={half_life:cfg.radar_half_life,events:radar.records()};
-    if(msg.radar_event==0){intent=null;admission=null;if(scanner?.busy())scanner.cancel('Radar event invalidated survey');}
+    if(msg.radar_event==0){urgent_eval=true;intent=null;admission=null;if(scanner?.busy())scanner.cancel('Radar event invalidated survey');}
     executor.event(e,discovered);
 }
 let io={cfg,state,boot,now,precise,save,lease,release,history,history_store,call,request,inventory,
     client_avoided,avoid_client,
+    evidence_at:()=>scan_result?.at,
+    reserved:()=>uniq([...reservations(executor?.pending()),...(returns?.radios() ?? [])]),
+    returning:name=>index(returns?.radios() ?? [],name)>=0,
+    priority_bands:()=>{
+        let preferred=filter(discovered,r=>r.name==steering?.config.preferred_radio)[0];
+        return preferred?.band=='5g'?['5g','2g']:['2g','5g'];
+    },
+    preferred:()=>steering?.config?.preferred_radio,
+    method_unsupported:r=>{
+        method_limits.radios[r.name]={csa:true};
+        fs.mkdir('/etc/wifi-coordinator',0700);
+        private_json('/etc/wifi-coordinator/methods.json',method_limits);
+        history({event:'method-unavailable',radio:r.name,reason:'CSA command unsupported; learned hardware/software limitation'});
+    },
+    valid_action:(p,radios)=>{
+        if(ARGV[0]=='--test-switch'||ARGV[0]=='--test-prepare')return true;
+        let r=filter(radios,r=>r.name==p.radio)[0];
+        if(!action_valid(p,r,now(),cfg.max_age))return false;
+        if(!scan_result||now()-scan_result.at>cfg.max_age)return false;
+        let rules=request(N.NL80211_CMD_GET_REG,0,{}).reg_rules ?? [];
+        let models=map(radios,r=>{
+            let choices=candidates(r,radios,rules,r.name==p.radio);
+            return {name:r.name,current:filter(choices,g=>same(g,r.current))[0],candidates:choices,
+                config:r.config,clients:max(length(r.clients),r.name==p.radio?length(p.return_before ?? p.before):0),
+                last_action:r.name==p.radio?(p.previous_action ?? 0):max(state.radios[r.name].last_attempt ?? 0,state.radios[r.name].last_move ?? 0)};
+        });
+        let plan=choose(models,cfg),decision=decide(plan,models,null,scan_result.at,cfg,null);
+        // Re-evaluate the complete layout: a neutral staging move can still be
+        // useful, but neither a stale plan nor its own retry gate may decide it.
+        let valid=decision.action=='move'&&models[decision.next.index].name==p.radio&&same(decision.next.target,p.target);
+        if(!valid)p.validation_reason='Prepared action reconsidered: '+decision.reason+
+            (decision.next?'; current choice '+models[decision.next.index].name+' channel '+channel(decision.next.target.freq):'')+
+            '; net benefit '+sprintf('%.1f',plan.gain)+', required '+sprintf('%.1f',decision.required ?? cfg.improvement);
+        return valid;
+    },
+    finished:p=>{
+        let outcome=p.last_event ?? 'cancelled';
+        history({event:'operation-complete',operation:p.id,radio:p.radio,reason:outcome,
+            disconnect_events:p.disconnects ?? 0,forced_disconnects:p.forced_disconnects ?? 0});
+        state.last_operation={id:p.id,radio:p.radio,outcome,disconnects:p.disconnects ?? 0};
+        if(index(['switch-verified','switch-ignored','switch-unconfirmed','external-recovery-verified'],outcome)>=0){
+            returns?.add(p,steering?.config.enabled?steering.config.preferred_radio:null);
+            steering?.followup(p);
+        }
+        if(p.external||index(['switch-recovery','error','rollback-failed'],outcome)>=0)urgent_eval=true;
+    },
     config_fingerprint,phy_caps,allclients,empty_interface,apply_empty_config,apply_radio_config,restore_preparation,private_json,
     coordination_ready,dfs_mode,log,rates,quiet_since,remember:remember_channel,completed};
-scanner=create_survey({...io,complete:(result,radios)=>{scan_result=result;evaluate(radios);if(one_shot)uloop.end();}});
+let scan_state={radios:state.radios};
+function accept_survey(result){
+    for(let band in result.band?[result.band]:['2g','5g']){
+        band_surveys[band]={at:result.at,frequencies:filter(result.frequencies,f=>(f<3000?'2g':'5g')==band),
+            observations:filter(result.observations,o=>(o.freq<3000?'2g':'5g')==band),scanners:result.scanners};
+    }
+    let fresh=filter(values(band_surveys),s=>now()-s.at<=cfg.max_age);
+    scan_result={at:now(),frequencies:[],observations:[],scanners:{},stamps:{}};
+    for(let band in keys(band_surveys))scan_result.stamps[band]=band_surveys[band].at;
+    for(let s in fresh){
+        scan_result.at=min(scan_result.at,s.at);
+        push(scan_result.frequencies,...s.frequencies);push(scan_result.observations,...s.observations);
+        for(let f in s.frequencies)scan_result.scanners[f]=s.scanners[f];
+    }
+}
+scanner=create_survey({...io,state:scan_state,progress:result=>{
+    // Use completed, fresh portions without waiting behind another band. The
+    // same per-radio coverage rule still forbids treating missing bins as clear.
+    accept_survey(result);
+    if(now()>=next_eval)urgent_eval=true;
+},save:()=>{
+    for(let k in ['scan_coverage','scan_deferred','scan_omitted'])if(scan_state[k]!=null)state[k]=scan_state[k];
+    state.survey_status=scan_state.status;
+    if(!executor?.busy()){state.status=scan_state.status;state.pending=scan_state.pending;}
+    save();
+},complete:(result,radios)=>{accept_survey(result);if(!executor.busy())evaluate(radios);if(one_shot)uloop.end();}});
+steering=create_preference({bus,history});
+returns=create_returns({now,history});
 executor=create_executor(io);
 // Import existing raw detections without inventing geometry from CAC completion.
 let old_history=readjson('/tmp/wifi-coordinator-history.json',{});
@@ -442,7 +535,7 @@ if(one_shot||ARGV[0]=='--test-switch'||ARGV[0]=='--test-prepare'){
     for(let k,v in services['channel-coordinator']?.instances ?? {})if(v.running)die('Stop coordinator before a manual test');
 }
 if(ARGV[0]=='--clear-stop'){delete state.halted;delete state.restart_check;for(let n,r in state.radios)delete r.failed;save();exit(0);}
-if(!cfg.enabled&&!one_shot)exit(0);
+if(!cfg.enabled&&!steering.config.enabled&&!one_shot)exit(0);
 uloop.init();
 let stopping=false;
 let termination=uloop.signal('SIGTERM',()=>{
@@ -463,7 +556,30 @@ let test_started=false;
 timer=uloop.timer(1000,()=>{try{
     if(stopping)return;
     discovered=inventory();sample(discovered);persist_channels();
-    executor.reassess(discovered);
+    scan_state.halted=state.halted;scan_state.radios=state.radios;
+    if(cfg.enabled)executor.reassess(discovered);
+    state.operation=executor.pending()?{id:executor.pending().id,radio:executor.pending().radio,stage:executor.pending().kind,reserved:reservations(executor.pending())}:null;
+    if(!one_shot&&now()-last_steering>=5){
+        last_steering=now();
+        try{
+            if(!steering_ready){
+                if(system('/usr/bin/ucode /usr/share/radio-prefer/coordination.uc --prepare')!=0)die('Could not prepare shared steering policy');
+                system('if /etc/init.d/usteer running; then /etc/init.d/usteer reload; fi');
+                steering_ready=true;
+            }
+            let locked=reservations(executor.pending());
+            let scan=scanner.pending?.();
+            if(scan?.scanner&&index(['scan','scan-recovery'],scan.kind)>=0)push(locked,scan.scanner.name);
+            if(state.halted||state.restart_check)locked=map(discovered,r=>r.name);
+            steering.tick(uniq(locked));returns.tick(discovered,steering.state.clients);
+            steering_error=null;
+        }catch(e){
+            steering.state.integration_error=''+e;
+            atomic('/tmp/radio-prefer-state.json',steering.state);
+            if(steering_error!=''+e)log('Preference waiting: '+e);
+            steering_error=''+e;
+        }
+    }
     if(state.halted&&!state.restart_check&&!executor.busy()&&!scanner.busy()&&now()>=(state.recovery_retry_at ?? 0)){
         try{
             if(fs.stat(JOURNAL))restore_preparation();
@@ -484,12 +600,22 @@ timer=uloop.timer(1000,()=>{try{
         if(state.halted)die('Resolve safety stop before manual operation');test_started=true;
         let r=filter(discovered,r=>r.name==ARGV[1])[0];if(!r)die('Unknown radio');
         executor.start(r,group((r.band=='2g'?2407:5000)+5*int(ARGV[2]),int(ARGV[3])),discovered);
-    }else if(executor.busy())executor.tick(discovered);
-    else if(scanner.busy())scanner.tick(discovered);
-    else if(!state.halted&&now()>=next_eval){next_eval=now()+cfg.interval;scanner.start(discovered);}
+    }else {
+        if(executor.busy())executor.tick(discovered);
+        if(scanner.busy())scanner.tick(discovered);
+        else if(cfg.enabled&&!state.halted&&now()>=next_eval){
+            next_eval=now()+cfg.interval;
+            if(urgent_eval&&!executor.busy()&&scan_result&&now()-scan_result.at<=cfg.max_age){urgent_eval=false;evaluate(discovered);}
+            else scanner.start(discovered);
+        }
+        if(urgent_eval&&!executor.busy()&&scanner.phase()!='scan'&&scan_result&&now()-scan_result.at<=cfg.max_age){
+            urgent_eval=false;evaluate(discovered);
+        }
+    }
     save();
+    if(manual_done&&!executor.busy()&&!returns.busy())uloop.end();
 }catch(err){if(executor.busy())executor.abort(err);else {scanner.cancel('Operation deferred: '+err);next_eval=now()+cfg.retry_delay;}}
-timer.set(scanner.busy()?500:5000);
+timer.set(scanner.busy()?500:1000);
 });
 log('Wi-Fi Coordinator: unified observe / plan / execute / verify cycle');
 uloop.run();history_store.flush(true);save();

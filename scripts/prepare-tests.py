@@ -51,7 +51,7 @@ end = main.index("    for(let mac,at in state.forced", start)
 write("test-comparison-snapshot.uc", "import {same,group} from '../channel-coordinator/files/policy.uc';\n" +
       "let state={},executor=null;function now(){return 100;}function prune_client_avoids(){}\n" + main[start:end] + "}\n" +
       read(root / "tests/comparison-cases.uc"))
-start = main.index("function candidates(r,radios,rules)")
+start = main.index("function candidates(r,radios,rules,revalidate)")
 end = main.index("function sum_overlap", start)
 write("test-width-limit.uc", read(root / "tests/width-limit-header.uc") + "\n" +
       main[start:end] + "\n" + read(root / "tests/width-limit-cases.uc"))

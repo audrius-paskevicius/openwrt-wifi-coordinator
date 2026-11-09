@@ -54,9 +54,9 @@ This merged package conflicts with the earlier standalone `luci-app-radio-prefer
 
 ## What installation changes
 
-The package enables and starts the channel coordinator and Radio Preference according to their configuration. **Fresh installations use Automatic mode**, with paced scans and the shared reconnect fallback enabled. It fills missing radio roles without overwriting existing administrator choices.
+The package enables one `channel-coordinator` service when either channel planning or Radio Preference is enabled. Upgrades stop the old preference daemon and disable its independent startup. `/etc/init.d/radio-prefer` remains a compatibility forwarding script; use the shared service for start/stop/restart. **Fresh installations use Automatic mode**, with paced scans and the shared reconnect fallback enabled. It fills missing radio roles without overwriting existing administrator choices.
 
-Radio Preference keeps usteer's competing steering rules passive while using its measurements and neighbor information. Stopping Radio Preference restores the saved rules while preserving administrator edits. The coordinator refuses to operate alongside running `wifi-auto-channel`, `dawn` or `linksys-steering` services, and checks selected usteer steering policies before scanning or moving. This is a check for known conflicts, not detection of every possible external controller. If Radio Preference is disabled while channel coordination stays enabled, keep usteer's competing policies passive yourself.
+The shared controller keeps usteer's competing steering rules passive while using its measurements and neighbor information. Stopping the shared service restores saved rules while preserving administrator edits. Disabling only Radio Preference leaves usteer passive while channel planning remains enabled. The controller refuses known competitors (`wifi-auto-channel`, `dawn`, `linksys-steering` and a leftover legacy preference process). This checks known conflicts, not every possible external controller.
 
 Fresh installation also enables DFS preparation and uses a one-hour radar-memory half-life. Package upgrades preserve existing configured values; installing a new default does not change an administrator's saved half-life. The radar-memory setting is independent of six-hour failure exclusions and flash checkpoints.
 
@@ -99,11 +99,10 @@ History loading uses LuCI's authenticated streaming reader for RAM and archive f
 
 ## Stop or remove
 
-Choose Observe to keep surveying without planner-initiated channel changes, or turn off **Enable channel coordination** to stop that controller. Observe does not disable interrupted-operation recovery or kernel radar evacuation. Client steering has its own enable switch. The following commands stop both services for the current session; they do not disable their configured startup after reboot:
+Choose Observe to keep surveying without planner-initiated channel changes, or turn off **Enable channel coordination** to stop that controller. Observe does not disable interrupted-operation recovery or kernel radar evacuation. Client steering has its own enable switch. The following command stops the shared controller for the current session; it does not disable configured startup after reboot:
 
 ```sh
 /etc/init.d/channel-coordinator stop
-/etc/init.d/radio-prefer stop
 ```
 
 After an interrupted operation, the coordinator restores its recovery journal and checks the enabled radios. It resumes automatically after 30 seconds of stable AP state. The fixed recovery deadline is 780 seconds (the internal 720-second radar-check allowance plus 60 seconds); an unresolved journal, inconsistent AP state or existing failure schedules further automatic checks with backoff capped at five minutes. Failed radios need stable AP state and positive service evidence from their currently authorized clients before planning resumes. This verifies AP operation, not end-to-end internet access. No radio is restarted by the observation check. Removing the package disables the services; do not delete the public key if another installed package still relies on it.

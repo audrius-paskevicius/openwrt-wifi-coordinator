@@ -28,12 +28,12 @@ var reasons={
  'no-matching-target':'No available preferred AP with matching network and security'
 };
 return view.extend({
- load:function(){return Promise.all([uci.load('radio_prefer'),uci.load('wireless'),readState(),services('radio-prefer')]);},
+ load:function(){return Promise.all([uci.load('radio_prefer'),uci.load('wireless'),readState(),services('channel-coordinator')]);},
  render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));},
  renderPage:function(data){
   var status=E('p',{'class':'wc-status'}),clients=E('div');
   function refresh(st,svc){
-   var running=Object.values(((svc||{})['radio-prefer']||{}).instances||{}).some(function(i){return i.running;});
+   var running=uci.get('radio_prefer','main','enabled')==='1'&&Object.values(((svc||{})['channel-coordinator']||{}).instances||{}).some(function(i){return i.running;});
    status.textContent=!running?'Client preference is stopped.':st.integration_error?'Waiting: '+st.integration_error:
     st.coordination_pause?'Channel operation has priority: '+st.coordination_pause:'Client preference is running. Preferred radio: '+(st.preferred_radio||'not selected')+'.';
    status.setAttribute('data-level',st.integration_error?'warning':'normal');
@@ -45,17 +45,17 @@ return view.extend({
    clients.replaceChildren(E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[header,E('tbody',{},rows)])));
   }
   refresh(data[2],data[3]);
-  poll.add(function(){return Promise.all([readState(),services('radio-prefer')]).then(function(x){refresh(x[0],x[1]);});},5);
+  poll.add(function(){return Promise.all([readState(),services('channel-coordinator')]).then(function(x){refresh(x[0],x[1]);});},5);
   var intro=E('div',{},[
    E('h2',{},_('Wi-Fi Coordinator: clients')),
    E('p',{},_('A shared Wi-Fi name lets devices roam between radios, but each device decides when to move. A fresh qualifying signal measurement permits your selected recommendation strength. Without measurement support, or after one minute without a usable report, either mode sends a gentle suggestion and lets the client judge the destination. A fresh weak-signal report blocks the recommendation.')),
-   E('p',{},_('During channel preparation, normal preference pauses so it does not pull clients back while the channel controller is moving them aside. Afterwards, preference resumes. usteer supplies measurements and neighbour information; this package owns steering decisions.')),
+   E('p',{},_('During channel work, preference pauses only on reserved radios. A completed preferred-radio operation allows one extra gentle return request and observes return for two minutes. Other radios continue independently. usteer supplies measurements and neighbour information; this package owns steering decisions.')),
    status,clients,
    E('p',{},_('802.11k supplies signal measurements; 802.11v carries roaming recommendations. A client may support one, both, or neither. Normal radio preference does not force disconnections. Channel-operation handoffs can use the stronger escalation policy configured on the Channels page.'))
   ]);
   var m=new form.Map('radio_prefer',_('Client steering settings'),_('These settings choose a preferred radio. Candidate channels, radar preparation and temporary handoff policy are on the Channels page. Status refreshes every five seconds without changing unsaved settings.'));
   var s=m.section(form.NamedSection,'main','radio_prefer');s.anonymous=true;
-  var o=s.option(form.Flag,'enabled',_('Enable preferred-radio steering'),_('Requires full wpad/hostapd with 802.11k/v support and usteer. While enabled, competing usteer steering rules are held passive. Disabling this service restores the previous rules while preserving administrator changes.'));o.rmempty=false;
+  var o=s.option(form.Flag,'enabled',_('Enable preferred-radio steering'),_('Requires full wpad/hostapd with 802.11k/v support and usteer. While enabled, competing usteer steering rules are held passive. The shared controller restores previous rules when it stops, preserving administrator changes. Channel planning also keeps usteer passive.'));o.rmempty=false;
   o=s.option(form.ListValue,'preferred_radio',_('Radio to prefer'),_('Choose the radio with the capabilities and coverage you want to prefer. On a WRT3200ACM, radio0 is normally the main 5 GHz radio. The preferred AP must use the same Wi-Fi name, security credentials and LAN as the client\'s current AP.'));
   o.value('',_('Select a radio'));uci.sections('wireless','wifi-device').forEach(function(r){o.value(r['.name'],r['.name']+' ('+(r.band=='2g'?'2.4':'5')+' GHz)');});
   o.validate=function(section,v){return this.map.lookupOption('enabled',section)[0].formvalue(section)!='1'||v?true:_('Select a preferred radio.');};o.rmempty=false;

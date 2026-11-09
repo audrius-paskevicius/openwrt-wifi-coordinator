@@ -15,6 +15,7 @@ let scan_ended={},scan_duration={};
 function lease(seconds,reason){io.lease(seconds,reason,pending?.scanner?[pending.scanner.name]:[]);}
 function release(){io.release();}
 function eligible(r,ignore_gap){
+    if(io.reserved && index(io.reserved(),r.name)>=0)return false;
     if(state.radios[r.name]?.failed||state.radios[r.name]?.unavailable)return false;
     if(now()<(state.radios[r.name]?.scan_until ?? 0))return false;
     if(!length(r.clients))return true;
@@ -62,7 +63,8 @@ function scan(radios) {
     state.scan_omitted=cfg.scan_policy=='paced'?[]:filter(freqs,f=>index(required,f)<0&&!find_scanner(radios,[f]));
     freqs=filter(freqs,f=>index(state.scan_omitted,f)<0);
     let jobs=[],deferred=[];
-    for(let band in ['2g','5g']){
+    let bands=io.priority_bands?io.priority_bands():['2g','5g'];
+    for(let band in bands){
         let bandfreq=filter(freqs,f=>(f<3000?'2g':'5g')==band);
         for(let start=0;start<length(bandfreq);){
             // Passive DFS visits are kept separate and short on mwifiex.
@@ -107,7 +109,7 @@ function advance_scan(radios) {
         state.status=state.halted?'Survey stopped; completed portions retained':'Survey exceeded the freshness limit; waiting for new measurements';
         pending=null;delete state.pending;release();save();
     }else{
-        scan_result={at:now(),observations:pending.observations,frequencies:completed,scanners:pending.scanners,scanner:join(', ',uniq(values(pending.scanners)))};
+        scan_result={at:pending.sweep_started,observations:pending.observations,frequencies:completed,scanners:pending.scanners,scanner:join(', ',uniq(values(pending.scanners)))};
         scan_result.partial=length(missing)>0;
         history({event:length(missing)?'scan-partial':'scan-complete',scanner:scan_result.scanner,neighbors:length(pending.observations),scanned_frequencies:length(completed),missing_frequencies:length(missing)});
         pending=null;delete state.pending;release();io.complete(scan_result,radios);
@@ -144,6 +146,14 @@ function finish_scan(event) {
     // Persist immediately, before the next batch can be deferred or aborted.
     // Coalesce one sweep into one bounded history frame, with per-bin times.
     history_store.survey(observations,map(keys(pending.scanners),f=>int(f)),pending.survey_id,pending.frequencies);
+    let band=pending.frequencies[0]<3000?'2g':'5g';
+    let covered=filter(pending.all_frequencies,f=>(f<3000?'2g':'5g')==band);
+    pending.published=pending.published ?? {};
+    if(io.progress&&!pending.published[band]&&!length(filter(covered,f=>!pending.scanners[f]))){
+        pending.published[band]=true;
+        io.progress({band,at:pending.sweep_started,observations:filter(observations,o=>(o.freq<3000?'2g':'5g')==band),
+            frequencies:covered,scanners:{...pending.scanners},partial:true});
+    }
     let present=allclients(radios),missing=filter(keys(pending.scan_clients ?? {}),m=>!present[m]);
     if(length(missing)){
         pending.kind='scan-recovery';pending.started=now();
@@ -210,5 +220,5 @@ function cancel(reason){
     if(pending?.kind=='scan')try{request(N.NL80211_CMD_ABORT_SCAN,0,{dev:pending.scanner.ifname});}catch(e){}
     pending=null;delete state.pending;release();state.status=reason;save();
 }
-return {start:scan,tick,event:finish_scan,cancel,busy:()=>pending!=null,phase:()=>pending?.kind};
+return {pending:()=>pending,start:scan,tick,event:finish_scan,cancel,busy:()=>pending!=null,phase:()=>pending?.kind};
 };

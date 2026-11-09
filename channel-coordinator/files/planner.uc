@@ -2,6 +2,7 @@
 // not Mbps. Execution never adds another hidden benefit threshold.
 import {same,group,overlap,pressure} from './policy.uc';
 import {risk} from './radar.uc';
+import {movement_cost} from './controller.uc';
 // Advertised bidirectional spatial capacity, never a client's momentary rate.
 export function spatial_streams(caps) {
     let v=caps?.vht_mcs_set,ht=caps?.ht_mcs_set;
@@ -61,7 +62,7 @@ export function layout(choices,cfg) {
     for(let i,g in choices){
         for(let j=0;j<i;j++)interference+=overlap(g,choices[j]);
         width+=g.width/(1.0*(g.max_width ?? g.width));
-        cost+=g.cost;power+=g.power ?? 0;
+        cost+=g.cost+(g.move_cost ?? 0);power+=g.power ?? 0;
     }
     return {overlap:interference,width,cost:cost+(cfg.separate?0:cfg.overlap_penalty*interference),power};
 };
@@ -103,15 +104,16 @@ export function transition(models,goal,cfg) {
     return best;
 };
 export function choose(models,cfg) {
-    // Primary choices with the same footprint have identical route constraints.
-    // Keep the best-scored one (the incumbent on ties) to bound joint search;
-    // retain every eligible choice in the explanatory comparison outside here.
+    // Keep the incumbent as well as the best alternative in each footprint.
+    // A cleaner primary must repay the cost of reaching it, including a restart.
     models=map(models,m=>{
         let best={};
-        for(let g in m.candidates){let key=g.center+':'+g.width,old=best[key];
-            if(!old||g.cost<old.cost-0.000001||max(g.cost-old.cost,old.cost-g.cost)<=0.000001&&same(g,m.current))best[key]=g;
+        for(let raw in m.candidates){let g={...raw,move_cost:movement_cost(m,raw,cfg)},key=g.center+':'+g.width,old=best[key];
+            if(!old||g.cost+g.move_cost<old.cost+old.move_cost-0.000001||max(g.cost+g.move_cost-old.cost-old.move_cost,old.cost+old.move_cost-g.cost-g.move_cost)<=0.000001&&same(g,m.current))best[key]=g;
         }
-        return {...m,candidates:values(best)};
+        let candidates=values(best);
+        if(!length(filter(candidates,g=>same(g,m.current))))push(candidates,{...m.current,move_cost:0});
+        return {...m,candidates};
     });
     let current=map(models,m=>m.current),base=layout(current,cfg),best={...base,choices:current,path:[]},visited=0,truncated=false;
     function visit(i,choices){
@@ -158,14 +160,13 @@ export function decide(plan,models,previous,stamp,cfg,intent) {
         let g=plan.choices[i],key=sprintf('%J',[g.freq,g.center,g.width]);
         let n=evidence[m.name].options[key]?.count ?? 1;
         comparisons[m.name]=n;count=min(count,n);
-        confidence=max(confidence,max(m.current.uncertainty ?? 3,g.uncertainty ?? 3)/(n ** 0.5));
+        confidence=max(confidence,max(m.current.uncertainty ?? 3,g.uncertainty ?? 3));
     }
     let required=max(cfg.improvement,confidence);
     let policy=cfg.separate&&plan.overlap<plan.base.overlap-0.000001;
-    let continuing=intent==signature&&plan.gain>0;
     if(!policy&&plan.gain<=0)return {action:'hold',reason:'No estimated service benefit from changing layout'};
-    let act=policy||continuing||plan.gain>=required;
+    let act=policy||plan.gain>=required;
     return {action:act?'move':'measure',signature,stamp,count,comparisons,evidence,required,gain:plan.gain,
-        reason:policy?'Better spectrum separation':act?'Service benefit exceeds evidence uncertainty':'Comparison needs more evidence',
+        reason:policy?'Better spectrum separation':act?'Benefit exceeds movement cost and evidence uncertainty':'Benefit does not yet justify disruption and uncertainty',
         next:plan.path[0],path:plan.path};
 };

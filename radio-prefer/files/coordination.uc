@@ -53,9 +53,10 @@ if (ARGV[0] == '--restore') {
     exit(0);
 }
 if (ARGV[0] != '--prepare') die('Use --prepare, --restore or --self-test\n');
-if (cursor.get('radio_prefer', 'main', 'enabled') != '1') exit(0);
+let preference=cursor.get('radio_prefer','main','enabled')=='1';
+if(!preference&&cursor.get('channel_coordinator','main','enabled')!='1')exit(0);
 let radio = cursor.get('radio_prefer', 'main', 'preferred_radio');
-if (!radio || cursor.get('wireless', radio) != 'wifi-device')
+if (preference && (!radio || cursor.get('wireless', radio) != 'wifi-device'))
     die('Select an existing preferred radio before enabling\n');
 
 let bus = ubus.connect();

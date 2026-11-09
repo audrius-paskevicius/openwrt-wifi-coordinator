@@ -1,12 +1,53 @@
 # Validation
 
-Source release: **0.6.0-r49**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.7.0-r2**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 51 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0 shared controller (2026-11-09)
+
+The complete isolated OpenWrt suite passed during development. After the live
+findings, the affected modules were rerun: 24 shared-controller checks, 60
+preference/protocol checks, 108 planner/radar/survey cases, 18 actual candidate
+cases and 1,122 executor cases. The full run also covered 1,023 restart-recovery
+checks and 668 archive-storage checks. These are assertions and simulated
+sequences, not equivalent numbers of RF trials.
+
+New regressions cover movement cost, incumbent retention, no confidence gained
+from repetition alone, scoped reservations, early complete-band publication,
+fresh-plan validation, width retry backoff, bounded return accounting, one gentle
+return request, late handoff departure notifications, and an expired stability
+watch without persistent loss. Radar arrival, legal evacuation, interrupted
+preparation and repeated failed-radio recovery remain covered by simulation.
+
+On the development router, a read-only comparison of both planners against the
+same live candidate snapshot retained the existing layout in both cases. This is
+a sanity check, not a performance comparison. The shared process ran alongside
+the existing network services without a second preference daemon. Chrome loaded
+Channels, Clients and both History charts successfully.
+
+Controlled trials moved the occupied preferred radio from channel 120 to 128 at
+160 MHz while its two clients used the auxiliary radio. The first trial exposed
+an unnecessary rollback: late departure notifications and an inconclusive
+stability deadline were being treated as evidence of a failed placement. Both
+paths now have regressions. The corrected repeat retained channel 128 and began
+the separate return observation, recording a client rejection instead of calling
+service on another radio a successful return. A temporary reassociation was used
+to reset the trial's starting point; that setup is not attributed to automatic
+preference. The erroneous inconclusive restriction from the failed trial was
+removed before the repeat; other restrictions and settings were retained.
+
+The signed package and index verified. All 42 payload files matched source or
+generated content. Source, history and extracted payload scans found no secret
+patterns; the on-router build also checked the actual private gateway and Wi-Fi
+values without exporting them. Network, firewall, DHCP, wireless and coordinator
+configuration hashes matched after the first installation. No artificial radar
+signal was transmitted. Long-term performance in changing RF conditions and
+universal client acceptance are not established by these trials.
 
 ## r49 bounded preferred-radio measurement wait (2026-11-09)
 

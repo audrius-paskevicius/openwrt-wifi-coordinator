@@ -33,6 +33,13 @@ Top-level metadata includes `format`, `version`, `package_version`, `exported_at
 | `radar` | Current planner-memory incidents: detection time, centre frequency, width, region, PHYs and weight |
 | `actions` | Action codes and recorded details within the selected period, including raw radar notifications |
 
+New action records can include an `operation` ID linking preparation, channel
+verification and client return. Return counts distinguish `returned`, `elsewhere`,
+`absent` and `declined`; `disconnect_events` and `forced_disconnects` describe
+different things. Older records omit these optional fields. They contain counts,
+not client addresses. A `switch-unconfirmed` outcome means the AP was ready but
+the bounded observation did not establish stable client service.
+
 `result` ends the document with `complete`, `warnings` and record `counts`. Survey counts count frames, not individual bins.
 
 Survey bands use `start` and `step` in MHz. Bin `i` spans `[start + i * step, start + (i + 1) * step)`. Its timestamp is the frame's `time + offsets[i]` (zero when omitted). `levels[i]` is a 0–100 congestion estimate, not airtime percent. `null` means unmeasured, never clear. Traffic `n`, `traffic_sum`, `busy_n` and `busy_sum` preserve the evidence behind means; absent busy measurements stay null.

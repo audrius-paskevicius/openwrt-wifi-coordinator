@@ -45,7 +45,7 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `enabled` | Stops this controller; distinct from observation, which still scans and proposes. Client steering has its own switch. |
 | `mode` | Observe versus automatic planner-initiated channel changes. Observe still allows interrupted-operation recovery and kernel radar evacuation. Does not control preferred-radio steering. |
 | `interval` | Administrator's scan-overhead budget: minimum wait after completed surveys/operations, including close comparisons. Startup begins after 15 seconds. |
-| `improvement` | Minimum service-index gain to admit a new capacity plan, including widening. Admitted multi-step plans do not repay this margin while remaining benefit is positive. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
+| `improvement` | Minimum net service-index gain after movement cost, including widening. Every step repays this margin against current evidence. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
 | `min_dwell` | Avoids repeated moves after successful verification. Independent of survey frequency. |
 | `persist` | Whether verified wireless placements are checkpointed, at most every six hours. Separate from graph history and radar memory. |
 | `clear_stop` | One-shot acknowledgement after resolving a recovery failure, reset after use. Interrupted-operation and failed-radio recovery checks repeat automatically with capped backoff, resuming only after the relevant service checks pass. This acknowledgement clears the global stop and per-radio unresolved-failure flags after an administrator has checked recovery; it does not erase timed destination or client-specific exclusions. |
@@ -87,15 +87,15 @@ On WRT3200ACM/WRT32X, frequency Auto uses advertised CSA on radio0/radio1 unless
 
 | Key | Why keep it / precise scope |
 | --- | --- |
-| `enabled` | Independent from channel planning. While enabled it owns steering and holds competing usteer policies passive. Disabling restores previous policies while preserving external edits. |
+| `enabled` | Independent from channel planning. While enabled it owns steering and holds competing usteer policies passive. Previous policies are restored when the shared controller stops; channel planning also requires passive usteer. |
 | `preferred_radio` | Explicit target: differing radios have different capabilities/coverage. No silent fallback to another radio. |
 | `mode` | Gentle versus Strong recommendation when a fresh target measurement qualifies. Either mode sends Gentle when measurement support is absent or no usable report arrives within one minute of a measurement request. This fallback is shown in client status. Neither mode sets an AP disconnect timer. |
 | `min_rssi` | Required measured target signal. A fresh weaker report blocks recommendations. Without usable measurements, a gentle suggestion leaves suitability to the client. |
 | `settle_time` | Lets a new association settle before measurement/steering. |
-| `cooldown` | Minimum interval between recommendations to a client. |
+| `cooldown` | Minimum interval between ordinary recommendations. One extra gentle return request is allowed after an operation on the preferred radio. |
 | `max_attempts` | Burst limit before a longer pause (`cooldown × max_attempts`). Distinct from interval; budget also resets after one minute on the preferred radio. |
 
-Channel handoffs and preferred-radio steering have separate signal/request policies because one prepares a necessary channel operation and the other merely recommends a favored AP. A shared lease prevents conflicting simultaneous actions. Busy/full or unavailable preferred APs now produce explicit client status rather than leaving a previous decision displayed.
+Channel handoffs and preferred-radio steering have separate signal/request policies because one prepares a necessary channel operation and the other merely recommends a favored AP. One controller reserves the affected radios to prevent conflicting actions. Busy/full or unavailable preferred APs now produce explicit client status rather than leaving a previous decision displayed.
 
 ## History
 

@@ -41,6 +41,18 @@ setup('csa','quiet');ex.start(radio,group(5580,80),[radio]);T+=15;let denied=fal
 try{ex.tick([radio]);}catch(e){denied=true;ex.abort(e);}
 check(denied&&!length(filter(calls,c=>c.method=='switch_chan')),'explicit quiet-only restriction is respected');
 check(!st.halted,'a deferred operation does not globally halt radios');
+setup();ex.start(radio,group(5580,80),[radio]);
+ex.event({cmd:nl.const.NL80211_CMD_DEL_STATION,msg:{mac:'client'}},[radio]);
+T+=15;ex.tick([radio]);ex.pending().switch_clients={};
+T+=181;ex.event({cmd:nl.const.NL80211_CMD_DEL_STATION,msg:{mac:'client'}},[radio]);
+check(ex.pending().disconnects==2,'handoff and delayed departure events remain in total accounting');
+check(ex.pending().last_problem==null,'delayed departure of evacuated client does not reset stability');
+ex.tick([radio]);check(!ex.busy()&&events[-1].event=='switch-verified','healthy service is not rolled back by a late handoff notification');
+setup();ex.start(radio,group(5580,80),[radio]);T+=15;ex.tick([radio]);
+ex.pending().verify_seconds=45;T+=106;ex.pending().last_problem=T;
+ex.tick([radio]);
+check(!ex.busy()&&!repairs&&!st.radios.r.failed&&events[-1].event=='switch-unconfirmed',
+ 'expired stability watch without persistent loss keeps the working AP and reports uncertainty');
 setup('idle_reconfigure','empty');ex.start(radio,group(5580,80),[radio]);T+=15;denied=false;
 try{ex.tick([radio]);}catch(e){denied=true;ex.abort(e);}
 check(denied&&repairs==0,'occupied AP cannot be restarted');

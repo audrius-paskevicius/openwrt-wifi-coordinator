@@ -25,7 +25,9 @@ The five tabs are **Channels**, **Clients**, **History**, **Storage & export**, 
 - Plans channels and widths jointly, following each radio's HT/VHT capabilities: up to 40 MHz on 2.4 GHz and 160 MHz on 5 GHz, subject to regulatory and coexistence checks.
 - Defaults to live driver-derived channel lists for every radio; optional explicit lists restrict selection.
 - Ranks joint layouts by usable bandwidth and advertised radio spatial capacity, accounting for the primary channel and radar memory. Width alone does not outrank estimated service; the objective is independent of today's client mix.
-- Keeps evidence for each alternative even when different channels take turns ranking first.
+- Uses one decision owner with per-radio reservations, allowing unrelated scans and preference requests during an operation.
+- Prices disruption before changing channels; repeated noisy surveys alone cannot manufacture confidence.
+- Separately observes preferred-radio return after a move and records the complete operation.
 - Uses live channel-switch announcements where supported. Otherwise it tries a compatible client handoff, then briefly restarts only the changing radio if clients remain.
 - Checks reconnection and service after a change, with rollback and temporary exclusions after failures.
 - Uses eligible DFS spectrum opportunistically, preparing it on an empty compatible helper while another radio serves clients when possible. Recent radar detections add a planning penalty with a one-hour default half-life, separate from mandatory kernel clearance and exclusion periods.
@@ -115,4 +117,4 @@ MIT; see [LICENSE](LICENSE). Bundled Chart.js 4.5.1 is MIT-licensed; its [licens
 
 ## Publishing releases
 
-Use `python3 scripts/prepare-release-notes.py NOTES.txt RELEASE-NOTES.md` to prepend the full [disclaimer](DISCLAIMER.txt), then pass the generated file to `gh release create --notes-file RELEASE-NOTES.md`. Publish and verify the new signed assets before withdrawing an older release. This repository currently keeps only the latest release and its version tag public; older revisions in the validation notes are historical evidence, not available release downloads. Include `DISCLAIMER.txt` with the release downloads and checksum manifest. The same canonical text is embedded in the APK UI during the build; unchanged text preserves browser acknowledgements.
+Use `python3 scripts/prepare-release-notes.py NOTES.txt RELEASE-NOTES.md` to prepend the full [disclaimer](DISCLAIMER.txt), then pass the generated file to `gh release create --notes-file RELEASE-NOTES.md`. Publish and verify the signed assets. Older releases may remain available for rollback; historical validation notes do not promise download availability. Include `DISCLAIMER.txt` with the release assets and checksum manifest. The same canonical text is embedded in the APK UI; unchanged text preserves browser acknowledgements.

@@ -1,12 +1,11 @@
 #!/bin/sh
 [ -z "${IPKG_INSTROOT:-}" ] || exit 0
 cat /usr/share/channel-coordinator/DISCLAIMER.txt
-/etc/init.d/radio-prefer enable
+/etc/init.d/radio-prefer disable
 /etc/init.d/channel-coordinator enable
 /usr/bin/ucode /usr/share/channel-coordinator/defaults.uc --apply
 /usr/bin/ucode /usr/share/channel-coordinator/country.uc --apply
-if [ "$(uci -q get radio_prefer.main.enabled)" = 1 ]; then /etc/init.d/radio-prefer start; fi
-if [ "$(uci -q get channel_coordinator.main.enabled)" = 1 ]; then /etc/init.d/channel-coordinator start; fi
+/etc/init.d/channel-coordinator start
 /etc/init.d/rpcd reload
 rm -f /tmp/luci-indexcache /tmp/luci-indexcache.*.json
 exit 0

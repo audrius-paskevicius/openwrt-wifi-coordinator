@@ -32,4 +32,8 @@ check(length(filter(list,g=>g.freq==2472&&g.width==20))>0,'failure expiry restor
 state.radios.r.rejected=[{target:group(2472,40),until:T+900}];
 list=candidates(r,[r],rules);
 check(length(filter(list,g=>g.freq==2472&&g.width==20))>0,'width refusal alone does not exclude20 service');
+state.radios.r.last_attempt=T;cfg.retry_delay=30;
+check(length(candidates(r,[r],rules))==1,'new action waits for retry delay');
+check(length(candidates(r,[r],rules,true))>1,'prepared action does not cancel itself through its own retry gate');
+r.unsafe=true;check(length(candidates(r,[r],rules,true))==1,'revalidation cannot bypass unsupported configuration');
 printf('PASS: %d actual width-limit candidate cases\n',checks);

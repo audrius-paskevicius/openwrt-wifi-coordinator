@@ -144,7 +144,11 @@ var actionNames={
  'external-recovery-verified':'External channel change verified','external-recovery-unresolved':'External recovery needs attention',
  'switch-recovery':'Channel change needs recovery','radio-reconnect':'Brief restart for client reconnection','scan-client-unconfirmed':'Scan paused for client recheck',
  'scan-retry':'Survey batch retried','scan-complete':'Survey completed','scan-partial':'Partial survey saved','scan-client-loss':'Client disappeared during survey','scan-aborted':'Survey batch aborted','error':'Operation deferred or failed',
- 'width-constrained':'20 MHz retained during HT40 setup'
+ 'width-constrained':'20 MHz retained during HT40 setup',
+ 'operation-complete':'Radio operation finished','client-return':'Preferred-radio return',
+ 'switch-unconfirmed':'Radio ready; client stability unconfirmed',
+ 'steering-request':'Preferred-radio recommendation','steering-response':'Client response',
+ 'method-unavailable':'Unsupported switching method learned'
 };
 return view.extend({
  load:function(){return Promise.all([uci.load('channel_coordinator'),readHistory()]);},
@@ -205,7 +209,7 @@ return view.extend({
    nodes.push(E('div',{'class':'wc-table-wrap wc-log-wrap'},E('table',{'class':'table wc-table'},[
     E('thead',{},E('tr',{},['Time','Action','Details'].map(function(x){return E('th',{'scope':'col'},_(x));}))),
     E('tbody',{},events.map(function(e){var detail=e.reason||[
-     e.radio,e.kind?'assessment: '+e.kind:'',e.affected!=null?e.affected+' affected clients':'',e.retry_seconds?Math.round(e.retry_seconds/60)+'-minute deferral':'',e.preflight?'before channel change':'',e.stage!=null?['gentle','strong','decisive'][e.stage]:'',e.helper?'helper '+e.helper:'',e.from!=null?'from '+e.from:'',e.to!=null?'to '+e.to:'',e.channel!=null?'channel '+e.channel:'',e.width?e.width+' MHz':'',e.clients!=null?e.clients+' clients':'',e.elapsed!=null?e.elapsed+' seconds':'',e.ban_seconds?e.ban_seconds+'-second return restriction':'',e.disconnect_events!=null?e.disconnect_events+' disconnect events':'',e.neighbors!=null?e.neighbors+' networks observed':'',e.missing_count!=null?e.missing_count+' clients missing':'',e.scanned_frequencies!=null?e.scanned_frequencies+' frequencies measured':'',e.missing_frequencies!=null?e.missing_frequencies+' deferred':''
+     e.operation?'operation '+e.operation:'',e.returned!=null?e.returned+' returned / '+e.elsewhere+' elsewhere / '+e.absent+' absent':'',e.declined?e.declined+' declined':'',e.response!=null?'response '+e.response:'',e.forced_disconnects!=null?e.forced_disconnects+' forced disconnects':'',e.radio,e.kind?'assessment: '+e.kind:'',e.affected!=null?e.affected+' affected clients':'',e.retry_seconds?Math.round(e.retry_seconds/60)+'-minute deferral':'',e.preflight?'before channel change':'',e.stage!=null?['gentle','strong','decisive'][e.stage]:'',e.helper?'helper '+e.helper:'',e.from!=null?'from '+e.from:'',e.to!=null?'to '+e.to:'',e.channel!=null?'channel '+e.channel:'',e.width?e.width+' MHz':'',e.clients!=null?e.clients+' clients':'',e.elapsed!=null?e.elapsed+' seconds':'',e.ban_seconds?e.ban_seconds+'-second return restriction':'',e.disconnect_events!=null?e.disconnect_events+' disconnect events':'',e.neighbors!=null?e.neighbors+' networks observed':'',e.missing_count!=null?e.missing_count+' clients missing':'',e.scanned_frequencies!=null?e.scanned_frequencies+' frequencies measured':'',e.missing_frequencies!=null?e.missing_frequencies+' deferred':''
     ].filter(Boolean).join('; ');return E('tr',{},[stamp(e.time),actionNames[e.event]||e.event,detail].map(function(x){return E('td',{},x);}));}))
    ])));
    if(h.archive_error)nodes.push(E('p',{'class':'alert-message warning'},h.archive_error));

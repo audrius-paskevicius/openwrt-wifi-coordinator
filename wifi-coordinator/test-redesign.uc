@@ -17,7 +17,9 @@ let reverse=[model('main',clean,[clean,old])];check(!length(choose(reverse,cfg).
 let uncertain={...clean,uncertainty:8},um=[model('main',old,[old,uncertain])],up=choose(um,cfg);
 let first=decide(up,um,null,1,cfg,null);check(first.action=='measure','uncertain comparison requests more evidence');
 check(decide(up,um,first,1,cfg,null).count==1,'same sweep cannot confirm itself');
-check(decide(up,um,first,2,cfg,null).action=='move','repeat evidence can resolve comparison');
+check(decide(up,um,first,2,cfg,null).action=='measure','repetition alone cannot erase uncertainty');
+let resolved=[model('main',old,[old,{...uncertain,uncertainty:3}])];
+check(decide(choose(resolved,cfg),resolved,first,2,cfg,null).action=='move','better evidence resolves a close comparison');
 // Reproduce rotating 2.4 GHz winners without losing the non-winning evidence.
 let incumbent={...g(2412,20,10),uncertainty:12.3};
 let altA={...g(2432,20,1.7),uncertainty:15},altB={...g(2427,20,1.9),uncertainty:15};
@@ -30,7 +32,7 @@ for(let round=1;round<=4;round++){
  let choices=round%2?[altA,altB]:[{...altA,cost:1.9},{...altB,cost:1.7}];
  support=comparison(incumbent,choices,support,round);
  check(support.count==round,'alternating winner retains its own comparison history '+round);
- check(support.action==(round<4?'measure':'move'),'8.3-point gain clears 15-point uncertainty after four surveys '+round);
+ check(support.action=='measure','rotating winners do not manufacture confidence '+round);
 }
 check(support.next.target.freq==2427,'latest evidence selects the current winner');
 check(comparison(incumbent,[altA,altB],support,4).count==4,'same survey with a new winner cannot add support');
@@ -128,8 +130,9 @@ survey.cancel('test complete');check(!survey.busy(),'scan can yield ownership fo
 check(scan_cost({...rr,clients:{}},1)==0,'empty scanner has no displaced-client cost');
 let fast={...rr,name:'fast',ifname:'fast0',phy:0,mbps:0,client_capacity:866},slow={...rr,name:'slow',ifname:'slow0',phy:2,mbps:0,client_capacity:58};
 check(scan_cost(fast,0.3)>scan_cost(slow,0.3),'uniform scan cost protects higher-capacity client links');
-T=200;commands=[];let radios=[fast,slow];state={radios:{fast:{},slow:{}}};
+T=200;commands=[];let radios=[fast,slow],reserved=[],progress=[];state={radios:{fast:{},slow:{}}};
 let coordinated=create_survey({cfg:scfg,state,now:()=>int(T),precise:()=>T,save:()=>{},lease:()=>{},release:()=>{},history:()=>{},coordination_ready:()=>{},
+ reserved:()=>reserved,progress:r=>push(progress,r),
  dfs_mode:()=>'off',allclients:()=>({c:true}),inventory:()=>radios,rates:{},quiet_since:{},history_store:{survey:()=>{}},
  fs:{popen:cmd=>{push(commands,cmd);return {read:()=>'',close:()=>0};}},
  request:cmd=>cmd==nl.const.NL80211_CMD_GET_REG?{reg_rules:rules}:[],complete:()=>{}});
@@ -138,4 +141,17 @@ T+=0.2;coordinated.event({cmd:nl.const.NL80211_CMD_NEW_SCAN_RESULTS,msg:{wiphy:2
 check(length(commands)==1,'serving gap does not borrow the costlier radio');
 T+=3;coordinated.tick(radios);check(length(commands)==2&&index(commands[1],'slow0')>=0,'preferred scanner resumes after its bounded serving gap');
 coordinated.cancel('test complete');
+reserved=['slow'];commands=[];T+=10;
+coordinated.start(radios);coordinated.tick(radios);
+check(index(commands[0],'fast0')>=0,'reserved helper cannot be borrowed by surveying');
+coordinated.event({cmd:nl.const.NL80211_CMD_NEW_SCAN_RESULTS,msg:{wiphy:0}});
+reserved=['slow','fast'];T+=10;coordinated.tick(radios);
+check(length(commands)==1,'all reserved radios defer scanning without an off-channel visit');
+reserved=[];
+for(let i=0;i<50&&coordinated.busy();i++){
+ T+=5;coordinated.tick(radios);
+ if(coordinated.phase()=='scan')coordinated.event({cmd:nl.const.NL80211_CMD_NEW_SCAN_RESULTS,msg:{wiphy:coordinated.pending().scanner.phy}});
+}
+check(length(progress)==1&&length(progress[0].frequencies)==13,'completed band is published once with full fresh coverage');
+check(!coordinated.busy(),'survey resumes and finishes after reservations release');
 print('PASS: '+count+' redesigned planner, radar and survey cases\n');
