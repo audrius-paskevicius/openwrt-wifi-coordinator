@@ -1,6 +1,6 @@
 # Current architecture
 
-The daemon in `channel-coordinator/files/main.uc` owns surveying, placement, execution and preferred-radio steering in one event loop. `controller.uc` contains shared movement cost, reservations and bounded return accounting; `steering.uc` contains the preference policy. Hardware calls remain injected into survey and executor tests. One disruptive operation runs at a time. Its serving radio, helper, handoff source/destination and client-recovery destination are reserved in memory. Scans and preference on unrelated radios continue. There is no second steering daemon or cross-process lease.
+The daemon in `channel-coordinator/files/main.uc` owns surveying, placement, execution and preferred-radio steering in one event loop. `controller.uc` contains shared movement cost, reservations and bounded return accounting; `steering.uc` contains the preference policy. Hardware calls remain injected into survey and executor tests. One disruptive operation runs at a time. Its serving radio, helper, handoff source/destination and client-recovery destination are reserved in memory. Scans and preference on unrelated radios continue. Survey failures cancel/retry only the survey; execution failures enter the executor's recovery path. Shared inventory failures remain a common safety concern. There is no second steering daemon or cross-process lease.
 
 ## Surveying
 

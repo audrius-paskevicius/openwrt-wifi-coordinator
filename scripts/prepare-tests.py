@@ -28,6 +28,10 @@ storage = storage.replace("system('sync')", "0")
 write("history-storage-test.uc", storage)
 
 main = read(production / "main.uc")
+start = main.index("function survey_action(")
+end = main.index("function history(", start)
+write("test-owner-errors.uc", read(root / "tests/owner-errors-header.uc") + "\n" +
+      main[start:end] + "\n" + read(root / "tests/owner-errors-cases.uc"))
 start = main.index("function dfs_mode(r)")
 end = main.index("function sample(", start)
 write("test-dfs-runtime.uc", read(root / "tests/dfs-runtime-header.uc") + "\n" +

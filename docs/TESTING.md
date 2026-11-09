@@ -1,6 +1,6 @@
 # Validation
 
-Source release: **0.7.0-r2**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r3**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
@@ -10,12 +10,16 @@ Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then
 
 ## 0.7.0 shared controller (2026-11-09)
 
-The complete isolated OpenWrt suite passed during development. After the live
-findings, the affected modules were rerun: 24 shared-controller checks, 60
-preference/protocol checks, 108 planner/radar/survey cases, 18 actual candidate
-cases and 1,122 executor cases. The full run also covered 1,023 restart-recovery
+The complete isolated OpenWrt suite passed again on the final release after the
+live findings: 24 shared-controller checks, 60 preference/protocol checks, 108
+planner/radar/survey cases, 18 actual candidate cases and 1,122 executor cases.
+The full run also covered 1,023 restart-recovery
 checks and 668 archive-storage checks. These are assertions and simulated
 sequences, not equivalent numbers of RF trials.
+
+Four checks extracted from the actual owner error handlers ensure that a busy
+scanner cancels/retries its survey without aborting a separate radio operation,
+and that an execution error does not cancel an unrelated survey.
 
 New regressions cover movement cost, incumbent retention, no confidence gained
 from repetition alone, scoped reservations, early complete-band publication,
@@ -41,13 +45,27 @@ to reset the trial's starting point; that setup is not attributed to automatic
 preference. The erroneous inconclusive restriction from the failed trial was
 removed before the repeat; other restrictions and settings were retained.
 
+The final controlled 128-to-120/160 MHz trial also verified without rollback.
+The preferred radio remained available during its bounded return window. Both
+clients still rejected the gentle return request (status 7); neither was missing,
+and both remained served by the auxiliary radio. Keeping the target available
+therefore did not establish automatic return for these clients. They were placed
+back on the preferred radio as test cleanup, not counted as automatic steering
+success. A busy-scan response observed during this trial motivated the separate
+owner error-handler regressions. No new forced-disconnect policy was added to
+ordinary preference.
+
 The signed package and index verified. All 42 payload files matched source or
 generated content. Source, history and extracted payload scans found no secret
 patterns; the on-router build also checked the actual private gateway and Wi-Fi
 values without exporting them. Network, firewall, DHCP, wireless and coordinator
-configuration hashes matched after the first installation. No artificial radar
+configuration hashes matched after the final installation. No artificial radar
 signal was transmitted. Long-term performance in changing RF conditions and
 universal client acceptance are not established by these trials.
+
+The final installed immutable payload matched the signed APK. One shared owner
+was running; its restart check cleared automatically after the interrupted test
+operation, and normal scanning and preference resumed without a safety stop.
 
 ## r49 bounded preferred-radio measurement wait (2026-11-09)
 

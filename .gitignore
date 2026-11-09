@@ -8,6 +8,7 @@ wifi-coordinator/test-width-limit.uc
 wifi-coordinator/test-client-memory.uc
 wifi-coordinator/test-radar-snapshot.uc
 wifi-coordinator/test-dfs-runtime.uc
+wifi-coordinator/test-owner-errors.uc
 __pycache__/
 *.pyc
 *.log

@@ -180,6 +180,14 @@ function save() { state.updated=now(); state.mode=cfg.mode; state.next_evaluatio
 // Reservations are owned in memory by this process; no cross-daemon lease.
 function lease(seconds,reason,reserved) {}
 function release() {}
+function survey_action(action) {
+    try { action(); }
+    catch(err) { scanner.cancel('Survey deferred: '+err);next_eval=now()+cfg.retry_delay; }
+}
+function execution_action(action) {
+    try { action(); }
+    catch(err) { executor.abort(err); }
+}
 function history(event) { let e={time:time(),...event};push(state.history,e);history_store.event(e);while(length(state.history)>30)shift(state.history); }
 function coordination_ready() {
     let services=call('service','list');
@@ -547,7 +555,7 @@ if(!termination)die('Cannot install graceful shutdown handler');
 let listener=nl.listener(e=>{try{
     if(stopping)return;
     if(e.cmd==N.NL80211_CMD_RADAR_DETECT)record_radar(e);
-    else if(e.cmd==N.NL80211_CMD_NEW_SCAN_RESULTS||e.cmd==N.NL80211_CMD_SCAN_ABORTED)scanner.event(e);
+    else if(e.cmd==N.NL80211_CMD_NEW_SCAN_RESULTS||e.cmd==N.NL80211_CMD_SCAN_ABORTED)survey_action(()=>scanner.event(e));
     else executor.event(e,discovered);
 }catch(err){if(executor.busy())executor.abort(err);else scanner.cancel('Survey deferred: '+err);}},
     [N.NL80211_CMD_NEW_SCAN_RESULTS,N.NL80211_CMD_SCAN_ABORTED,N.NL80211_CMD_DEL_STATION,N.NL80211_CMD_RADAR_DETECT]);
@@ -601,12 +609,12 @@ timer=uloop.timer(1000,()=>{try{
         let r=filter(discovered,r=>r.name==ARGV[1])[0];if(!r)die('Unknown radio');
         executor.start(r,group((r.band=='2g'?2407:5000)+5*int(ARGV[2]),int(ARGV[3])),discovered);
     }else {
-        if(executor.busy())executor.tick(discovered);
-        if(scanner.busy())scanner.tick(discovered);
+        if(executor.busy())execution_action(()=>executor.tick(discovered));
+        if(scanner.busy())survey_action(()=>scanner.tick(discovered));
         else if(cfg.enabled&&!state.halted&&now()>=next_eval){
             next_eval=now()+cfg.interval;
             if(urgent_eval&&!executor.busy()&&scan_result&&now()-scan_result.at<=cfg.max_age){urgent_eval=false;evaluate(discovered);}
-            else scanner.start(discovered);
+            else survey_action(()=>scanner.start(discovered));
         }
         if(urgent_eval&&!executor.busy()&&scanner.phase()!='scan'&&scan_result&&now()-scan_result.at<=cfg.max_age){
             urgent_eval=false;evaluate(discovered);
