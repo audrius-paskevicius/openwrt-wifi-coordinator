@@ -17,6 +17,19 @@ Protocol checks ensure an unmeasured fallback from Strong has neither a
 disassociation warning nor a disconnect timer, while a measured recommendation
 retains the selected mode. Clients without roaming support remain untouched.
 
+The full isolated native suite passed, including 57 Radio Preference checks,
+1118 executor cases, 1023 restart recovery checks and 668 archive-storage checks.
+Portable source/documentation and UI checks passed. The signed APK and package
+index verified; all 40 payload files matched intended source/generated content.
+The installed Clients page matched the verified package, and wireless, network,
+firewall, DHCP and both coordinator configuration hashes were preserved.
+
+In the live check, a client advertising table-only measurements received one gentle
+recommendation while Strong was selected and associated with the preferred radio
+about ten seconds later. Another client was already there before installation;
+that move is not attributed to this fix. The missing-report timeout is covered by
+simulation, not a forced live-client trial. Client acceptance remains discretionary.
+
 ## r48 acknowledgement guidance (2026-11-09)
 
 The acknowledgement note explains that browser and computer restarts preserve
