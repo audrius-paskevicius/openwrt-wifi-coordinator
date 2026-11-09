@@ -35,7 +35,7 @@ function gate(render){
   return showPage().catch(function(e){button.disabled=false;error.textContent='Unable to load this page: '+e.message;});
  }},'I understand — continue');
  host.appendChild(E('section',{'class':'wc-disclaimer-gate'},[fullText(),
-  E('p',{},'Acknowledgement is remembered in this browser for this router. It does not enable, disable, or change the running services.'),button,error]));
+  E('p',{},'Acknowledgement is remembered in this browser for this router while its site data is retained, including after a computer restart. It does not enable, disable, or change the running services.'),button,error]));
  return Promise.resolve(host);
 }
 return L.Class.extend({gate:gate,page:page});

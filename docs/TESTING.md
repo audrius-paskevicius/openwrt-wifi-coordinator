@@ -1,12 +1,31 @@
 # Validation
 
-Source release: **0.6.0-r47**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
+Source release: **0.6.0-r48**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Older release downloads and version tags have since been withdrawn. Entries below retain historical validation evidence, not current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 51 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r48 acknowledgement guidance (2026-11-09)
+
+The acknowledgement note explains that browser and computer restarts preserve
+acceptance while site data is retained. Canonical disclaimer wording, stored
+acknowledgements and the amber notice styling are unchanged. The cross-project
+date audit confirmed that UI timestamps already use readable ISO ordering, while
+exports retain precise UTC timestamps; no Wi-Fi timestamp conversion was needed.
+
+Portable source/UI checks passed, including persistence, changed text, unavailable
+storage, midnight and DST cases, 51 history/cache assertions and 30 recovery cases.
+The signed APK verified and all 40 payload files matched source/generated content.
+Controller and recorder code is unchanged; native controller simulations and live
+RF trials were not repeated for this explanatory UI change.
+
+The signed package was installed on the development router. Wireless, network,
+firewall, DHCP and both coordinator configuration hashes were preserved. Both
+services resumed; the disclaimer JavaScript served over HTTP matches the verified
+package, including its canonical text and new explanatory note.
 
 ## r47 history refresh recovery
 
