@@ -85,7 +85,7 @@ The shared setting **Change channel even if handoff cannot finish** is under **P
 
 ## Configuration and history
 
-Configuration lives in `/etc/config/channel_coordinator` and `/etc/config/radio_prefer`. Use LuCI for explanations of each setting. Fresh normal Radio Preference uses gentle recommendations; strong mode is an administrator choice and still does not set an AP disconnect timer.
+Configuration lives in `/etc/config/channel_coordinator` and `/etc/config/radio_prefer`. Use LuCI for explanations of each setting. Fresh normal Radio Preference uses gentle recommendations; strong mode is an administrator choice and still does not set an AP disconnect timer. Both modes use a gentle fallback when beacon measurements are unsupported or no usable target report arrives within one minute. A fresh weak-signal report still blocks a recommendation. Clients decide whether to accept the suggestion.
 
 Every setting uses the same native LuCI help behavior: a short explanation is always visible; hover or focus that text for full details, or click/tap to open them. Click again or press Escape to close. The existing LuCI styling and help icon are retained. Specialist controls are under Advanced; conditional controls appear in their applicable modes. See the [complete settings reference](SETTINGS.md) for the purpose and exact scope of every retained control including the six retired timing controls and the removed width-selection threshold.
 

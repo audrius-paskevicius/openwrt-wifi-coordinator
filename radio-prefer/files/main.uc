@@ -37,9 +37,23 @@ function decision(c, s, now, target, cfg) {
         let rssi = signed(m.rssi);
         return rssi >= cfg.min_rssi && rssi < 0 ? 'recommend' : 'target-weak';
     }
-    if (s.last_scan != null && now - s.last_scan < 60) return 'await-measurement';
+    if (s.last_scan != null)
+        return now - s.last_scan < 60 ? 'await-measurement' : 'recommend-unmeasured';
     let modes = c['beacon-measurement-modes'] ?? [];
-    return index(modes, 'ACTIVE') >= 0 || index(modes, 'PASSIVE') >= 0 ? 'measure' : cfg.mode=='strong'?'no-measurement-support':'recommend-unmeasured';
+    return index(modes, 'ACTIVE') >= 0 || index(modes, 'PASSIVE') >= 0 ? 'measure' : 'recommend-unmeasured';
+}
+
+function measurement_scope(s, source, target, placement) {
+    let scope = sprintf('%s|%s|%d|%d|%d', source, target, placement.freq, placement.center, placement.width);
+    if (s.measurement_scope != scope) {
+        delete s.last_scan;
+        s.measurement_scope = scope;
+    }
+}
+
+function recommendation_mode(reason, configured) {
+    // Missing evidence permits only advice, never a disassociation warning.
+    return reason == 'recommend-unmeasured' ? 'advisory' : configured;
 }
 
 function request(mac, nr, token, mode) {
@@ -102,7 +116,30 @@ function selftest() {
     s.last_btm=100;eq(choose(),'recommend');
     s.attempts=0;c.measurements=[];delete s.last_scan;delete s.last_btm;
     c['beacon-measurement-modes']=[];eq(choose(),'recommend-unmeasured');
-    cfg.mode='strong';eq(choose(),'no-measurement-support');
+    cfg.mode='strong';eq(choose(),'recommend-unmeasured');
+    c['beacon-measurement-modes']=['TABLE'];eq(choose(),'recommend-unmeasured');
+    c['beacon-measurement-modes']=['ACTIVE'];eq(choose(),'measure');
+    s.last_scan=941;eq(choose(),'await-measurement');
+    s.last_scan=940;eq(choose(),'recommend-unmeasured');
+    c.measurements=[{node:'another',age:0,rcpi:120,rssi:-50}];eq(choose(),'recommend-unmeasured');
+    c.measurements=[{node:'preferred',age:0,rcpi:84,rssi:-68}];eq(choose(),'target-weak');
+    c.measurements=[];s.last_btm=999;eq(choose(),'cooldown');
+    s.last_btm=700;s.attempts=3;eq(choose(),'attempt-limit');
+    delete s.last_btm;s.attempts=0;
+    let placement={freq:5600,center:5570,width:160};
+    measurement_scope(s,'source','preferred',placement);eq(s.last_scan,null);
+    s.last_scan=940;measurement_scope(s,'source','preferred',placement);eq(choose(),'recommend-unmeasured');
+    measurement_scope(s,'source','preferred',{...placement,freq:5620});eq(choose(),'measure');
+    s.last_scan=940;measurement_scope(s,'other','preferred',placement);eq(choose(),'measure');
+    s.last_scan=940;measurement_scope(s,'other','new-target',placement);eq(s.last_scan,null);
+    s.last_scan=940;measurement_scope(s,'other','new-target',{...placement,width:80});eq(s.last_scan,null);
+    s.last_scan=940;measurement_scope(s,'other','new-target',{...placement,width:80,center:5610});eq(s.last_scan,null);
+    let fallback=request('02:00:00:00:00:02','020000000001ef190000802409',1,recommendation_mode('recommend-unmeasured','strong'));
+    eq(fallback.disassociation_imminent,false);eq(fallback.disassociation_timer,0);
+    eq(recommendation_mode('recommend','strong'),'strong');
+    // A completed request clears the measurement wait; the next episode tries again.
+    delete s.last_scan;eq(choose(),'measure');
+    cfg.mode='advisory';s.last_scan=940;eq(choose(),'recommend-unmeasured');delete s.last_scan;
     c.measurements=[{node:'preferred',age:1000,rcpi:120,rssi:-50}];eq(choose(),'recommend');
     c.measurements=[];cfg.mode='advisory';
     eq(request('02:00:00:00:00:02','020000000001ef190000802409',1,'advisory').disassociation_imminent,false);
@@ -283,6 +320,7 @@ function tick() {
             let op = operating_class(status.freq, status.channel);
             if (status.status != 'ENABLED' || !op) {s.decision='target-unavailable';continue;}
             if (t.load >= 80 || (t.max_assoc > 0 && t.n_assoc >= t.max_assoc)) {s.decision='target-busy';continue;}
+            measurement_scope(s, source, target, aps[target].placement);
             let nr = t.rrm_nr?.[2];
             if (type(nr) != 'string') {s.decision='target-unavailable';continue;}
             s.decision = decision(client, s, now, target, cfg);
@@ -293,13 +331,14 @@ function tick() {
                     op_class: op, channel: status.channel, duration: 50,
                     bssid: t.bssid, ssid: t.ssid, reporting_detail: 0 });
             } else if (s.decision == 'recommend'||s.decision=='recommend-unmeasured') {
-                let mode=cfg.mode;
+                let mode=recommendation_mode(s.decision,cfg.mode);
                 if(now-(s.last_btm ?? now)>=cfg.cooldown*cfg.max_attempts)s.attempts=0;
                 let message = request(mac, nr, ((s.dialog ?? 0) % 255) + 1, mode);
                 s.last_btm = now; s.attempts++; s.dialog = message.dialog_token;
+                delete s.last_scan;
                 fs.writefile(STATE, sprintf('%J\n', state));
                 call(source, 'bss_transition_request', message);
-                printf('%s recommendation to %s: %s -> %s, attempt %d\n', cfg.mode, mac, source, target, s.attempts);
+                printf('%s recommendation to %s: %s -> %s, attempt %d\n', mode, mac, source, target, s.attempts);
             }
         }
     }

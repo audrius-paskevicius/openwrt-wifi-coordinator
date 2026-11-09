@@ -15,13 +15,13 @@ var reasons={
  'on-preferred-radio':'Already on the preferred radio',
  'settling':'Allowing this connection to settle',
  'measure':'Requesting a fresh signal measurement',
- 'await-measurement':'Waiting for the client to report the target signal',
+ 'await-measurement':'Waiting up to one minute for the client to report the target signal',
  'target-weak':'Preferred radio is below the signal threshold',
  'recommend':'Sending a roaming recommendation',
  'cooldown':'Waiting before another recommendation',
  'attempt-limit':'Attempt limit reached for this episode',
  'unsupported':'Client does not advertise 802.11v roaming support',
- 'recommend-unmeasured':'Advisory recommendation; destination measurement unavailable',
+ 'recommend-unmeasured':'Gentle recommendation; destination measurement unavailable',
  'coordinator-reservation':'Radio reserved by channel coordination',
  'client-placement-cooldown':'This client recovered elsewhere; avoiding the previous placement temporarily',
  'target-unavailable':'Preferred AP information unavailable','target-busy':'Preferred AP busy or full','no-measurement-support':'Client cannot provide the required beacon measurement',
@@ -48,7 +48,7 @@ return view.extend({
   poll.add(function(){return Promise.all([readState(),services('radio-prefer')]).then(function(x){refresh(x[0],x[1]);});},5);
   var intro=E('div',{},[
    E('h2',{},_('Wi-Fi Coordinator: clients')),
-   E('p',{},_('A shared Wi-Fi name lets devices roam between radios, but each device decides when to move. This controller recommends your preferred radio when a fresh measurement says its signal is strong enough. In Gentle mode, clients without measurement support receive an unmeasured suggestion. Strong mode waits for a qualifying measurement.')),
+   E('p',{},_('A shared Wi-Fi name lets devices roam between radios, but each device decides when to move. A fresh qualifying signal measurement permits your selected recommendation strength. Without measurement support, or after one minute without a usable report, either mode sends a gentle suggestion and lets the client judge the destination. A fresh weak-signal report blocks the recommendation.')),
    E('p',{},_('During channel preparation, normal preference pauses so it does not pull clients back while the channel controller is moving them aside. Afterwards, preference resumes. usteer supplies measurements and neighbour information; this package owns steering decisions.')),
    status,clients,
    E('p',{},_('802.11k supplies signal measurements; 802.11v carries roaming recommendations. A client may support one, both, or neither. Normal radio preference does not force disconnections. Channel-operation handoffs can use the stronger escalation policy configured on the Channels page.'))
@@ -59,7 +59,7 @@ return view.extend({
   o=s.option(form.ListValue,'preferred_radio',_('Radio to prefer'),_('Choose the radio with the capabilities and coverage you want to prefer. On a WRT3200ACM, radio0 is normally the main 5 GHz radio. The preferred AP must use the same Wi-Fi name, security credentials and LAN as the client\'s current AP.'));
   o.value('',_('Select a radio'));uci.sections('wireless','wifi-device').forEach(function(r){o.value(r['.name'],r['.name']+' ('+(r.band=='2g'?'2.4':'5')+' GHz)');});
   o.validate=function(section,v){return this.map.lookupOption('enabled',section)[0].formvalue(section)!='1'||v?true:_('Select a preferred radio.');};o.rmempty=false;
-  o=s.option(form.ListValue,'mode',_('How strongly to recommend a move'),_('Gentle sends a suggestion. Strong also signals that disassociation is imminent, but sets no AP disconnect timer. A client may reconnect in response or decline either mode. Strong requires a fresh qualifying signal measurement; it never silently falls back to Gentle. Channel-operation handoff escalation is configured separately on the Channels page.'));
+  o=s.option(form.ListValue,'mode',_('How strongly to recommend a move'),_('Gentle sends a suggestion. With a fresh qualifying signal measurement, Strong also signals that disassociation is imminent, but sets no AP disconnect timer. If measurements are unsupported or no usable report arrives within one minute, both modes send Gentle instead; the client decides whether to move. Normal cooldowns and attempt limits apply. Channel-operation handoff escalation is configured separately on the Channels page.'));
   o.value('advisory',_('Gentle recommendation'));o.value('strong',_('Stronger recommendation'));o.default='advisory';o.rmempty=false;
   function value(name,title,def,type,description){var v=s.option(form.Value,name,_(title),_(description));v.default=String(def);v.datatype='and(integer,'+type+')';v.rmempty=false;}
   value('min_rssi','Minimum signal at the preferred radio (dBm)',-67,'range(-90,-30)','Less negative means stronger: -50 dBm is stronger than -70 dBm. At -67, a measured -60 qualifies; -75 does not. A lower threshold allows moves from farther away but may reduce speed.');

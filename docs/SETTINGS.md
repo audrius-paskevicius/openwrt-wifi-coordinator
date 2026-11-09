@@ -89,8 +89,8 @@ On WRT3200ACM/WRT32X, frequency Auto uses advertised CSA on radio0/radio1 unless
 | --- | --- |
 | `enabled` | Independent from channel planning. While enabled it owns steering and holds competing usteer policies passive. Disabling restores previous policies while preserving external edits. |
 | `preferred_radio` | Explicit target: differing radios have different capabilities/coverage. No silent fallback to another radio. |
-| `mode` | Gentle versus Strong recommendation. Strong requires a fresh qualifying measurement; absent measurement support is reported instead of silently sending Gentle. Neither mode sets an AP disconnect timer. |
-| `min_rssi` | Required measured target signal. Gentle can still make an unmeasured suggestion to a client without measurement support; the client judges suitability. |
+| `mode` | Gentle versus Strong recommendation when a fresh target measurement qualifies. Either mode sends Gentle when measurement support is absent or no usable report arrives within one minute of a measurement request. This fallback is shown in client status. Neither mode sets an AP disconnect timer. |
+| `min_rssi` | Required measured target signal. A fresh weaker report blocks recommendations. Without usable measurements, a gentle suggestion leaves suitability to the client. |
 | `settle_time` | Lets a new association settle before measurement/steering. |
 | `cooldown` | Minimum interval between recommendations to a client. |
 | `max_attempts` | Burst limit before a longer pause (`cooldown × max_attempts`). Distinct from interval; budget also resets after one minute on the preferred radio. |
