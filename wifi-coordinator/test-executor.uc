@@ -336,4 +336,12 @@ opt=setup();radio.aps=[{status:{status:'ENABLED',freq:5500}}];st.radios.r.failed
 peer={...radio,name:'peer',phy:2,ifname:'peer0',current:group(5745,80),clients:{},authorized:{}};st.radios.peer={};
 ex.start(peer,group(5180,80),[radio,peer]);ex.reassess([radio,peer]);T+=61;radio.client_data.client={rx:40000,tx:40000};ex.reassess([radio,peer]);
 check(!st.radios.r.failed&&ex.pending().radio=='peer','other-radio operation cannot starve reassessment or lose its own context');
+opt=setup();opt.valid_action=()=>null;
+ex.start(radio,group(5580,80),[radio]);T+=15;ex.tick([radio]);
+check(ex.busy()&&ex.pending().kind=='move-wait'&&!length(filter(calls,c=>c.method=='switch_chan')),'pending asynchronous validation neither moves nor aborts');
+opt.valid_action=()=>true;ex.tick([radio]);
+check(length(filter(calls,c=>c.method=='switch_chan'))==1,'accepted validation resumes normal execution');
+opt=setup();opt.valid_action=()=>false;ex.start(radio,group(5580,80),[radio]);T+=15;
+let invalid=false;try{ex.tick([radio]);}catch(e){invalid=true;}
+check(invalid&&!length(filter(calls,c=>c.method=='switch_chan')),'rejected validation never issues a move');
 print('PASS: '+checks+' executor integration and failure cases\n');

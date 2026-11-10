@@ -176,7 +176,44 @@ function radarData(records,start,end,halfLife,axis){
   };
  });
 }
-function channelChart(canvas,periods,names,start,end,surveys,radar,bands){
+// Mark evidence without filling missing observations or inventing continuity.
+function evidenceData(rows,names,start,end,events,axis){
+ var sets=[],labels={unknown:'Unknown observation gap',unavailable:'Confirmed unavailable',action:'Recorded action'};
+ names.forEach(function(r){
+  var ordered=rows.filter(p=>p.radio==r).slice().sort((a,b)=>a.start-b.start),marks={unknown:[],unavailable:[],action:[]};
+  function anchor(t){var previous=ordered.filter(p=>p.start<=t).slice(-1)[0];return previous||ordered[0];}
+  function mark(kind,a,b,detail){
+   if(b<start||a>end)return;
+   var p=anchor(a),y=p?(axis?axis.position(centre(p)):p.count):null;
+   if(y==null)return;
+   marks[kind].push({x:Math.max(start,Math.min(end,(a+b)/2)),y:y,evidence:{radio:r,start:a,end:b,detail:detail,kind:kind}});
+  }
+  for(var i=1;i<ordered.length;i++){
+   var a=ordered[i-1].end,b=ordered[i].start;
+   if(b-a>15){
+    var unknown=[[a,b]];
+    (events||[]).filter(e=>e.radio==r&&e.event=='radio-unavailable').forEach(function(e){
+     unknown=unknown.flatMap(function(span){
+      if(e.end<=span[0]||e.start>=span[1])return [span];
+      return [[span[0],Math.min(span[1],e.start)],[Math.max(span[0],e.end),span[1]]].filter(p=>p[1]>p[0]);
+     });
+    });
+    unknown.forEach(p=>mark('unknown',p[0],p[1],'No observations for '+Math.round(p[1]-p[0])+' s; service continuity unknown'));
+   }
+  }
+  (events||[]).forEach(function(e){
+   if(e.radio!=r)return;
+   if(e.event=='radio-unavailable')mark('unavailable',e.start,e.end,'Hostapd reported no enabled access point');
+   else if(['placement-observed','radio-reconnect','radar-evacuation','client-departure'].includes(e.event)||e.event=='operation-complete'&&e.disconnect_events>0)
+    mark('action',e.time,e.time,(e.reason||e.event)+(e.disconnect_events?' ('+e.disconnect_events+' station departures)':''));
+  });
+  Object.keys(marks).forEach(function(kind){if(marks[kind].length)sets.push(line(r+' · '+labels[kind],marks[kind],kind=='unavailable'?'#b83b35':kind=='unknown'?'#777':colour(r,0),
+   {wcEvidence:true,showLine:false,pointStyle:kind=='unavailable'?'crossRot':kind=='unknown'?'rect':'triangle',pointRadius:4,pointHoverRadius:6,pointBorderWidth:2,order:-1}));});
+ });return sets;
+}
+function evidenceTitle(raw){return dated(raw.evidence.start)+(raw.evidence.end!=raw.evidence.start?' – '+dated(raw.evidence.end):'');}
+function evidenceLabel(raw){return [raw.evidence.radio+': '+raw.evidence.detail,'Marker height uses the nearest recorded value; it is not a measurement during the gap.'];}
+function channelChart(canvas,periods,names,start,end,surveys,radar,bands,events){
  var options=baseOptions(start,end),axis=spectrumAxis(bands),ticks=axis.ticks;
  options.scales.y.min=-6;options.scales.y.max=Math.max(1,axis.max)+6;
  options.scales.y.afterBuildTicks=function(s){s.ticks=ticks.map(function(t){return {value:t.value};});};
@@ -185,10 +222,10 @@ function channelChart(canvas,periods,names,start,end,surveys,radar,bands){
  options.scales.y.title={display:true,text:'Band / channel',color:'#444'};
  options.plugins.tooltip.filter=function(item){return !item.dataset.wcHalo&&!item.dataset.wcFill;};
  options.plugins.tooltip.callbacks={
-  title:function(items){var raw=items[0]&&items[0].raw,p=raw&&raw.period;return p?dated(p.start)+' – '+dated(p.end):raw?(raw.radar?'Last radar detection: ':'Survey measured at ')+dated(raw.observed):'';},
-  label:function(c){var p=c.raw.period;return p?[p.radio+': primary channel '+p.channel+' / '+p.width+' MHz','Centre '+c.raw.center+' MHz · '+(p.role||'serving')]:c.raw.radar?[c.raw.low+'–'+c.raw.high+' MHz','Radar avoidance strength: '+Math.round(c.raw.level*100)+'% (not a probability)']:[c.raw.low+'–'+c.raw.high+' MHz','Congestion estimate: '+c.raw.level+' / 100'];}
+  title:function(items){var raw=items[0]&&items[0].raw,p=raw&&raw.period;return raw?.evidence?evidenceTitle(raw):p?dated(p.start)+' – '+dated(p.end):raw?(raw.radar?'Last radar detection: ':'Survey measured at ')+dated(raw.observed):'';},
+  label:function(c){var p=c.raw.period;return c.raw.evidence?evidenceLabel(c.raw):p?[p.radio+': primary channel '+p.channel+' / '+p.width+' MHz','Centre '+c.raw.center+' MHz · '+(p.role||'serving')]:c.raw.radar?[c.raw.low+'–'+c.raw.high+' MHz','Radar avoidance strength: '+Math.round(c.raw.level*100)+'% (not a probability)']:[c.raw.low+'–'+c.raw.high+' MHz','Congestion estimate: '+c.raw.level+' / 100'];}
  };
- return new chartlib.Chart(canvas,{type:'line',data:{datasets:channelData(periods,names,start,end,axis).concat(surveyData(surveys||[],start,end,axis),radarData(radar&&radar.events,start,end,radar&&radar.half_life,axis))},options:options});
+ return new chartlib.Chart(canvas,{type:'line',data:{datasets:channelData(periods,names,start,end,axis).concat(surveyData(surveys||[],start,end,axis),radarData(radar&&radar.events,start,end,radar&&radar.half_life,axis),evidenceData(periods,names,start,end,events,axis))},options:options});
 }
 function trafficChart(canvas,samples,names,start,end){
  var options=baseOptions(start,end);options.scales.y.min=0;options.scales.y.suggestedMax=0.1;
@@ -197,14 +234,14 @@ function trafficChart(canvas,samples,names,start,end){
   label:function(c){return c.dataset.label+': '+c.raw.y.toFixed(3)+' Mbit/s average; '+c.raw.peak.toFixed(3)+' peak (5-minute summary)';}};
  return new chartlib.Chart(canvas,{type:'line',data:{datasets:trafficData(samples,names)},options:options});
 }
-function clientChart(canvas,intervals,names,start,end){
+function clientChart(canvas,intervals,names,start,end,events){
  var options=baseOptions(start,end);options.scales.y.min=0;options.scales.y.suggestedMax=1;
  options.scales.y.ticks.maxTicksLimit=5;options.scales.y.ticks.precision=0;
  options.scales.y.title={display:true,text:'Clients',color:'#444'};
- options.plugins.tooltip.callbacks={title:function(items){var p=items[0]&&items[0].raw.interval;return p?dated(p.start)+' – '+dated(p.end):'';},
-  label:function(c){return c.dataset.label+': '+c.raw.y+' client'+(c.raw.y==1?'':'s');}};
+ options.plugins.tooltip.callbacks={title:function(items){var raw=items[0]&&items[0].raw,p=raw&&raw.interval;return raw?.evidence?evidenceTitle(raw):p?dated(p.start)+' – '+dated(p.end):'';},
+  label:function(c){return c.raw.evidence?evidenceLabel(c.raw):c.dataset.label+': '+c.raw.y+' client'+(c.raw.y==1?'':'s');}};
  options.layout={padding:{top:10}};
- return new chartlib.Chart(canvas,{type:'line',data:{datasets:clientData(intervals,names,start,end)},options:options,plugins:[clientFinPlugin]});
+ return new chartlib.Chart(canvas,{type:'line',data:{datasets:clientData(intervals,names,start,end).concat(evidenceData(intervals,names,start,end,events))},options:options,plugins:[clientFinPlugin]});
 }
 function finSlant(r,i){return [-8,0,8][radioIndex(r,i)%3];}
 function clientFinStyle(r,i){
@@ -213,7 +250,7 @@ function clientFinStyle(r,i){
  return 'display:inline-block;width:28px;height:14px;margin-right:7px;vertical-align:baseline;background:no-repeat center url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
 }
 function clientFinMarks(chart){
- var marks=[],area=chart.chartArea,spacing=12,total=chart.data.datasets.length;
+ var marks=[],area=chart.chartArea,spacing=12,total=chart.data.datasets.filter(d=>!d.wcEvidence).length;
  chart.data.datasets.forEach(function(d,i){
   if(!chart.isDatasetVisible(i))return;
   for(var j=0;j+1<d.data.length;j++){
@@ -234,4 +271,4 @@ var clientFinPlugin={id:'wcClientFins',afterDatasetsDraw:function(chart){
  clientFinMarks(chart).forEach(function(m){ctx.strokeStyle=m.color;ctx.beginPath();ctx.moveTo(m.x,m.y);ctx.lineTo(m.x+m.dx,m.y-8);ctx.stroke();});
  ctx.restore();
 }};
-return baseclass.extend({spectrumAxis:spectrumAxis,channelChart:channelChart,clientChart:clientChart,trafficChart:trafficChart,colour:colour,keyStyle:keyStyle,patternStyle:patternStyle,patternName:patternName,geometry:geometry,channelData:channelData,clientData:clientData,clientFinStyle:clientFinStyle,clientFinMarks:clientFinMarks,trafficData:trafficData,surveyData:surveyData,radarData:radarData,radarColour:radarColour,radarGradient:radarGradient});
+return baseclass.extend({evidenceData:evidenceData,spectrumAxis:spectrumAxis,channelChart:channelChart,clientChart:clientChart,trafficChart:trafficChart,colour:colour,keyStyle:keyStyle,patternStyle:patternStyle,patternName:patternName,geometry:geometry,channelData:channelData,clientData:clientData,clientFinStyle:clientFinStyle,clientFinMarks:clientFinMarks,trafficData:trafficData,surveyData:surveyData,radarData:radarData,radarColour:radarColour,radarGradient:radarGradient});

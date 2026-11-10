@@ -1,12 +1,48 @@
 # Validation
 
-Source release: **0.7.0-r8**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r9**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r9 responsive planning and history evidence (2026-11-10)
+
+Candidate scoring and the final pre-move comparison run in one read-only worker.
+The decision owner keeps observing and processing radar/steering events. Helper
+configuration checks are cached within the captured calculation. The candidate
+spectrum, scoring algorithm, movement costs and execution safeguards are retained.
+
+Tests cover worker isolation, timer responsiveness during CPU work, identical
+search results, changed inputs, timeout, failure and shutdown (11 checks), plus
+15 snapshot-validity checks. Executor tests now cover deferred/accepted/rejected
+asynchronous validation (1,130 cases total). History checks distinguish missed
+samples from confirmed unavailability, split short outages and merge interval
+extensions (20 client-history cases). The 38 export checks include timings,
+missed samples, interval deduplication, UTC boundaries and private-field filtering.
+The existing 200-hour archive simulation and portable UI/cache tests also run.
+The actual Chart.js fixture checks unknown-gap, unavailable and action markers,
+tooltips and retained spectrum/traffic geometry in Chrome.
+
+Live validation uses the normal configured planner and saved history. The first
+comparisons took about 2.5 seconds while observed owner updates stayed within
+1–2 seconds. This is evidence for responsive live operation, not a guarantee of
+zero wireless outages or proof that every historical gap had the same cause.
+Radar/CAC and real channel moves can still interrupt service. Old gaps remain
+unknown; new records distinguish positive AP-unavailability observations.
+
+The final full isolated suite passed, including 668 archive-storage checks with
+7,203 original samples and 2,401 surveys retained for 200 hours. The signed APK
+verified and all 46 payload files matched source. Source and extracted payload
+secret scans passed, including checks against the router's saved credentials.
+Installation preserved all six checked network/coordinator configuration files.
+The final monitored run kept owner updates within three seconds under concurrent
+test/export load, with no observations older than five seconds. Live JSON and
+Actions CSV downloads completed and included calculation timings without private
+runtime fields. The actual LuCI History page rendered three charts with no
+warnings or exceptions on a clean reload.
 
 ## 0.7.0-r8 configuration audit and settings redesign (2026-11-10)
 

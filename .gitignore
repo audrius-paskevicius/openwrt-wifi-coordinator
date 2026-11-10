@@ -9,6 +9,7 @@ wifi-coordinator/test-client-memory.uc
 wifi-coordinator/test-radar-snapshot.uc
 wifi-coordinator/test-dfs-runtime.uc
 wifi-coordinator/test-owner-errors.uc
+wifi-coordinator/test-planning-key.uc
 __pycache__/
 *.pyc
 *.log

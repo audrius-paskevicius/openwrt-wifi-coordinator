@@ -8,6 +8,7 @@
 'require wifi-coordinator.time as timefmt';
 'require wifi-coordinator.help as help';
 function historyKey(k,x){
+ if(x.event=='radio-unavailable')return JSON.stringify([x.event,x.radio,x.source,x.start]);
  if(k=='clients')return JSON.stringify([x.radio,x.source,x.start,x.count]);
  if(k=='periods')return JSON.stringify([x.radio,x.start,x.channel,x.center,x.width,x.role]);
  if(k=='samples')return JSON.stringify([x.radio,x.time,x.channel,x.width,x.role,x.source]);
@@ -133,6 +134,7 @@ function congestionCell(sample,surveys){
 }
 var retentionChoices=[1,3,6,12,24,48,72,96,120,168,200];
 var actionNames={
+ 'planning-complete':'Planning calculation completed','planning-discarded':'Planning calculation discarded','planning-failed':'Planning calculation failed','slow-stage':'Slow controller stage','observation-gap':'Missed observations','radio-unavailable':'Confirmed radio unavailability','placement-observed':'Channel placement changed','client-departure':'Station departed',
  'radio-recovered':'Radio service recovered automatically','restart-retry':'Automatic restart-recovery check','switch-request-failed':'Channel switch request failed',
  'client-recovery-start':'Targeted client recovery started','client-recovery-request':'Targeted roaming request',
  'client-recovery-verified':'Alternate client service verified','client-recovery-unresolved':'Alternate client service unconfirmed',
@@ -192,10 +194,10 @@ return view.extend({
      E('div',{'class':'wc-radar-ticks'},[100,75,50,25,0].map(function(n){return E('span',{},n+'%');}))
     ])
    ]);
-   var nodes=[heading(_('Where each radio spent its time'),_('Ribbons show each radio’s channel and width. // marks gaps in spectrum. Hover or tap for details. Each declared band shows its standard channel plan; displayed channels may not be permitted locally or supported by your radio. Dashed outlines indicate radar listening.')+(surveys.length?'':' '+_('Survey background appears after the next scan.'))),
+   var nodes=[heading(_('Where each radio spent its time'),_('Ribbons show each radio’s channel and width. // marks gaps in spectrum. Hover or tap for details. Each declared band shows its standard channel plan; displayed channels may not be permitted locally or supported by your radio. Dashed outlines indicate radar listening. Grey squares mark unknown observation gaps; red crosses mark confirmed unavailability. Triangles mark recorded radio actions. These markers do not imply that a previous channel remained active during a gap.')+(surveys.length?'':' '+_('Survey background appears after the next scan.'))),
     E('div',{'class':'wc-chart wc-spectrum-chart'},channelCanvas),legend(true),
     E('div',{'class':'wc-spectrum-keys'},[E('div',{'class':'wc-survey-key','title':'Estimated congestion ranges from 0 (lowest) to 100 (highest estimated congestion). Darker grey means more or stronger overlapping networks, adjusted for advertised load. This is an estimate, not measured airtime or a percentage. Hover over the graph for measurement times.'},[E('span',{},_('Estimated congestion')),E('div',{'class':'wc-survey-ramp'},[E('div',{'class':'wc-grey-scale','aria-hidden':'true'}),E('div',{'class':'wc-scale-ticks'},[0,25,50,75,100].map(function(n){return E('span',{},String(n));}))])]),radarKey]),
-    heading(_('Clients on each radio over time'),_('Associated clients, sampled every five seconds. Whole-number steps show count changes. Gaps mean no observations; older history contains no client-count intervals. Hover or tap for details.')),
+    heading(_('Clients on each radio over time'),_('Associated clients, sampled every five seconds. Whole-number steps show count changes. Gaps mean no observations; older history contains no client-count intervals. Grey squares mark unknown gaps; red crosses mark confirmed unavailability; triangles mark recorded actions. Hover or tap for details.')),
     E('div',{'class':'wc-chart wc-traffic-chart'},clientCanvas),legend(false,true),
     heading(_('Observed traffic over time'),_('Upload + download, averaged over five minutes. This shows usage, not a speed test. Hover or tap for details.')),
     E('div',{'class':'wc-chart wc-traffic-chart'},trafficCanvas),legend()];
@@ -208,14 +210,14 @@ return view.extend({
      s.radio,s.channel+' / '+s.width+' MHz',(s.traffic_sum/Math.max(1,s.n)).toFixed(2)+' / '+s.traffic_peak.toFixed(2)+' Mbps',String(s.clients_peak),congestionCell(s,surveys),s.signal_min!=null?s.signal_min+' dBm':s.clients_peak===0?'No clients':'No signal data'
     ].map(function(x){return E('td',{},x);}));}))
    ])));
-   var events=(h.events||[]).filter(function(e){return e.time>=cutoff;}).slice().reverse();
+   var events=(h.events||[]).filter(function(e){return (e.end==null?e.time:e.end)>=cutoff;}).slice().reverse();
    nodes.push(heading(_('Recent actions'),_('Newest first, within the selected time window.')));
    nodes.push(E('div',{'class':'wc-table-wrap wc-log-wrap'},E('table',{'class':'table wc-table'},[
     E('thead',{},E('tr',{},['Time','Action','Details'].map(function(x){return E('th',{'scope':'col'},_(x));}))),
     E('tbody',{},events.map(function(e){var detail=e.reason||[
      e.operation?'operation '+e.operation:'',e.returned!=null?e.returned+' returned / '+e.elsewhere+' elsewhere / '+e.absent+' absent':'',e.declined?e.declined+' declined':'',e.response!=null?'response '+e.response:'',e.forced_disconnects!=null?e.forced_disconnects+' forced disconnects':'',e.radio,e.kind?'assessment: '+e.kind:'',e.affected!=null?e.affected+' affected clients':'',e.retry_seconds?Math.round(e.retry_seconds/60)+'-minute deferral':'',e.preflight?'before channel change':'',e.stage!=null?['gentle','strong','decisive'][e.stage]:'',e.helper?'helper '+e.helper:'',e.from!=null?'from '+e.from:'',e.to!=null?'to '+e.to:'',e.channel!=null?'channel '+e.channel:'',e.width?e.width+' MHz':'',e.clients!=null?e.clients+' clients':'',e.elapsed!=null?e.elapsed+' seconds':'',e.ban_seconds?e.ban_seconds+'-second return restriction':'',e.disconnect_events!=null?e.disconnect_events+' disconnect events':'',e.neighbors!=null?e.neighbors+' networks observed':'',e.missing_count!=null?e.missing_count+' clients missing':'',e.scanned_frequencies!=null?e.scanned_frequencies+' frequencies measured':'',e.missing_frequencies!=null?e.missing_frequencies+' deferred':''
     ].filter(Boolean).join('; ');
-    var metrics=[e.estimated_gain!=null?'net benefit '+Number(e.estimated_gain).toFixed(1)+' points':'',e.movement_cost!=null?'move cost '+Number(e.movement_cost).toFixed(1):'',e.required_gain!=null?'required '+Number(e.required_gain).toFixed(1):'',e.affected_clients!=null?e.affected_clients+' clients on affected radios':'',e.client_moves!=null?e.client_moves+' estimated client moves':'',e.scan_age!=null?'survey age '+e.scan_age+' seconds':'',e.observed_clients!=null?e.observed_clients+' tracked clients':'',e.departed_clients!=null?e.departed_clients+' clients observed leaving':'',e.operation_seconds!=null?'operation '+e.operation_seconds+' seconds':'',e.reason&&e.disconnect_events!=null?e.disconnect_events+' disconnect events':''].filter(Boolean);
+    var metrics=[e.start!=null&&e.end!=null?'observed interval '+stamp(e.start)+' – '+stamp(e.end):'',e.candidates_seconds!=null?'candidate calculation '+Number(e.candidates_seconds).toFixed(2)+' s':'',e.search_seconds!=null?'layout search '+Number(e.search_seconds).toFixed(2)+' s':'',e.missed_samples!=null?e.missed_samples+' missed samples':'',e.estimated_gain!=null?'net benefit '+Number(e.estimated_gain).toFixed(1)+' points':'',e.movement_cost!=null?'move cost '+Number(e.movement_cost).toFixed(1):'',e.required_gain!=null?'required '+Number(e.required_gain).toFixed(1):'',e.affected_clients!=null?e.affected_clients+' clients on affected radios':'',e.client_moves!=null?e.client_moves+' estimated client moves':'',e.scan_age!=null?'survey age '+e.scan_age+' seconds':'',e.observed_clients!=null?e.observed_clients+' tracked clients':'',e.departed_clients!=null?e.departed_clients+' clients observed leaving':'',e.operation_seconds!=null?'operation '+e.operation_seconds+' seconds':'',e.reason&&e.disconnect_events!=null?e.disconnect_events+' disconnect events':''].filter(Boolean);
     detail=[detail].concat(metrics).filter(Boolean).join('; ');return E('tr',{},[stamp(e.time),actionNames[e.event]||e.event,detail].map(function(x){return E('td',{},x);}));}))
    ])));
    if(h.archive_error)nodes.push(E('p',{'class':'alert-message warning'},h.archive_error));
@@ -226,7 +228,7 @@ return view.extend({
    function draw(){
     if(!display.isConnected){if(++attempts<60)frame=requestAnimationFrame(draw);return;}
     frame=null;
-    instances=[graphs.channelChart(channelCanvas,periods,radioNames,start,now,surveys,h.radar,h.declared_bands),graphs.clientChart(clientCanvas,clients,radioNames,start,now),graphs.trafficChart(trafficCanvas,samples,radioNames,start,now)];
+    instances=[graphs.channelChart(channelCanvas,periods,radioNames,start,now,surveys,h.radar,h.declared_bands,h.events),graphs.clientChart(clientCanvas,clients,radioNames,start,now,h.events),graphs.trafficChart(trafficCanvas,samples,radioNames,start,now)];
    }
    frame=requestAnimationFrame(draw);
   }

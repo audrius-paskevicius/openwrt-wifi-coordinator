@@ -6,7 +6,7 @@ const FIELDS={
  clients:['radio','source','start','end','count'],
  periods:['radio','channel','center','width','role','start','end'],
  traffic:['time','end','source','radio','channel','width','role','n','traffic_sum','traffic_peak','clients_peak','busy_sum','busy_n','signal_min'],
- actions:['time','event','operation','kind','affected','retry_seconds','preflight','stage','radio','from','to','channel','width','center','region','clients','clients_missing','clients_unproven','disconnect_events','forced_disconnects','returned','elsewhere','absent','total','declined','response','mode','helper','elapsed','ban_seconds','radar_event','freq','phy','neighbors','missing_count','scanned_frequencies','missing_frequencies','estimated_gain','movement_cost','required_gain','affected_clients','client_moves','scan_age','observed_clients','departed_clients','operation_seconds','requested_width','reason'],
+ actions:['start','end','source','missed_samples','candidates_seconds','search_seconds','time','event','operation','kind','affected','retry_seconds','preflight','stage','radio','from','to','channel','width','center','region','clients','clients_missing','clients_unproven','disconnect_events','forced_disconnects','returned','elsewhere','absent','total','declined','response','mode','helper','elapsed','ban_seconds','radar_event','freq','phy','neighbors','missing_count','scanned_frequencies','missing_frequencies','estimated_gain','movement_cost','required_gain','affected_clients','client_moves','scan_age','observed_clients','departed_clients','operation_seconds','requested_width','reason'],
  radar:['time','center','width','region','phys','weight'],
  surveys:['time','cycle','updated']
 };
@@ -16,6 +16,7 @@ export function iso(t){
  return sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ',d.year,d.mon,d.mday,d.hour,d.min,d.sec);
 };
 function key(k,x){
+ if(x.event=='radio-unavailable')return sprintf('%J',[x.event,x.radio,x.source,x.start]);
  if(k=='clients')return sprintf('%J',[x.radio,x.source,x.start,x.count]);
  if(k=='periods')return sprintf('%J',[x.radio,x.start,x.channel,x.center,x.width,x.role]);
  if(k=='traffic')return sprintf('%J',[x.radio,x.time,x.channel,x.width,x.role,x.source]);
@@ -64,6 +65,7 @@ export function stream(options,read_source,write){
    'Client counts are sampled every five seconds and compacted into constant-count intervals. Gaps and older archives without counts mean unknown, not zero.',
    'Survey context includes earlier retained observations needed at the window start. Null means unmeasured, not clear.',
    'Radar memory can predate retained graph history. Apply the exported half-life to each detection.',
+   'Action records include planning timings, missed observations and intervals positively observed unavailable. Blank graph intervals alone do not prove an outage.',
    'Records are in source order; sort by start/time for chronological use. Check the final result for completeness.'],
   dropped_ram_records:options.dropped ?? 0};
  let datasets=options.format=='json'?DATASETS:[options.dataset];

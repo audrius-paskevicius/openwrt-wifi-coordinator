@@ -36,6 +36,7 @@ export function expire_archive(t,hours) {
         if(file.saved<t-hours*3600)fs.unlink(DIRECTORY+'/'+file.name);
 };
 function key(k,x) {
+    if(x.event=='radio-unavailable')return sprintf('%J',[x.event,x.radio,x.source,x.start]);
     if(k=='periods')return sprintf('%J',[x.radio,x.start,x.channel,x.center,x.width,x.role]);
     if(k=='clients')return sprintf('%J',[x.radio,x.source,x.start,x.count]);
     if(k=='samples')return sprintf('%J',[x.radio,x.time,x.channel,x.width,x.role,x.source]);

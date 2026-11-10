@@ -67,6 +67,30 @@ addresses, names or traffic contents are included.
 
 `result` ends the document with `complete`, `warnings` and record `counts`. Survey counts count frames, not individual bins.
 
+From 0.7.0-r9, the same **Actions** CSV and JSON `actions` dataset also contain:
+
+| Event | Additional information |
+| --- | --- |
+| `planning-complete` | `kind` (comparison or validation), total `elapsed`, `candidates_seconds`, `search_seconds` |
+| `planning-discarded`, `planning-failed` | Calculation kind, duration and reason |
+| `slow-stage` | Controller stage in `kind` and `elapsed` seconds; recorded from one second upwards |
+| `observation-gap` | `start`, `end`, `elapsed`, `missed_samples` against the five-second target |
+| `radio-unavailable` | Radio, boot `source`, `start` and `end` of consecutive positive hostapd observations with no enabled AP |
+| `placement-observed`, `client-departure` | Observed placement change or identifiable station-departure event; no client identity |
+
+These fields are also included in the action CSV `details` JSON cell. Interval
+timestamps include UTC ISO companions. Unavailability intervals retain their
+original boundaries and deduplicate by event, radio, boot and start. A successful
+enabled observation or a gap longer than 15 seconds separates intervals.
+Missing RPC responses do not prove downtime, and older gaps cannot be diagnosed
+retroactively. Ordinary observation gaps do not invent zero clients or extend a
+radio ribbon. Graph squares identify unknown gaps, crosses identify confirmed
+unavailability and triangles identify recorded actions, including departures
+counted in completed operations. Their height is a nearby recorded placement or
+count, not a measurement inside a missing interval. History's existing RAM limit,
+retention and archive cadence apply to all these records; no new settings or
+unbounded diagnostic log are introduced.
+
 Client counts are sampled every five seconds and stored as whole-number intervals.
 When the next observation is within 15 seconds, a changed count closes the old
 interval at that observation and starts a new one. Longer gaps remain unknown.

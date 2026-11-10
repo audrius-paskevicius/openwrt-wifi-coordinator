@@ -1,0 +1,16 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const g=new Function('baseclass','chartlib',fs.readFileSync(path.join(__dirname,'../channel-coordinator/files/wifi-coordinator.graphs.js'),'utf8'))({extend:x=>x},{});
+const rows=[{radio:'radio0',start:0,end:10,count:2},{radio:'radio0',start:40,end:80,count:2}];
+const events=[{radio:'radio0',event:'radio-unavailable',start:20,end:30},{radio:'radio0',event:'operation-complete',time:60,disconnect_events:2}];
+const sets=g.evidenceData(rows,['radio0'],0,80,events);
+assert.equal(sets.length,3);
+assert.equal(sets[0].data[0].evidence.kind,'unknown');
+assert.equal(sets[0].data[0].evidence.start,10);
+assert.equal(sets[1].data[0].evidence.kind,'unavailable');
+assert.equal(sets[2].data[0].x,60);
+assert(sets.every(s=>s.showLine===false));
+assert.equal(g.evidenceData(rows,['radio0'],50,80,events).length,1);
+assert.equal(g.evidenceData(rows,['radio1'],0,80,events).length,0);
+assert.equal(g.clientData(rows,['radio0'],0,80)[0].data.filter(p=>p.y===null).length,1);
+console.log('PASS: unknown gaps, confirmed unavailability and action markers remain distinct without invented continuity');

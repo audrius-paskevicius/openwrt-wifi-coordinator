@@ -34,6 +34,7 @@ The tabs are **Channels**, **Clients**, **Comparison**, **History**, **Settings*
 - Uses eligible DFS spectrum opportunistically, preparing it on an empty compatible helper while another radio serves clients when possible. Recent radar detections add a planning penalty with a one-hour default half-life, separate from mandatory kernel clearance and exclusion periods.
 - Records channel placement, spectrum surveys, traffic summaries, and actions. Recent history stays in RAM; older history moves to flash in six-hour batches. Orderly shutdown saves pending records.
 - Draws history locally with bundled Chart.js; no CDN is required.
+- Keeps observation and steering responsive while a read-only worker calculates placements. History distinguishes unknown gaps, confirmed AP unavailability and recorded actions; calculation timings and missed samples are included in Actions exports.
 - Streams authenticated JSON and CSV [history downloads](docs/EXPORT.md) without creating export files or writing flash.
 - Shows short help beside every setting, with full explanations on hover, focus or click/tap.
 

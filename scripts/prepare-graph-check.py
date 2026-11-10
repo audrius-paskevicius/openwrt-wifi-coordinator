@@ -15,7 +15,7 @@ const timefmt=new Function('baseclass',payload.time)(baseclass);
 const graph=new Function('baseclass','chartlib','timefmt',payload.graph)(baseclass,chart,timefmt);
 const start=1700000000,end=start+21600;
 const periods=[
- {radio:'radio0',start,end:start+10800,channel:36,center:5250,width:160},
+ {radio:'radio0',start,end:start+10000,channel:36,center:5250,width:160},
  {radio:'radio0',start:start+10800,end,channel:100,center:5570,width:160},
  {radio:'radio1',start,end,channel:6,center:2437,width:20},
  {radio:'radio2',start,end,channel:149,center:5775,width:80}
@@ -26,11 +26,20 @@ const surveys=[{time:start,bands:[
 ]}];
 const radar={half_life:21600,events:[{time:start,center:5610,width:80}]};
 const names=['radio0','radio1','radio2'];
+const evidence=[{radio:'radio0',event:'radio-unavailable',start:start+10200,end:start+10600},
+ {radio:'radio0',event:'placement-observed',time:start+10800}];
 function assert(x,msg){if(!x)throw Error(msg);}
 try{
- const full=graph.channelChart(document.getElementById('full'),periods,names,start,end,surveys,radar,['2g','5g']);
+ const full=graph.channelChart(document.getElementById('full'),periods,names,start,end,surveys,radar,['2g','5g'],evidence);
  const five=graph.channelChart(document.getElementById('five'),periods,names,start,end,surveys,radar,['5g']);
  [full,five].forEach(c=>c.update('none'));
+ const markers=full.data.datasets.filter(d=>d.wcEvidence);
+ assert(markers.length===3,'unknown, unavailable and action evidence shown independently');
+ markers.forEach(d=>{
+  const raw=d.data[0];
+  assert(full.options.plugins.tooltip.callbacks.title([{raw}]).length>0,'evidence tooltip timestamp');
+  assert(full.options.plugins.tooltip.callbacks.label({raw}).length===2,'evidence tooltip explains marker position');
+ });
  assert(full.scales.y.ticks.filter(t=>t.label==='//').length===2,'two standard breaks');
  assert(five.scales.y.ticks.filter(t=>t.label==='//').length===1,'5 GHz-only has one break');
  assert(five.scales.y.ticks.every(t=>!t.label.startsWith('2.4G')),'history cannot introduce undeclared band');

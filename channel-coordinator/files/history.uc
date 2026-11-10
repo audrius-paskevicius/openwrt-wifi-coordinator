@@ -22,7 +22,7 @@ export function open_history(boot,enabled,hours) {
         h.periods=filter(h.periods,p=>p.end>=cutoff);
         h.samples=filter(h.samples,s=>s.end>=cutoff);
         h.clients=filter(h.clients,s=>s.end>=cutoff);
-        h.events=filter(h.events,e=>e.time>=cutoff);
+        h.events=filter(h.events,e=>(e.end ?? e.time)>=cutoff);
         h.surveys=filter(h.surveys,s=>(s.updated ?? s.time)>=cutoff);
         h.updated=t;h.retention_hours=hours;h.limit_bytes=LIMIT;h.enabled=enabled;
         if(shutdown||t-last_attempt>=INTERVAL){
@@ -41,22 +41,40 @@ export function open_history(boot,enabled,hours) {
         return ok;
     }
     function record(rows) {
-        let t=time();if(!enabled){flush(false);return;}if(t-last_record<5)return;last_record=t;h.archive_dirty=true;
+        let t=time();if(!enabled){flush(false);return;}if(t-last_record<5)return;
+        if(last_record&&t-last_record>15)push(h.events,{event:'observation-gap',time:t,start:last_record,end:t,
+            elapsed:t-last_record,missed_samples:max(0,int((t-last_record)/5)-1)});
+        last_record=t;h.archive_dirty=true;
         let bucket=int(t/300)*300;
         for(let r in rows){
+            // Positive hostapd evidence only. Missing/failed reads stay unknown.
+            if(r.availability=='unavailable'){
+                let interval=null;
+                for(let i=length(h.events)-1;i>=0;i--)if(h.events[i].event=='radio-unavailable'&&h.events[i].radio==r.radio){interval=h.events[i];break;}
+                for(let i=length(h.periods)-1;interval&&i>=0;i--)if(h.periods[i].radio==r.radio){
+                    if(h.periods[i].end>interval.end)interval=null;
+                    break;
+                }
+                if(interval&&interval.source==boot&&t>=interval.end&&t-interval.end<=15)interval.end=t;
+                else push(h.events,{event:'radio-unavailable',radio:r.radio,source:boot,time:t,start:t,end:t});
+                continue;
+            }
+            let last_down=null;
+            if(r.role!='radar preparation')for(let i=length(h.events)-1;i>=0;i--)
+                if(h.events[i].event=='radio-unavailable'&&h.events[i].radio==r.radio){last_down=h.events[i];break;}
             // Counts are observations, not five-minute peaks or estimates.
             // Close a previous count at the next observation only if continuous.
             if(type(r.clients)=='int'&&r.clients>=0){
                 let count=null;
                 for(let i=length(h.clients)-1;i>=0;i--)if(h.clients[i].radio==r.radio){count=h.clients[i];break;}
-                let continuous=count&&count.source==boot&&t>=count.end&&t-count.end<=15;
+                let continuous=count&&count.source==boot&&t>=count.end&&t-count.end<=15&&(!last_down||last_down.end<=count.end);
                 if(continuous)count.end=t;
                 if(!continuous||count.count!=r.clients)
                     push(h.clients,{radio:r.radio,source:boot,start:t,end:t,count:r.clients});
             }
             let period=null;
             for(let i=length(h.periods)-1;i>=0;i--)if(h.periods[i].radio==r.radio){period=h.periods[i];break;}
-            if(!period||t-period.end>15||period.channel!=r.channel||period.width!=r.width||period.center!=r.center||period.role!=r.role){
+            if(!period||t-period.end>15||last_down&&last_down.end>period.end||period.channel!=r.channel||period.width!=r.width||period.center!=r.center||period.role!=r.role){
                 period={radio:r.radio,channel:r.channel,center:r.center,width:r.width,role:r.role,start:t,end:t};push(h.periods,period);
             }else period.end=t;
             let sample=null;
@@ -77,7 +95,7 @@ export function open_history(boot,enabled,hours) {
         if(!enabled)return;
         h.archive_dirty=true;
         let clean={time:e.time ?? time()};
-        for(let k in ['event','kind','affected','retry_seconds','preflight','stage','radio','from','to','channel','width','center','region','clients','clients_missing','clients_unproven','disconnect_events','helper','elapsed','ban_seconds','radar_event','freq','phy','neighbors','missing_count','scanned_frequencies','missing_frequencies'])
+        for(let k in ['start','end','missed_samples','candidates_seconds','search_seconds','event','kind','affected','retry_seconds','preflight','stage','radio','from','to','channel','width','center','region','clients','clients_missing','clients_unproven','disconnect_events','helper','elapsed','ban_seconds','radar_event','freq','phy','neighbors','missing_count','scanned_frequencies','missing_frequencies'])
             if(e[k]!=null)clean[k]=e[k];
         for(let k in ['operation','returned','elsewhere','absent','total','declined','forced_disconnects','response','mode'])if(e[k]!=null)clean[k]=e[k];
         for(let k in ['estimated_gain','movement_cost','required_gain','affected_clients','client_moves','scan_age','observed_clients','departed_clients','operation_seconds','requested_width'])if(e[k]!=null)clean[k]=e[k];

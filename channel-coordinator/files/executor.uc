@@ -78,7 +78,7 @@ function preparation_options(r,g,radios,rules,cache) {
         if(io.returning&&io.returning(h.name))continue;
         let cached=cache?.[h.name];
         if(!cached){
-            cached={mode:dfs_mode(h),text:fs.readfile('/var/run/hostapd-phy'+h.phy+'.conf')};
+            cached={mode:dfs_mode(h),text:fs.readfile('/var/run/hostapd-phy'+h.phy+'.conf'),valid:{}};
             if(cache)cache[h.name]=cached;
         }
         if(!h.config.managed||h.unsafe||h.band!='5g'||length(h.aps)!=1||
@@ -93,8 +93,12 @@ function preparation_options(r,g,radios,rules,cache) {
                 if(!length(filter(groups,x=>same_block(x,part))))push(groups,part);
             }
         }
-        for(let part in groups)if(permitted(part,h.caps,rules,h.config.channels,'prepare')&&
-            preparation_text(cached.text,part))push(suitable,{...h,cac_part:part});
+        for(let part in groups)if(permitted(part,h.caps,rules,h.config.channels,'prepare')){
+            let key=sprintf('%J',[part.freq,part.center,part.width]);
+            cached.valid=cached.valid ?? {};
+            if(cached.valid[key]==null)cached.valid[key]=!!preparation_text(cached.text,part);
+            if(cached.valid[key])push(suitable,{...h,cac_part:part});
+        }
     }
     let choices=filter(suitable,h=>!length(h.clients));
     choices=sort(choices,(a,b)=>(a.name==r.name?1:0)-(b.name==r.name?1:0)||b.cac_part.width-a.cac_part.width);
@@ -518,7 +522,11 @@ function operation(radios) {
     }
     if(pending.kind=='move-wait'&&t-pending.started>=12){
         coordination_ready();
-        if(!pending.repair_attempted && io.valid_action && !io.valid_action(pending,radios))die(pending.validation_reason ?? 'Current evidence no longer supports the prepared action');
+        if(!pending.repair_attempted && io.valid_action){
+            let valid=io.valid_action(pending,radios);
+            if(valid==null){state.status='Checking current evidence before moving '+pending.radio;return;}
+            if(!valid)die(pending.validation_reason ?? 'Current evidence no longer supports the prepared action');
+        }
         let r=filter(radios,x=>x.name==pending.radio)[0];
         if(!r||r.fingerprint!=pending.fingerprint||config_fingerprint(r.name)!=pending.fingerprint||!same(r.current,pending.source))die('Radio settings changed; proposed move cancelled');
         if(!pending.repair_attempted&&placement_rejected(pending.target,state.radios[r.name].rejected,r.band,t))

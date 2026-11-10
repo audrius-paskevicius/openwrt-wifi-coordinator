@@ -9,6 +9,8 @@ LOCK=/tmp/wifi-coordinator-project-test.lock
 mkdir "$LOCK" 2>/dev/null || { echo 'Another test run owns the test lock.' >&2; exit 1; }
 trap 'rmdir "$LOCK"' EXIT HUP INT TERM
 cd "$BASE"
+ucode wifi-coordinator/test-planning-job.uc
+ucode wifi-coordinator/test-planning-key.uc
 ucode wifi-coordinator/test-policy.uc
 ucode wifi-coordinator/test-controller.uc
 ucode wifi-coordinator/test-handoff.uc

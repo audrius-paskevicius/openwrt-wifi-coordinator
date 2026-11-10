@@ -56,4 +56,17 @@ result=stream({...opts,format:'csv',dataset:'traffic',sources:names,now:100000,s
  let h=empty();for(let j=0;j<1000;j++)push(h.samples,{...a.samples[0],time:i*1000+j,end:i*1000+j+1});return h;
 },s=>{bytes+=length(s);chunks++;largest=max(largest,length(s));});
 check(result.counts.traffic==10000&&bytes>1000000&&chunks>50&&largest<20000,'large export uses bounded response chunks');
+let diag=empty(),extended=empty();
+diag.events=[{event:'planning-complete',time:150,kind:'comparison',elapsed:21,candidates_seconds:20,search_seconds:0.5,snapshot:'private'},
+ {event:'observation-gap',time:150,start:100,end:150,missed_samples:9},
+ {event:'radio-unavailable',radio:'r',source:'boot',time:90,start:90,end:110}];
+extended.events=[{...diag.events[2],end:160}];
+output='';stream({...opts,sources:['one','two']},i=>[diag,extended][i],s=>output+=s);
+let diagnostics=json(output).datasets.actions;
+check(length(diagnostics)==3&&!exists(diagnostics[0],'snapshot'),'diagnostics export allowlist and interval deduplication');
+check(diagnostics[0].candidates_seconds==20&&diagnostics[0].search_seconds==0.5,'candidate/search timings exported');
+check(diagnostics[1].missed_samples==9&&diagnostics[1].start_iso==iso(100),'gap count and ISO boundaries exported');
+check(diagnostics[2].start==90&&diagnostics[2].end==160,'confirmed interval overlapping window retained');
+output='';stream({...opts,format:'csv',dataset:'actions',sources:['one']},i=>diag,s=>output+=s);
+check(index(output,'candidates_seconds')>=0&&index(output,'missed_samples')>=0&&index(output,'private')<0,'CSV diagnostics included without private snapshot');
 printf('PASS: %d streaming export checks\n',checks);

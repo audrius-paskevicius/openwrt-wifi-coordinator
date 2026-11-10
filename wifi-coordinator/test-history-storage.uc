@@ -42,7 +42,7 @@ check(length(info.files)<=34,'expired batches removed by time');
 let merged=merge_history(a,r);prune(merged,start+2592*300-200*3600);
 check(length(merged.samples)==7203,'all 200-hour five-minute samples preserved exactly');
 check(length(merged.surveys)==2401,'every five-minute spectrum survey preserved');
-check(length(merged.events)==2401,'all actions preserved without count cap');
+check(length(filter(merged.events,e=>e.event!='observation-gap'))==2401,'all actions preserved without count cap');
 check(!length(filter(merged.samples,s=>s.interval==7200))&&!length(filter(merged.surveys,s=>s.interval==7200)),'no two-hour aggregation');
 check(!length(filter(merged.samples,s=>s.traffic_sum/s.n!=int(substr(s.radio,5))+1)),'original traffic values unchanged');
 check(merged.surveys[0].cycle=='cycle-192'&&merged.surveys[0].bands[0].levels[2]>0,'old survey detail and identity retained');

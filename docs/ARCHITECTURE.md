@@ -12,6 +12,29 @@ Only radios with complete, fresh coverage of their candidate spectrum may move. 
 
 ## Planning and evidence
 
+Candidate scoring and layout search run in one bounded `uloop.task()` worker,
+managed by `planning-job.uc`. The owner captures regulatory rules, hostapd helper
+templates, evidence and eligibility state before forking. The child computes
+only: it makes no ubus/netlink requests and cannot apply a channel or steering
+action. Helper-template validation is reused within the calculation. The owner
+continues observation, radar handling, recovery and steering while it runs.
+
+The same worker performs the final whole-layout check before a move. The executor
+waits for that answer without blocking its timer. Changed clients, placements,
+DFS permissions, regulatory rules, settings, reservations, recovery state or
+survey stamps invalidate the captured calculation. Radar detection cancels it
+immediately. Calculations are bounded to 60 seconds and cancelled on shutdown;
+survey freshness is checked again before acceptance. Final regulatory, overlap,
+configuration and client-safety checks remain in the owner. Validation answers
+may be reused for at most five seconds with identical eligibility inputs.
+Changing byte counters and DFS elapsed-time counters do not continually discard
+work; traffic/airtime scores describe the captured observations. No second
+decision owner, reduced candidate spectrum or weaker movement threshold is added.
+
+Workers communicate through an anonymous pipe. Captured configuration and
+authentication-bearing helper text remain private process memory; they are not
+written into history or exports. Planning timing records contain durations only.
+
 `policy.uc` supplies geometry, regulatory checks and the neighbor-pressure calculation shared with history graphs. `planner.uc` is the single planning implementation. It evaluates driver-advertised HT/VHT widths (20/40 MHz on 2.4 GHz and 20/40/80/160 MHz on 5 GHz), with at most four radios and a bounded search of 100,000 nodes. If the bound is exceeded, the decision holds the current layout rather than executing a partially searched result. HT40 considers both secondary-channel directions. VHT160 uses standard contiguous blocks, not sliding centers or 80+80. AUTO_BW can join contiguous regulatory ranges while preserving per-member width, power and DFS restrictions.
 
 The `channels` setting defaults to `auto`. Each inventory refresh resolves it from the radio's current nl80211 frequency capabilities, confined to its active band. Disabled frequencies and non-DFS frequencies prohibiting AP initiation are excluded. DFS frequencies remain subject to DFS mode, kernel state and clearance checks. An explicit numeric list restricts primary channels, independently of width: listing 36 can permit an 80 MHz block with primary 36 without also listing 40, 44 and 48. Every member frequency must still pass driver, regulatory and DFS checks. No fixed 1–11 or 5 GHz channel list limits automatic discovery. The controller still supports the HT/VHT bands described above, not 6 GHz.
