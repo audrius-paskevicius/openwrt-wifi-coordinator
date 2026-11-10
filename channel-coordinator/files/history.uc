@@ -2,6 +2,15 @@ import * as fs from 'fs';
 import {pressure} from './policy.uc';
 import {RAM_LIMIT,INTERVAL,archive_info,clear_archive,expire_archive,prune,bounded,checkpoint} from './history-storage.uc';
 const PATH='/tmp/wifi-coordinator-history.json',LIMIT=RAM_LIMIT;
+function scan_frequencies(rows){return slice(filter(type(rows)=='array'?rows:[],f=>type(f)=='int'&&f>=2300&&f<5925),0,128);}
+function scan_quality(rows){
+ return map(slice(filter(type(rows)=='array'?rows:[],q=>type(q)=='object'&&match(q.radio ?? '',/^[A-Za-z0-9_.-]{1,32}$/)),0,4),q=>{
+  let out={radio:q.radio,frequencies:scan_frequencies(q.frequencies)};
+  for(let k in ['visits','scan_seconds','retries','aborts','detections','active_visits','passive_visits'])
+   if((type(q[k])=='int'||type(q[k])=='double')&&q[k]>=0&&q[k]<=1000000000)out[k]=q[k];
+  return out;
+ });
+}
 export function open_history(boot,enabled,hours) {
     hours=max(1,min(120,hours));
     let h={boot,started:time(),periods:[],samples:[],clients:[],events:[],surveys:[]},last_record=0,last_flush=0;
@@ -99,6 +108,10 @@ export function open_history(boot,enabled,hours) {
             if(e[k]!=null)clean[k]=e[k];
         for(let k in ['operation','returned','elsewhere','absent','total','declined','forced_disconnects','response','mode'])if(e[k]!=null)clean[k]=e[k];
         for(let k in ['estimated_gain','movement_cost','required_gain','affected_clients','client_moves','scan_age','observed_clients','departed_clients','operation_seconds','requested_width'])if(e[k]!=null)clean[k]=e[k];
+        if(e.attempt!=null&&type(e.attempt)=='int'&&e.attempt>=0&&e.attempt<=2)clean.attempt=e.attempt;
+        if(match(e.survey_cycle ?? '',/^[0-9]+:[0-9]+$/))clean.survey_cycle=e.survey_cycle;
+        if(e.frequencies!=null)clean.frequencies=scan_frequencies(e.frequencies);
+        if(e.scan_quality!=null)clean.scan_quality=scan_quality(e.scan_quality);
         if(e.reason)clean.reason=substr(replace(''+e.reason,/[0-9a-f]{2}(:[0-9a-f]{2}){5}/gi,'[client]'),0,240);
         push(h.events,clean);flush(true);
     }

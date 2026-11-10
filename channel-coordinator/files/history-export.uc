@@ -23,9 +23,24 @@ function key(k,x){
  if(k=='surveys')return ''+(x.cycle ?? x.time);
  return sprintf('%J',x);
 }
+function scan_frequencies(rows){return slice(filter(type(rows)=='array'?rows:[],f=>type(f)=='int'&&f>=2300&&f<5925),0,128);}
+function scan_quality(rows){
+ return map(slice(filter(type(rows)=='array'?rows:[],q=>type(q)=='object'&&match(q.radio ?? '',/^[A-Za-z0-9_.-]{1,32}$/)),0,4),q=>{
+  let out={radio:q.radio,frequencies:scan_frequencies(q.frequencies)};
+  for(let k in ['visits','scan_seconds','retries','aborts','detections','active_visits','passive_visits'])
+   if((type(q[k])=='int'||type(q[k])=='double')&&q[k]>=0&&q[k]<=1000000000)out[k]=q[k];
+  return out;
+ });
+}
 function clean(k,x){
  let out={};
  for(let f in FIELDS[k])if(x[f]!=null)out[f]=x[f];
+ if(k=='actions'){
+  if(x.attempt!=null&&type(x.attempt)=='int'&&x.attempt>=0&&x.attempt<=2)out.attempt=x.attempt;
+  if(match(x.survey_cycle ?? '',/^[0-9]+:[0-9]+$/))out.survey_cycle=x.survey_cycle;
+  if(x.frequencies!=null)out.frequencies=scan_frequencies(x.frequencies);
+  if(x.scan_quality!=null)out.scan_quality=scan_quality(x.scan_quality);
+ }
  for(let f in ['time','start','end','updated'])if(out[f]!=null)out[f+'_iso']=iso(out[f]);
  if(k=='surveys')out.bands=map(x.bands ?? [],b=>({start:b.start,step:b.step,levels:b.levels,offsets:b.offsets ?? []}));
  if(k=='traffic'){

@@ -11,7 +11,7 @@ export function create_survey(io) {
 let fs=io.fs ?? system_fs;
 let cfg=io.cfg,state=io.state,now=io.now,precise=io.precise,save=io.save,request=io.request,coordination_ready=io.coordination_ready,dfs_mode=io.dfs_mode,allclients=io.allclients,inventory=io.inventory,history=io.history,history_store=io.history_store,rates=io.rates,quiet_since=io.quiet_since;
 let N=nl.const,pending=null,scan_result=null;
-let scan_ended={},scan_duration={};
+let scan_ended={},scan_duration={},last_scanner={};
 function lease(seconds,reason){io.lease(seconds,reason,pending?.scanner?[pending.scanner.name]:[]);}
 function release(){io.release();}
 function eligible(r,ignore_gap){
@@ -33,16 +33,30 @@ function find_scanner(radios,freqs,ignore_gap) {
         for(let f in freqs) if(!r.caps[f]||r.caps[f].disabled) supported=false;
         if(supported) push(choices,r);
     }
-    let best=sort(choices,(a,b)=>scan_cost(a,state.radios[a.name]?.scan_duration)-scan_cost(b,state.radios[b.name]?.scan_duration))[0];
+    let band=freqs[0]<3000?'2g':'5g',previous=last_scanner[band];
+    let best=sort(choices,(a,b)=>{
+        let cost=scan_cost(a,state.radios[a.name]?.scan_duration)-scan_cost(b,state.radios[b.name]?.scan_duration);
+        // Continuity never outweighs service cost, eligibility or a fixed choice.
+        return cost||(a.name==b.name?0:a.name==previous?-1:b.name==previous?1:a.name<b.name?-1:a.name>b.name?1:0);
+    })[0];
     // A serving gap is not a reason to borrow a more disruptive scanner. The
     // job scheduler can visit another ready band while this scanner serves.
     return best&&(ignore_gap||eligible(best,false))?best:null;
 }
-function record_visit(){
+function record_visit(aborted){
     let name=pending.scanner.name,duration=max(0.01,precise()-(pending.clock_started ?? precise()));
     scan_ended[name]=precise();scan_duration[name]=duration;
     let s=state.radios[name];s.scan_duration=s.scan_duration==null?duration:0.7*s.scan_duration+0.3*duration;
+    let q=pending.quality[name];
+    if(!q)q=pending.quality[name]={radio:name,frequencies:[],visits:0,scan_seconds:0,retries:0,aborts:0,detections:0,active_visits:0,passive_visits:0};
+    for(let f in pending.frequencies)if(index(q.frequencies,f)<0)push(q.frequencies,f);
+    q.visits++;q.scan_seconds+=int(duration*1000+0.5)/1000.0;
+    if(aborted)q.aborts++;
+    if(pending.active)q.active_visits++;else q.passive_visits++;
+    return duration;
 }
+function quality(){return {survey_cycle:pending.survey_id,elapsed:now()-pending.sweep_started,scan_quality:values(pending.quality)};}
+
 function scan(radios) {
     coordination_ready();
     let freqs=[],required=[];
@@ -87,7 +101,7 @@ function scan(radios) {
     }
     let first=shift(jobs);
     // Reserve only the scanner; other radios remain available for steering.
-    pending={kind:'scan-wait',...first,jobs,all_frequencies:freqs,observations:[],seen:{},scanners:{},survey_id:''+time()+':'+now(),attempt:0,started:now()-12,sweep_started:now(),waited:0,before:allclients(radios)};
+    pending={kind:'scan-wait',...first,jobs,all_frequencies:freqs,observations:[],seen:{},scanners:{},quality:{},survey_id:''+time()+':'+now(),attempt:0,started:now()-12,sweep_started:now(),waited:0,before:allclients(radios)};
     lease(70,'Surveying channel occupancy'); state.status='Preparing survey on '+(first.scanner?.name ?? 'the next available radio'); state.pending='scan';save();
 }
 function advance_scan(radios) {
@@ -104,14 +118,14 @@ function advance_scan(radios) {
     state.scan_deferred=missing;
     let expired=cfg.scan_policy=='paced'&&now()-pending.sweep_started>cfg.max_age;
     if(state.halted||expired){
-        history({event:'scan-partial',scanned_frequencies:length(completed),missing_frequencies:length(missing)});
+        history({...quality(),event:'scan-partial',scanned_frequencies:length(completed),missing_frequencies:length(missing)});
         scan_result=null;
         state.status=state.halted?'Survey stopped; completed portions retained':'Survey exceeded the freshness limit; waiting for new measurements';
         pending=null;delete state.pending;release();save();
     }else{
         scan_result={at:pending.sweep_started,observations:pending.observations,frequencies:completed,scanners:pending.scanners,scanner:join(', ',uniq(values(pending.scanners)))};
         scan_result.partial=length(missing)>0;
-        history({event:length(missing)?'scan-partial':'scan-complete',scanner:scan_result.scanner,neighbors:length(pending.observations),scanned_frequencies:length(completed),missing_frequencies:length(missing)});
+        history({...quality(),event:length(missing)?'scan-partial':'scan-complete',scanner:scan_result.scanner,neighbors:length(pending.observations),scanned_frequencies:length(completed),missing_frequencies:length(missing)});
         pending=null;delete state.pending;release();io.complete(scan_result,radios);
     }
     
@@ -119,29 +133,33 @@ function advance_scan(radios) {
 function finish_scan(event) {
     if(!pending||pending.kind!='scan'||event.msg?.wiphy!=pending.scanner.phy) return;
     if(event.cmd==N.NL80211_CMD_SCAN_ABORTED) {
-        record_visit();
+        let duration=record_visit(true);
         if(pending.attempt<2){
+            pending.quality[pending.scanner.name].retries++;
             pending.attempt++;pending.kind='scan-wait';pending.started=now()-10;
             lease(70,'Retrying aborted channel scan');state.status='Retrying scan at '+join(', ',pending.frequencies)+' MHz';
-            history({event:'scan-retry',frequencies:pending.frequencies,attempt:pending.attempt});save();return;
+            history({event:'scan-retry',radio:pending.scanner.name,frequencies:pending.frequencies,attempt:pending.attempt,elapsed:duration,mode:pending.active?'active':'passive',survey_cycle:pending.survey_id});save();return;
         }
         
-        history({event:'scan-aborted',radio:pending.scanner.name,frequencies:pending.frequencies});
+        history({event:'scan-aborted',radio:pending.scanner.name,frequencies:pending.frequencies,attempt:pending.attempt,elapsed:duration,mode:pending.active?'active':'passive',survey_cycle:pending.survey_id});
         advance_scan(inventory());return;
     }
     let rows=request(N.NL80211_CMD_GET_SCAN,N.NLM_F_DUMP,{dev:pending.scanner.ifname});
     let radios=inventory(),own={};for(let r in radios) for(let b in r.own_bssids)own[b]=true;
-    record_visit();
-    let observations=pending.observations,seen=pending.seen;
+    record_visit(false);
+    last_scanner[pending.frequencies[0]<3000?'2g':'5g']=pending.scanner.name;
+    let observations=pending.observations,seen=pending.seen,detected={};
     for(let x in rows ?? []) {
         let b=x.bss;
         if(!b||b.seen_ms_ago==null||b.seen_ms_ago<0||b.seen_ms_ago>(now()-pending.started+3)*1000||own[lc(b.bssid)])continue;
         let item=neighbor(b);if(item){
+            detected[b.bssid]=true;
             let old=seen[b.bssid];
             if(old){item.signal=max(old.signal,item.signal);for(let key,value in item)old[key]=value;}
             else {push(observations,item);seen[b.bssid]=item;}
         }
     }
+    pending.quality[pending.scanner.name].detections+=length(detected);
     for(let f in pending.frequencies)pending.scanners[f]=pending.scanner.name;
     // Persist immediately, before the next batch can be deferred or aborted.
     // Coalesce one sweep into one bounded history frame, with per-bin times.
@@ -205,6 +223,7 @@ function tick(radios){if(!pending)return;let t=now();if(scan_recovery(radios))re
         // This ucode nl80211 binding encodes SSIDs as NUL-terminated strings;
         // [''] becomes a one-byte SSID, not a wildcard. Use iw's correct encoder.
         // Interface names and frequencies were validated/discovered above.
+        pending.active=active;
         let pipe=fs.popen('iw dev '+r.ifname+' scan trigger freq '+join(' ',pending.frequencies)+(active?'':' passive')+' 2>&1','r');
         if(!pipe)die('Cannot invoke iw scan trigger');
         let output=pipe.read('all'),result=pipe.close();
@@ -217,6 +236,7 @@ function tick(radios){if(!pending)return;let t=now();if(scan_recovery(radios))re
     }
 }
 function cancel(reason){
+    if(pending&&length(pending.quality))history({...quality(),event:'scan-partial',scanned_frequencies:length(pending.scanners),missing_frequencies:length(filter(pending.all_frequencies,f=>pending.scanners[f]==null)),reason});
     if(pending?.kind=='scan')try{request(N.NL80211_CMD_ABORT_SCAN,0,{dev:pending.scanner.ifname});}catch(e){}
     pending=null;delete state.pending;release();state.status=reason;save();
 }

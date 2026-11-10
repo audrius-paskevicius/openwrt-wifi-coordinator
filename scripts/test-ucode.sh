@@ -21,6 +21,7 @@ ucode wifi-coordinator/test-widths.uc
 ucode radio-prefer/files/main.uc --self-test
 ucode radio-prefer/files/coordination.uc --self-test
 ucode wifi-coordinator/test-redesign.uc
+ucode wifi-coordinator/test-survey-quality.uc
 ucode wifi-coordinator/test-service.uc
 ucode wifi-coordinator/test-executor.uc
 ucode wifi-coordinator/test-restart.uc

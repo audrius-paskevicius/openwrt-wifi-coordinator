@@ -103,6 +103,39 @@ dataset; consumers should ignore datasets they do not use.
 
 Survey bands use `start` and `step` in MHz. Bin `i` spans `[start + i * step, start + (i + 1) * step)`. Its timestamp is the frame's `time + offsets[i]` (zero when omitted). `levels[i]` is a 0–100 congestion estimate, not airtime percent. `null` means unmeasured, never clear. Traffic `n`, `traffic_sum`, `busy_n` and `busy_sum` preserve the evidence behind means; absent busy measurements stay null.
 
+## Survey quality in Actions
+
+From 0.7.0-r14, `scan-complete` and `scan-partial` actions include `survey_cycle`
+(the matching survey frame's `cycle`), wall-clock sweep `elapsed` seconds, and
+`scan_quality`: up to four per-radio objects with these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `radio` | Scanner radio identifier |
+| `frequencies` | Attempted centre frequencies in MHz, including aborted visits |
+| `visits` | Visits whose success or abort was observed |
+| `scan_seconds` | Sum of trigger-to-result processing durations for those visits; not measured airtime or outage |
+| `retries` | Retry requests scheduled after observed aborts |
+| `aborts` | Observed aborts, including ones followed by a successful retry |
+| `detections` | Fresh distinct BSS entries per successful visit, summed across visits; repeated networks can contribute in several visits |
+| `active_visits`, `passive_visits` | Visit counts by the requested scan mode |
+
+The existing sweep-level `neighbors` count remains the number of unique detected
+networks in that sweep. Successful `scanned_frequencies` and `missing_frequencies`
+remain distinct from attempted frequencies. A cancelled sweep records finished
+visits; an in-flight visit without a result is not included in these counts.
+
+`scan-retry` and `scan-aborted` additionally retain `radio`, `frequencies`,
+`attempt`, `elapsed`, `mode` and `survey_cycle`. `attempt` is the retry number
+(1 or 2); the final abort can also report 2. These events distinguish repeated
+abort notifications from successful coverage; they do not diagnose the driver's
+reason for aborting.
+
+These fields appear in JSON `actions` and **Recent actions** CSV's existing
+`details` cell. No additional dataset or CSV columns are needed. Old records
+omit them. Nested fields and frequencies are allowlisted at both recording and
+export; raw BSS entries, SSIDs, addresses and credentials are excluded.
+
 ## CSV conventions
 
 UTF-8, comma delimiter and CRLF row endings. Data cells are quoted with doubled embedded quotes; null values are empty cells. The fixed header names are unquoted. Each file has a header and `record_type` column:

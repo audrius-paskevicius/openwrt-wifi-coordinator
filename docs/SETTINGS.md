@@ -97,7 +97,7 @@ Every remaining control has a distinct operational purpose. Controls are grouped
 | `scan_duty` | Paced only: maximum off-channel duty calculated from measured visit duration. |
 | `scan_gap` | Paced only: minimum serving time between occupied-radio visits; duty may require a longer gap. |
 | `scan_type` | Passive or active where legal. Restricted frequencies always use passive listening, with an explicit status reason. |
-| `scanner` | Survey & radar: Auto or a fixed scanner. A fixed scanner is never silently substituted; unreachable bands can therefore remain unmeasured. |
+| `scanner` | Survey & radar: Auto or a fixed scanner. A fixed scanner is never silently substituted; unreachable bands can therefore remain unmeasured. Automatic uses the least service-cost scanner, keeping the last successful scanner for that band only when costs tie. Continuity does not bypass eligibility or serving gaps. |
 | `max_age` | Survey & radar: freshness ceiling for evidence; also supplies the initial retry pause when setup retains a narrower width. Repeated refusals double the pause up to six hours, with attempts retained across pause expiry and forgotten after a day without another refusal. The active width constraint and remaining time are shown. An actual service failure at 20 MHz has its own restriction, which also excludes HT40 requests that could fall back to it. Too short for a full scan can prevent decisions; unknown spectrum is never assumed clear. |
 | `separate_radios` | Whether separation ranks before total estimated service, or overlap becomes a cost penalty. Distinct priorities, not interchangeable thresholds. |
 | `overlap_penalty` | Shown only when strict separation is disabled: allows the administrator to trade overlap against other costs. |

@@ -69,4 +69,13 @@ check(diagnostics[1].missed_samples==9&&diagnostics[1].start_iso==iso(100),'gap 
 check(diagnostics[2].start==90&&diagnostics[2].end==160,'confirmed interval overlapping window retained');
 output='';stream({...opts,format:'csv',dataset:'actions',sources:['one']},i=>diag,s=>output+=s);
 check(index(output,'candidates_seconds')>=0&&index(output,'missed_samples')>=0&&index(output,'private')<0,'CSV diagnostics included without private snapshot');
+let quality=empty();quality.events=[{event:'scan-complete',time:150,survey_cycle:'123:456',scan_quality:[{radio:'radio2',frequencies:[2412,2437,'private'],visits:2,scan_seconds:0.75,retries:1,aborts:1,detections:4,active_visits:2,passive_visits:0,password:'PRIVATE-QUALITY',bssid:'aa:bb:cc:dd:ee:ff'}]},
+ {event:'scan-retry',time:151,radio:'radio2',frequencies:[2412],attempt:2,elapsed:0.25,mode:'active',survey_cycle:'123:456'}];
+output='';stream({...opts,sources:['one']},i=>quality,s=>output+=s);
+let q=json(output).datasets.actions;
+check(q[0].scan_quality[0].scan_seconds==0.75&&length(q[0].scan_quality[0].frequencies)==2&&q[0].survey_cycle=='123:456','scan summary exported with valid frequencies and sweep identity');
+check(index(output,'PRIVATE-QUALITY')<0&&index(output,'aa:bb:cc')<0,'nested quality export rejects private fields');
+check(q[1].attempt==2&&q[1].frequencies[0]==2412&&q[1].mode=='active','retry diagnostic export retains context');
+output='';stream({...opts,format:'csv',dataset:'actions',sources:['one']},i=>quality,s=>output+=s);
+check(index(output,'scan_quality')>=0&&index(output,'scan_seconds')>=0&&index(output,'survey_cycle')>=0&&index(output,'PRIVATE-QUALITY')<0,'Actions CSV includes quality without new columns or private fields');
 printf('PASS: %d streaming export checks\n',checks);
