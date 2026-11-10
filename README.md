@@ -21,7 +21,7 @@ The tabs are **Channels**, **Clients**, **Comparison**, **History**, **Settings*
 
 ## What it does
 
-- Surveys the surrounding spectrum with paced scans and serving gaps. Equal-cost scanner choices keep the last successful receiver for that band; compact quality summaries and retry details are available in history and exports.
+- Surveys the surrounding spectrum with paced scans and serving gaps. Equal-cost scanner choices keep the last successful receiver for that band until service restart; compact quality summaries and retry details are available in history and exports without additional scan visits.
 - Plans channels and widths jointly, following each radio's HT/VHT capabilities: up to 40 MHz on 2.4 GHz and 160 MHz on 5 GHz, subject to regulatory and coexistence checks.
 - Defaults to live driver-derived channel lists for every radio; optional explicit lists restrict selection.
 - Ranks joint layouts by usable bandwidth and advertised radio spatial capacity, accounting for the primary channel and radar memory. Width alone does not outrank estimated service; the objective is independent of today's client mix.

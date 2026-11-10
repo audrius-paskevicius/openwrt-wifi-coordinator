@@ -1,6 +1,6 @@
 # Current agreement review
 
-Reviewed against 0.7.0-r13. This review compares the requested behavior with the current implementation and deployment evidence. It distinguishes an implementation from proof of universal radio performance.
+Reviewed against 0.7.0-r15. This review compares the requested behavior with the current implementation and deployment evidence. It distinguishes an implementation from proof of universal radio performance.
 
 ## Current behavior review
 
@@ -29,6 +29,7 @@ scoring and any active recovery restrictions still govern the next move.
 | Auto can adapt, explicit choices stay explicit | Fixed planned CSA/restart choices remain fixed; Auto adapts to capabilities and recent failures. Applied choices and reasons are visible. Emergency service recovery remains possible. |
 | Fewer settings, short explanations, detailed help | Six internal timing knobs and the obsolete narrowing threshold were removed; settings are consolidated by algorithm responsibility, with driver overrides per radio. Conditional controls preserve their saved values while hidden. [Settings reference](SETTINGS.md) records why each remaining control exists. |
 | Paced scans without requiring silence | Paced scanning schedules short visits and serving gaps; quiet-only scanning remains an explicit alternate policy. The historical r11 test completed 41/41 requested frequencies; see the dated validation record. |
+| Improve measurement consistency without increasing scan work | Automatic keeps the last successful scanner per band only when service costs tie. Existing duty, serving gaps and two-retry limit remain. Per-radio sweep summaries and retry details use existing history and JSON/Recent actions CSV; full coverage is not proof of accurate detection. Signal aggregation and sparse-survey scoring remain unchanged. |
 | Coordinate radios and prefer useful width | The joint planner ranks separation and hardware-based service for present and future clients; it checks overlap at intermediate steps. Missing evidence is not treated as empty spectrum. |
 | Try handoff first, then move despite stubborn clients | The common reconnect policy applies to all serving radios, subject to explicit protected-client and quiet/empty restrictions. No compatible target skips an impossible handoff wait. |
 | Spare-radio DFS preparation and radar memory | Empty compatible helpers can perform clearance while other radios serve. Kernel clearance is verified on the destination PHY. Radar memory decays; it never overrides mandatory non-occupancy or listening. |

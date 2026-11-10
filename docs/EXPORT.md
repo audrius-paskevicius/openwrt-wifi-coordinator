@@ -106,13 +106,14 @@ Survey bands use `start` and `step` in MHz. Bin `i` spans `[start + i * step, st
 ## Survey quality in Actions
 
 From 0.7.0-r14, `scan-complete` and `scan-partial` actions include `survey_cycle`
-(the matching survey frame's `cycle`), wall-clock sweep `elapsed` seconds, and
+(the survey frame's `cycle`, if a successful visit produced one), total sweep
+`elapsed` seconds measured using uptime, and
 `scan_quality`: up to four per-radio objects with these fields:
 
 | Field | Meaning |
 | --- | --- |
 | `radio` | Scanner radio identifier |
-| `frequencies` | Attempted centre frequencies in MHz, including aborted visits |
+| `frequencies` | Distinct attempted centre frequencies in MHz from visits with a success/abort result, including aborted visits |
 | `visits` | Visits whose success or abort was observed |
 | `scan_seconds` | Sum of trigger-to-result processing durations for those visits; not measured airtime or outage |
 | `retries` | Retry requests scheduled after observed aborts |
@@ -120,13 +121,24 @@ From 0.7.0-r14, `scan-complete` and `scan-partial` actions include `survey_cycle
 | `detections` | Fresh distinct BSS entries per successful visit, summed across visits; repeated networks can contribute in several visits |
 | `active_visits`, `passive_visits` | Visit counts by the requested scan mode |
 
-The existing sweep-level `neighbors` count remains the number of unique detected
-networks in that sweep. Successful `scanned_frequencies` and `missing_frequencies`
-remain distinct from attempted frequencies. A cancelled sweep records finished
-visits; an in-flight visit without a result is not included in these counts.
+Where present, the existing sweep-level `neighbors` count is the number of
+distinct detected BSSIDs across that sweep, not physical routers or distinct
+Wi-Fi names. Cancelled or expired partial summaries can omit it. Successful
+`scanned_frequencies` and `missing_frequencies` remain distinct from attempted
+frequencies. A cancelled sweep records finished visits; an in-flight visit
+without a result is not included. Cancellation before any result records no
+quality summary. Complete frequency coverage does not establish reliable
+detection of every neighbouring network.
+
+A summary is grouped by radio across the entire sweep, possibly across both
+bands. Its duration and detection totals are not per-frequency measurements.
+Sweep `elapsed` includes serving gaps and other waits; `scan_seconds` sums only
+finished visit durations. Neither measures client outage. A multi-frequency
+batch is one visit, so visit counts need not equal frequency counts.
 
 `scan-retry` and `scan-aborted` additionally retain `radio`, `frequencies`,
-`attempt`, `elapsed`, `mode` and `survey_cycle`. `attempt` is the retry number
+`attempt`, `elapsed`, `mode` and `survey_cycle`. Here `elapsed` describes the
+aborted visit, and `mode` is `active` or `passive`. `attempt` is the retry number
 (1 or 2); the final abort can also report 2. These events distinguish repeated
 abort notifications from successful coverage; they do not diagnose the driver's
 reason for aborting.

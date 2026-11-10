@@ -22,7 +22,7 @@ const periods=[
 ];
 const surveys=[{time:start,bands:[
  {start:2400,step:5,levels:Array.from({length:19},(_,i)=>i<9?70:15)},
- {start:5170,step:20,levels:Array.from({length:34},(_,i)=>i<8?50:i<16?90:25)}
+ {start:5170,step:20,levels:Array.from({length:34},(_,i)=>i<8?50:i<16?90:i===16?0:25)}
 ]}];
 const radar={half_life:21600,events:[{time:start,center:5610,width:80}]};
 const names=['radio0','radio1','radio2'];
@@ -41,6 +41,14 @@ try{
  assert(full.tooltip.dataPoints.length===1,'closed ribbon corner must produce one tooltip entry');
  full.tooltip.setActiveElements([{datasetIndex:outlineIndex,index:0},{datasetIndex:outlineIndex,index:4},{datasetIndex:outlineIndex,index:6},{datasetIndex:otherIndex,index:0}],{x:corner.x,y:corner.y});
  assert(full.tooltip.dataPoints.length===3,'distinct intervals and radios remain in the tooltip');
+ const zeroIndex=full.data.datasets.findIndex(d=>d.wcSurvey&&d.data.some(p=>p.level===0));
+ const positiveIndex=full.data.datasets.findIndex(d=>d.wcSurvey&&d.data[0].level>0);
+ assert(zeroIndex>=0&&positiveIndex>=0,'fixture contains zero and nonzero congestion');
+ const zeroPoint=full.data.datasets[zeroIndex].data.findIndex(p=>p.level===0);
+ full.tooltip.setActiveElements([{datasetIndex:zeroIndex,index:zeroPoint}],{x:corner.x,y:corner.y});
+ assert(full.tooltip.dataPoints.length===0&&full.tooltip.title.length===0&&full.tooltip.body.length===0,'zero congestion alone has no popup content');
+ full.tooltip.setActiveElements([{datasetIndex:zeroIndex,index:zeroPoint},{datasetIndex:positiveIndex,index:0},{datasetIndex:outlineIndex,index:0}],{x:corner.x,y:corner.y});
+ assert(full.tooltip.dataPoints.length===2&&full.tooltip.dataPoints.some(p=>p.dataset.wcSurvey)&&full.tooltip.dataPoints.some(p=>p.raw.period),'zero congestion suppressed while nonzero readings and radio details remain');
  full.tooltip.setActiveElements([],{x:0,y:0});full.update('none');
  const markers=full.data.datasets.filter(d=>d.wcEvidence);
  assert(markers.length===3,'unknown, unavailable and action evidence shown independently');

@@ -221,7 +221,7 @@ function channelChart(canvas,periods,names,start,end,surveys,radar,bands,events)
  options.scales.y.grid={color:function(c){return axis.breaks.some(g=>c.tick&&g.value==c.tick.value)?'#999':'#e5e5e5';}};
  options.scales.y.title={display:true,text:'Band / channel',color:'#444'};
  options.plugins.tooltip.filter=function(item,index,items){
-  if(item.dataset.wcHalo||item.dataset.wcFill)return false;
+  if(item.dataset.wcHalo||item.dataset.wcFill||item.dataset.wcSurvey&&item.raw.level===0)return false;
   // Closing a ribbon repeats its first corner. Show its interval only once,
   // even when several outline vertices are equally close to the pointer.
   var period=item.raw.period;

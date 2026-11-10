@@ -1,6 +1,6 @@
 # Algorithm-to-settings audit
 
-The settings redesign was reviewed for 0.7.0-r8; this reference was rechecked against 0.7.0-r13. The algorithm determines which administrator choices are
+The settings redesign was reviewed for 0.7.0-r8; this reference was rechecked against 0.7.0-r15. The algorithm determines which administrator choices are
 needed. This review traces controls through configuration parsing and their
 runtime consumers, rather than treating a parsed key as proof of an effect.
 The [settings reference](SETTINGS.md) lists every key and its precise scope.
@@ -75,5 +75,11 @@ section names. No new write ACL, daemon API or network service is required.
 In 0.7.0-r8, the only runtime change was the displayed attempt count; it does not admit or
 reject attempts. Planner scoring, movement admission, DFS, escalation, signal
 checks, retry budgets and recovery algorithms are unchanged by that presentation revision. The later 0.7.0-r12 history cap is separate: retention, Show and export periods stop at 120 hours; larger saved retention values are reduced on installation or service startup. This does not change movement policy.
+The later 0.7.0-r14 scanner change adds an exact-cost tie-breaker within Automatic:
+it remembers the last successful scanner per band until service restart. It does
+not add a control or override fixed scanner choice, service cost, eligibility or
+serving gaps. Quality recording uses the existing history enable/retention/clear
+controls and exports. It adds no independent log or scan-frequency setting.
+
 Any future consolidation should be judged against those behaviours and tested
 separately from presentation work.

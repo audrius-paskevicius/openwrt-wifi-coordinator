@@ -1,12 +1,41 @@
 # Validation
 
-Source release: **0.7.0-r14**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r15**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 54 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
-Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r15 quiet zero-congestion areas and survey documentation (2026-11-10)
+
+Documentation was rechecked against scanner selection, visit accounting,
+recording/export allowlists, service startup and the existing UI. It now states
+that continuity resolves exact cost ties, resets on restart and remembers a
+completed scan even when it detects no neighbours. Export descriptions separate
+sweep elapsed time from summed visit duration, attempted frequencies from
+successful coverage, and per-visit detections from sweep-level distinct BSSIDs.
+Cancelled sweeps need not have a matching survey frame or neighbour count.
+The strongest-signal aggregation remains explicitly documented; no averaging or
+new sparse-survey scoring was introduced.
+
+Zero-congestion cells now produce no congestion popup. Nonzero readings and
+radio/event/radar tooltips remain available. The actual Chart.js Chrome fixture
+reproduced the zero-popup case before the fix and passed afterward, including
+mixed zero/nonzero/radio selections and existing ribbon deduplication checks.
+Portable source, link/privacy and UI checks passed. Controller, recorder and
+export logic are unchanged from r14; the full isolated runtime suite passed for
+r14 and is not repeated for this tooltip/documentation change. Historical
+validation entries remain unchanged.
+
+The signed APK and index verified, all 46 payload files matched source, and
+source/package sensitive-data scans passed. Comparison with the r14 payload
+found only the graph tooltip filter and embedded version changes. Installation
+preserved all six checked configuration files. On the live History chart,
+zero-only congestion selection produced no tooltip content; mixed selection
+kept the nonzero reading and radio entry. All three charts rendered without
+warnings or exceptions on a clean reload. Authenticated quality exports completed.
 
 ## 0.7.0-r14 scanner continuity and quality evidence (2026-11-10)
 
