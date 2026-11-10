@@ -30,8 +30,8 @@ try{
  check(index(response,'Content-Disposition: attachment;')>=0&&index(response,'Cache-Control: no-store')>=0,'download and no-cache headers');
  let data=json(substr(response,at+4));
  check(data.format=='wifi-coordinator-history'&&data.version==1&&data.result.complete,'authorized JSON complete');
- check(length(keys(data.datasets))==5,'all graph datasets');
- for(let k in ['periods','traffic','surveys','radar','actions']){
+ check(length(keys(data.datasets))==6&&type(data.datasets.clients)=='array','all graph datasets, including client counts');
+ for(let k in ['periods','clients','traffic','surveys','radar','actions']){
   response=post('format=csv&hours=6&dataset='+k);
   check(index(response,'Content-Type: text/csv')==0&&index(response,'"summary"')>=0,'authorized CSV '+k);
  }

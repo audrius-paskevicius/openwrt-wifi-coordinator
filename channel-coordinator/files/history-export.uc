@@ -1,8 +1,9 @@
 // Read-only export engine. One source batch and one dataset's key index at a
 // time; never assemble the archive or the completed download in memory.
-export const DATASETS=['periods','traffic','surveys','radar','actions'];
-const LIST={periods:'periods',traffic:'samples',surveys:'surveys',actions:'events'};
+export const DATASETS=['periods','clients','traffic','surveys','radar','actions'];
+const LIST={periods:'periods',clients:'clients',traffic:'samples',surveys:'surveys',actions:'events'};
 const FIELDS={
+ clients:['radio','source','start','end','count'],
  periods:['radio','channel','center','width','role','start','end'],
  traffic:['time','end','source','radio','channel','width','role','n','traffic_sum','traffic_peak','clients_peak','busy_sum','busy_n','signal_min'],
  actions:['time','event','operation','kind','affected','retry_seconds','preflight','stage','radio','from','to','channel','width','center','region','clients','clients_missing','clients_unproven','disconnect_events','forced_disconnects','returned','elsewhere','absent','total','declined','response','mode','helper','elapsed','ban_seconds','radar_event','freq','phy','neighbors','missing_count','scanned_frequencies','missing_frequencies','reason'],
@@ -15,6 +16,7 @@ export function iso(t){
  return sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ',d.year,d.mon,d.mday,d.hour,d.min,d.sec);
 };
 function key(k,x){
+ if(k=='clients')return sprintf('%J',[x.radio,x.source,x.start,x.count]);
  if(k=='periods')return sprintf('%J',[x.radio,x.start,x.channel,x.center,x.width,x.role]);
  if(k=='traffic')return sprintf('%J',[x.radio,x.time,x.channel,x.width,x.role,x.source]);
  if(k=='surveys')return ''+(x.cycle ?? x.time);
@@ -39,6 +41,7 @@ export function csv_cell(x){
  return '"'+replace(s,'"','""')+'"';
 };
 const COLUMNS={
+ clients:['start_iso','end_iso','radio','count','source','start','end'],
  periods:['start_iso','end_iso','radio','channel','center','width','role','start','end'],
  traffic:['time_iso','end_iso','radio','channel','width','role','traffic_avg_mbps','traffic_peak','clients_peak','busy_avg_percent','signal_min','n','traffic_sum','busy_sum','busy_n','source','time','end'],
  surveys:['time_iso','observed_iso','low_mhz','high_mhz','congestion','context','cycle','time','observed'],
@@ -55,9 +58,10 @@ export function stream(options,read_source,write){
  let meta={format:'wifi-coordinator-history',version:1,package_version:options.version,
   exported_at:iso(now),window:{start,end:now,start_iso:iso(start),end_iso:iso(now)},
   retention_hours:options.hours,declared_bands:options.bands ?? [],radar_half_life_seconds:options.radar?.half_life ?? 3600,
-  units:{timestamps:'Unix seconds and ISO 8601 UTC',frequencies:'MHz',width:'MHz',traffic:'Mbit/s',signal:'dBm',congestion:'estimate 0-100, not airtime percent',busy:'measured airtime percent'},
+  units:{timestamps:'Unix seconds and ISO 8601 UTC',frequencies:'MHz',width:'MHz',clients:'observed associated clients',traffic:'Mbit/s',signal:'dBm',congestion:'estimate 0-100, not airtime percent',busy:'measured airtime percent'},
   notes:['Best-effort snapshot at request start; immutable archives plus a fixed RAM snapshot.',
    'Intervals keep original boundaries; filter to the requested window when plotting. No prorating of traffic summaries.',
+   'Client counts are sampled every five seconds and compacted into constant-count intervals. Gaps and older archives without counts mean unknown, not zero.',
    'Survey context includes earlier retained observations needed at the window start. Null means unmeasured, not clear.',
    'Radar memory can predate retained graph history. Apply the exported half-life to each detection.',
    'Records are in source order; sort by start/time for chronological use. Check the final result for completeness.'],
@@ -91,6 +95,7 @@ export function stream(options,read_source,write){
    function source(i){
     let h=read_source(i);
     if(!h){warn('Cannot read source '+options.sources[i]);return null;}
+    if(k=='clients'&&h.clients==null)return []; // Older history has peaks only.
     if(type(h[LIST[k]])!='array'){warn('Invalid '+k+' in '+options.sources[i]);return null;}
     return h[LIST[k]];
    }

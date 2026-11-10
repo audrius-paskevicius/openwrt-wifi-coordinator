@@ -1,12 +1,37 @@
 # Validation
 
-Source release: **0.7.0-r3**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r4**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
-Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 51 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
+Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r4 client-count history (2026-11-10)
+
+The new graph sits between placement and traffic history and uses the traffic
+chart's colours, line weight, dimensions and time axis. Counts are whole-number
+observations; older data is left blank. All three graph explanations are title
+tooltips, with keyboard activation and tap support.
+
+Portable source/UI checks passed, including 52 history/cache assertions and new
+count-step, zero, gap, reboot-boundary and title-order cases. Native OpenWrt checks
+passed: 19 history cases, 13 client-count recording/migration/storage cases, 31
+streaming export cases and 668 archive-storage cases. The 200-hour simulation
+retained all 7,203 traffic samples and 2,401 surveys, with client intervals sharing
+the existing RAM cap and archive policy. Fifteen live CGI checks covered access
+denial, invalid requests and authenticated JSON/CSV downloads for all six datasets.
+
+Chrome rendered the actual Chart.js fixture and the installed History page. The
+live page showed the three graphs in order, omitted explanatory paragraphs, and
+opened title help with the keyboard. An authenticated JSON download contained
+newly recorded client intervals and a complete result. The signed APK and index
+verified; all 42 payload files matched source/generated content. Configuration
+hashes for network, firewall, DHCP, wireless and both coordinator files were
+unchanged after installation. Source and payload secret scans passed, including
+an on-router comparison with private configuration values. Channel-planning and
+steering behavior are unchanged; their unrelated RF trials were not repeated.
 
 ## 0.7.0 shared controller (2026-11-09)
 

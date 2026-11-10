@@ -6,7 +6,9 @@
 'require poll';
 'require wifi-coordinator.graphs as graphs';
 'require wifi-coordinator.time as timefmt';
+'require wifi-coordinator.help as help';
 function historyKey(k,x){
+ if(k=='clients')return JSON.stringify([x.radio,x.source,x.start,x.count]);
  if(k=='periods')return JSON.stringify([x.radio,x.start,x.channel,x.center,x.width,x.role]);
  if(k=='samples')return JSON.stringify([x.radio,x.time,x.channel,x.width,x.role,x.source]);
  if(k=='surveys')return String(x.cycle==null?x.time:x.cycle);
@@ -61,7 +63,7 @@ async function loadHistory(){
   try{
    var raw=await historyRequest(function(){return fs.read_direct(path,'text');}),h=JSON.parse(raw);
    if(!h||typeof h!='object'||Array.isArray(h))throw Error('Invalid history data');
-   if(['periods','samples','events','surveys'].some(function(k){return h[k]!=null&&!Array.isArray(h[k]);}))throw Error('Invalid history records');
+   if(['periods','samples','clients','events','surveys'].some(function(k){return h[k]!=null&&!Array.isArray(h[k]);}))throw Error('Invalid history records');
    h.file_bytes=new TextEncoder().encode(raw).length;if(recent)recentCache.set(path,h);return h;
   }catch(e){
    if(missingHistory(e)){if(recent)recentCache.delete(path);return {};}
@@ -92,7 +94,7 @@ async function loadHistory(){
  files.forEach(function(f){if(archiveCache.has(f.name))parts.push(archiveCache.get(f.name));});
  var ram=await read('/tmp/wifi-coordinator-history.json',true),out=Object.assign({},ram),archiveBytes=parts.reduce(function(n,h){return n+(h.file_bytes||0);},0),saved=parts.reduce(function(n,h){return Math.max(n,h.saved||0);},0);
  parts.push(ram);
- ['periods','samples','events','surveys'].forEach(function(k){var records=new Map();
+ ['periods','samples','clients','events','surveys'].forEach(function(k){var records=new Map();
   parts.forEach(function(part){(part[k]||[]).forEach(function(x){var id=historyKey(k,x),old=records.get(id),at=function(s){return s.updated||s.end||s.time;};if(!old||at(x)>=at(old))records.set(id,x);});});
   out[k]=Array.from(records.values()).sort(function(a,b){return (a.start||a.time)-(b.start||b.time);});
  });
@@ -167,14 +169,17 @@ return view.extend({
    instances.forEach(function(c){c.destroy();});instances=[];frame=null;
    var now=Math.floor(Date.now()/1000),cutoff=now-hours*3600;
    var periods=(h.periods||[]).filter(function(p){return p.end>=cutoff;});
+   var clients=(h.clients||[]).filter(function(s){return s.end>=cutoff;});
    var samples=(h.samples||[]).filter(function(s){return s.end>=cutoff;});
    var surveys=(h.surveys||[]).slice().sort(function(a,b){return a.time-b.time;});
-   var radioNames=Array.from(new Set(periods.map(function(p){return p.radio;}).concat(samples.map(function(s){return s.radio;})))).sort();
+   var radioNames=Array.from(new Set(periods.map(function(p){return p.radio;}).concat(samples.map(function(s){return s.radio;}),clients.map(function(s){return s.radio;})))).sort();
    var warnings=(h.read_errors||[]).map(function(e){return E('p',{'class':'alert-message warning'},'History is incomplete. '+e);});
    if(h.refresh_warning)warnings.unshift(E('p',{'class':'alert-message warning'},h.refresh_warning));
    if(!radioNames.length){display.replaceChildren.apply(display,warnings.concat([E('p',{'class':'wc-status'},'History is collecting, or has been disabled. Recent history is in RAM; archived history survives reboot.')]));return;}
-   var start=Math.min(now-1,Math.max(cutoff,Math.min.apply(null,periods.map(function(p){return p.start;}).concat(samples.map(function(s){return s.time;}),surveys.map(function(s){return s.time;})))));
+   var start=Math.min(now-1,Math.max(cutoff,Math.min.apply(null,periods.map(function(p){return p.start;}).concat(clients.map(function(s){return s.start;}),samples.map(function(s){return s.time;}),surveys.map(function(s){return s.time;})))));
    var channelCanvas=E('canvas',{'role':'img','aria-label':'Channel and width of each radio over time'});
+   var clientCanvas=E('canvas',{'role':'img','aria-label':'Clients on each radio over time'});
+   function heading(title,detail){return E('h3',{},E('span',{'class':'wc-setting-help','role':'button','tabindex':'0','data-tooltip':detail,'data-tooltip-style':'wc-help-tooltip','aria-label':title+'. '+detail},title));}
    var trafficCanvas=E('canvas',{'role':'img','aria-label':'Observed radio traffic over time'});
    function legend(patterns){return E('p',{'class':'wc-legend'},radioNames.map(function(r,i){return E('span',{'style':'color:'+graphs.colour(r,i)+';margin-right:22px;font-weight:600;'},[E('span',{'class':patterns?'wc-pattern-key':'wc-line-key','style':patterns?graphs.patternStyle(r,i):'border-color:'+graphs.colour(r,i),'title':patterns?graphs.patternName(r,i):r}),r]);}));}
    var radarHalf=Number(h.radar&&h.radar.half_life)||3600;
@@ -186,13 +191,12 @@ return view.extend({
      E('div',{'class':'wc-radar-ticks'},[100,75,50,25,0].map(function(n){return E('span',{},n+'%');}))
     ])
    ]);
-   var nodes=[E('h3',{},_('Where each radio spent its time')),
-    E('p',{'class':'wc-caption','title':'Each declared band shows its standard channel plan. Displayed channels may not be permitted locally or supported by your radio. Dashed outlines indicate radar listening.'},_('Ribbons show each radio’s channel and width. // marks gaps in spectrum. Hover or tap for details.')),
+   var nodes=[heading(_('Where each radio spent its time'),_('Ribbons show each radio’s channel and width. // marks gaps in spectrum. Hover or tap for details. Each declared band shows its standard channel plan; displayed channels may not be permitted locally or supported by your radio. Dashed outlines indicate radar listening.')+(surveys.length?'':' '+_('Survey background appears after the next scan.'))),
     E('div',{'class':'wc-chart wc-spectrum-chart'},channelCanvas),legend(true),
     E('div',{'class':'wc-spectrum-keys'},[E('div',{'class':'wc-survey-key','title':'Estimated congestion ranges from 0 (lowest) to 100 (highest estimated congestion). Darker grey means more or stronger overlapping networks, adjusted for advertised load. This is an estimate, not measured airtime or a percentage. Hover over the graph for measurement times.'},[E('span',{},_('Estimated congestion')),E('div',{'class':'wc-survey-ramp'},[E('div',{'class':'wc-grey-scale','aria-hidden':'true'}),E('div',{'class':'wc-scale-ticks'},[0,25,50,75,100].map(function(n){return E('span',{},String(n));}))])]),radarKey]),
-    ...(surveys.length?[]:[E('p',{'class':'wc-caption'},_('Survey background appears after the next scan.'))]),
-    E('h3',{},_('Observed traffic over time')),
-    E('p',{'class':'wc-caption'},_('Upload + download, averaged over five minutes. This shows usage, not a speed test.')),
+    heading(_('Clients on each radio over time'),_('Associated clients, sampled every five seconds. Whole-number steps show count changes. Gaps mean no observations; older history contains no client-count intervals. Hover or tap for details.')),
+    E('div',{'class':'wc-chart wc-traffic-chart'},clientCanvas),legend(),
+    heading(_('Observed traffic over time'),_('Upload + download, averaged over five minutes. This shows usage, not a speed test. Hover or tap for details.')),
     E('div',{'class':'wc-chart wc-traffic-chart'},trafficCanvas),legend()];
    var latest=radioNames.map(function(r){return samples.filter(function(s){return s.radio==r;}).slice(-1)[0];}).filter(Boolean);
    var head=['Radio','Channel / width','Traffic avg / peak','Clients peak','Congestion evidence','Weakest signal'];
@@ -220,7 +224,7 @@ return view.extend({
    function draw(){
     if(!display.isConnected){if(++attempts<60)frame=requestAnimationFrame(draw);return;}
     frame=null;
-    instances=[graphs.channelChart(channelCanvas,periods,radioNames,start,now,surveys,h.radar,h.declared_bands),graphs.trafficChart(trafficCanvas,samples,radioNames,start,now)];
+    instances=[graphs.channelChart(channelCanvas,periods,radioNames,start,now,surveys,h.radar,h.declared_bands),graphs.clientChart(clientCanvas,clients,radioNames,start,now),graphs.trafficChart(trafficCanvas,samples,radioNames,start,now)];
    }
    frame=requestAnimationFrame(draw);
   }

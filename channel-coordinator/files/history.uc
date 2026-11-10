@@ -4,11 +4,12 @@ import {RAM_LIMIT,INTERVAL,archive_info,clear_archive,expire_archive,prune,bound
 const PATH='/tmp/wifi-coordinator-history.json',LIMIT=RAM_LIMIT;
 export function open_history(boot,enabled,hours) {
     hours=max(1,min(200,hours));
-    let h={boot,started:time(),periods:[],samples:[],events:[],surveys:[]},last_record=0,last_flush=0;
+    let h={boot,started:time(),periods:[],samples:[],clients:[],events:[],surveys:[]},last_record=0,last_flush=0;
     try { if((fs.stat(PATH)?.size ?? LIMIT+1)<=LIMIT){let old=json(fs.readfile(PATH));
         if(old.boot==boot&&type(old.periods)=='array'&&type(old.samples)=='array'&&type(old.events)=='array'&&type(old.surveys)=='array')
             h=old;
     } }catch(e){}
+    if(type(h.clients)!='array')h.clients=[];
     let archive=archive_info();
     let saved=archive.saved ?? 0;
     archive=null; // Older history is loaded only during a checkpoint, not held by the daemon.
@@ -20,13 +21,14 @@ export function open_history(boot,enabled,hours) {
         let cutoff=t-hours*3600;
         h.periods=filter(h.periods,p=>p.end>=cutoff);
         h.samples=filter(h.samples,s=>s.end>=cutoff);
+        h.clients=filter(h.clients,s=>s.end>=cutoff);
         h.events=filter(h.events,e=>e.time>=cutoff);
         h.surveys=filter(h.surveys,s=>(s.updated ?? s.time)>=cutoff);
         h.updated=t;h.retention_hours=hours;h.limit_bytes=LIMIT;h.enabled=enabled;
         if(shutdown||t-last_attempt>=INTERVAL){
             last_attempt=t;h.archive_attempt=t;
             expire_archive(t,hours);
-            let changed=h.archive_dirty||length(filter(h.samples,s=>s.end>saved))||length(filter(h.events,e=>e.time>saved))||length(filter(h.surveys,s=>(s.updated ?? s.time)>saved))||length(filter(h.periods,p=>p.end>saved));
+            let changed=h.archive_dirty||length(filter(h.clients,s=>s.end>saved))||length(filter(h.samples,s=>s.end>saved))||length(filter(h.events,e=>e.time>saved))||length(filter(h.surveys,s=>(s.updated ?? s.time)>saved))||length(filter(h.periods,p=>p.end>saved));
             if(changed){
                 if(checkpoint(h,t,hours)){saved=t;h.archive_dirty=false;h.archive_error=null;prune(h,t-3600);}
                 else {ok=false;h.archive_error='Archive write failed or less than 4 MiB would remain free. Recent history kept in RAM; next scheduled attempt in six hours.';}
@@ -42,6 +44,16 @@ export function open_history(boot,enabled,hours) {
         let t=time();if(!enabled){flush(false);return;}if(t-last_record<5)return;last_record=t;h.archive_dirty=true;
         let bucket=int(t/300)*300;
         for(let r in rows){
+            // Counts are observations, not five-minute peaks or estimates.
+            // Close a previous count at the next observation only if continuous.
+            if(type(r.clients)=='int'&&r.clients>=0){
+                let count=null;
+                for(let i=length(h.clients)-1;i>=0;i--)if(h.clients[i].radio==r.radio){count=h.clients[i];break;}
+                let continuous=count&&count.source==boot&&t>=count.end&&t-count.end<=15;
+                if(continuous)count.end=t;
+                if(!continuous||count.count!=r.clients)
+                    push(h.clients,{radio:r.radio,source:boot,start:t,end:t,count:r.clients});
+            }
             let period=null;
             for(let i=length(h.periods)-1;i>=0;i--)if(h.periods[i].radio==r.radio){period=h.periods[i];break;}
             if(!period||t-period.end>15||period.channel!=r.channel||period.width!=r.width||period.center!=r.center||period.role!=r.role){
@@ -94,6 +106,6 @@ export function open_history(boot,enabled,hours) {
         }
         frame.bands=bands;frame.updated=t;flush(true);
     }
-    function clear() { h={boot,started:time(),periods:[],samples:[],events:[],surveys:[]};last_record=0;last_flush=0;saved=0;last_attempt=time();fs.unlink(PATH);clear_archive();flush(true); }
+    function clear() { h={boot,started:time(),periods:[],samples:[],clients:[],events:[],surveys:[]};last_record=0;last_flush=0;saved=0;last_attempt=time();fs.unlink(PATH);clear_archive();flush(true); }
     return {record,event,flush,clear,survey,shutdown:()=>flush(true,true)};
 };

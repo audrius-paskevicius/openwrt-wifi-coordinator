@@ -2,8 +2,8 @@
 
 Open **Network / Wi-Fi Coordinator / Storage & export**, then **Export history** below History retention. Its independent Period selector offers All retained history (the default) and durations up to the saved retention limit. Changing Show on the History tab does not change the export period. Downloads do not change recording, retention, radio settings or channel planning.
 
-- **CSV data** selects channel placements, traffic summaries, spectrum surveys, radar detections or actions, followed by its Download button.
-- **JSON data** downloads all five datasets below in one structured file using its separate Download button.
+- **CSV data** selects channel placements, client counts, traffic summaries, spectrum surveys, radar detections or actions, followed by its Download button.
+- **JSON data** downloads all six datasets below in one structured file using its separate Download button.
 
 The Period selector above these rows applies to both downloads.
 
@@ -28,6 +28,7 @@ Top-level metadata includes `format`, `version`, `package_version`, `exported_at
 | Dataset | Contents |
 | --- | --- |
 | `periods` | Radio, primary channel, centre frequency, width, role and residence interval |
+| `clients` | Radio, boot source, observed count and constant-count interval (`start`, `end`, plus UTC ISO timestamps) |
 | `traffic` | Original five-minute sums/counts/peaks plus derived mean Mbit/s and measured busy-airtime percent |
 | `surveys` | Compact frequency-bin levels and their measurement-time offsets |
 | `radar` | Current planner-memory incidents: detection time, centre frequency, width, region, PHYs and weight |
@@ -41,6 +42,16 @@ not client addresses. A `switch-unconfirmed` outcome means the AP was ready but
 the bounded observation did not establish stable client service.
 
 `result` ends the document with `complete`, `warnings` and record `counts`. Survey counts count frames, not individual bins.
+
+Client counts are sampled every five seconds and stored as whole-number intervals.
+When the next observation is within 15 seconds, a changed count closes the old
+interval at that observation and starts a new one. Longer gaps remain unknown.
+Intervals retain their original boundaries, including those overlapping the
+window start. Deduplication uses radio, boot source, start and count, retaining
+the latest end. Old archives without this dataset export an empty client list;
+five-minute `clients_peak` values are not converted into invented observations.
+No client addresses or names are recorded. This is an additive schema-version-1
+dataset; consumers should ignore datasets they do not use.
 
 Survey bands use `start` and `step` in MHz. Bin `i` spans `[start + i * step, start + (i + 1) * step)`. Its timestamp is the frame's `time + offsets[i]` (zero when omitted). `levels[i]` is a 0–100 congestion estimate, not airtime percent. `null` means unmeasured, never clear. Traffic `n`, `traffic_sum`, `busy_n` and `busy_sum` preserve the evidence behind means; absent busy measurements stay null.
 

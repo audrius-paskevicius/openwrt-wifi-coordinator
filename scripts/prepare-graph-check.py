@@ -57,6 +57,20 @@ try{
  assert(smooth.data.datasets.filter(d=>d.wcSurvey).every(d=>d.inflateAmount===0),'survey cells have no inflated edges');
  assert(full.data.datasets.filter(d=>d.wcRadar).every(d=>d.inflateAmount===0),'radar cells have no inflated edges');
  const traffic=graph.trafficChart(document.getElementById('traffic'),[],names,start,end);
+ const clients=graph.clientChart(document.getElementById('clients'),[
+  {radio:'radio0',source:'one',start,end:start+7200,count:0},
+  {radio:'radio0',source:'one',start:start+7200,end,count:2},
+  {radio:'radio1',source:'one',start,end:start+7200,count:2},
+  {radio:'radio1',source:'one',start:start+7200,end,count:0},
+  {radio:'radio2',source:'one',start,end:start+10800,count:1},
+  {radio:'radio2',source:'two',start:start+14400,end,count:1}
+ ],names,start,end);
+ clients.update('none');
+ assert(clients.scales.y.ticks.every(t=>Number.isInteger(t.value)),'client axis has whole numbers');
+ assert(clients.data.datasets.every(d=>d.borderWidth===traffic.data.datasets[0].borderWidth),'client and traffic line styles match');
+ const cx=clients.scales.x.getPixelForValue(start+9000),cy=clients.scales.y.getPixelForValue(2);
+ const cp=clients.ctx.getImageData(Math.round(cx)-2,Math.round(cy)-2,5,5).data;
+ assert(Array.from({length:25},(_,i)=>i*4).some(i=>cp[i]>150&&cp[i+1]<80&&cp[i+2]>100),'actual client-count line painted');
  const localStart=new Date(2026,10,7,9,0).getTime()/1000;
  [300,950].forEach(width=>[ [localStart,localStart+21600], [localStart,localStart+200*3600], [localStart+14*3600,localStart+16*3600] ].forEach(([a,b])=>{
   const c=graph.channelChart(document.getElementById('dates'),[],[],a,b,[],{},['2g','5g']);
@@ -83,6 +97,7 @@ html = '''<!doctype html><meta charset="utf-8"><title>Standard spectrum axis che
 <h2>5 GHz declaration only (same history)</h2><section><canvas id="five"></canvas></section>
 <h2>Dense survey boundaries</h2><section><canvas id="smooth"></canvas></section>
 <h2>Traffic</h2><section><canvas id="traffic"></canvas></section>
+<h2>Clients</h2><section><canvas id="clients"></canvas></section>
 <section><canvas id="dates"></canvas></section><section><canvas id="times"></canvas></section>
 <script>const payload=''' + json.dumps(payload) + ';\n' + script + '</script>'
 Path(sys.argv[1]).write_text(html, encoding='utf-8')

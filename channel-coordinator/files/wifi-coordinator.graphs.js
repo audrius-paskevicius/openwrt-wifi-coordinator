@@ -108,6 +108,18 @@ function trafficData(samples,names){
   });return line(r,points,colour(r,i),{radio:r,borderDash:dash(r,i),pointRadius:points.filter(function(p){return p.y!=null;}).length==1?2:0});
  });
 }
+function clientData(intervals,names,start,end){
+ return names.map(function(r,i){
+  var points=[],previous=null;
+  intervals.filter(function(p){return p.radio==r&&Number.isInteger(p.count)&&p.count>=0&&Number.isFinite(p.start)&&Number.isFinite(p.end)&&p.end>=p.start&&p.end>=start&&p.start<=end;})
+   .sort(function(a,b){return a.start-b.start;}).forEach(function(p){
+    var a=Math.max(start,p.start),b=Math.min(end,p.end);
+    if(previous&&(a>previous.end||p.source!=previous.source))points.push({x:a,y:null});
+    points.push({x:a,y:p.count,interval:p},{x:b,y:p.count,interval:p});previous={end:b,source:p.source};
+   });
+  return line(r,points,colour(r,i),{radio:r,borderDash:dash(r,i),pointRadius:function(c){var p=c.raw;return p&&p.interval&&p.interval.start==p.interval.end?2:0;}});
+ });
+}
 function surveyData(surveys,start,end,axis){
  axis=axis||defaultAxis;
  var bins={},frames=surveys.slice().sort(function(a,b){return a.time-b.time;});
@@ -185,4 +197,12 @@ function trafficChart(canvas,samples,names,start,end){
   label:function(c){return c.dataset.label+': '+c.raw.y.toFixed(3)+' Mbit/s average; '+c.raw.peak.toFixed(3)+' peak (5-minute summary)';}};
  return new chartlib.Chart(canvas,{type:'line',data:{datasets:trafficData(samples,names)},options:options});
 }
-return baseclass.extend({spectrumAxis:spectrumAxis,channelChart:channelChart,trafficChart:trafficChart,colour:colour,keyStyle:keyStyle,patternStyle:patternStyle,patternName:patternName,geometry:geometry,channelData:channelData,trafficData:trafficData,surveyData:surveyData,radarData:radarData,radarColour:radarColour,radarGradient:radarGradient});
+function clientChart(canvas,intervals,names,start,end){
+ var options=baseOptions(start,end);options.scales.y.min=0;options.scales.y.suggestedMax=1;
+ options.scales.y.ticks.maxTicksLimit=5;options.scales.y.ticks.precision=0;
+ options.scales.y.title={display:true,text:'Clients',color:'#444'};
+ options.plugins.tooltip.callbacks={title:function(items){var p=items[0]&&items[0].raw.interval;return p?dated(p.start)+' – '+dated(p.end):'';},
+  label:function(c){return c.dataset.label+': '+c.raw.y+' client'+(c.raw.y==1?'':'s');}};
+ return new chartlib.Chart(canvas,{type:'line',data:{datasets:clientData(intervals,names,start,end)},options:options});
+}
+return baseclass.extend({spectrumAxis:spectrumAxis,channelChart:channelChart,clientChart:clientChart,trafficChart:trafficChart,colour:colour,keyStyle:keyStyle,patternStyle:patternStyle,patternName:patternName,geometry:geometry,channelData:channelData,clientData:clientData,trafficData:trafficData,surveyData:surveyData,radarData:radarData,radarColour:radarColour,radarGradient:radarGradient});

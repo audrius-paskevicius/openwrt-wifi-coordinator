@@ -3,13 +3,14 @@ import * as fs from 'fs';
 export const DIRECTORY='/etc/wifi-coordinator';
 export const RAM_LIMIT=1048576;
 export const INTERVAL=21600;
-const LISTS=['periods','samples','events','surveys'];
-export function empty() { return {periods:[],samples:[],events:[],surveys:[]}; };
+const LISTS=['periods','samples','clients','events','surveys'];
+export function empty() { return {periods:[],samples:[],clients:[],events:[],surveys:[]}; };
 function read_file(path) {
     try {
         // Bounds a single input allocation, not the size of the archive.
         if((fs.stat(path)?.size ?? RAM_LIMIT*2+1)>RAM_LIMIT*2)return null;
         let h=json(fs.readfile(path));
+        if(h.clients==null)h.clients=[]; // Archives from before client-count recording.
         for(let k in LISTS)if(type(h[k])!='array')return null;
         return h;
     }catch(e){return null;}
@@ -36,6 +37,7 @@ export function expire_archive(t,hours) {
 };
 function key(k,x) {
     if(k=='periods')return sprintf('%J',[x.radio,x.start,x.channel,x.center,x.width,x.role]);
+    if(k=='clients')return sprintf('%J',[x.radio,x.source,x.start,x.count]);
     if(k=='samples')return sprintf('%J',[x.radio,x.time,x.channel,x.width,x.role,x.source]);
     if(k=='surveys')return ''+(x.cycle ?? x.time);
     return sprintf('%J',x);
@@ -64,7 +66,7 @@ export function prune(h,cutoff) {
 export function bounded(h,limit) {
     let data=sprintf('%J\n',h);
     while(length(data)>limit){
-        let available=filter(['samples','events','periods','surveys'],k=>length(h[k]));
+        let available=filter(['samples','clients','events','periods','surveys'],k=>length(h[k]));
         if(!length(available))return null;
         let oldest=sort(available,(a,b)=>(h[a][0].end ?? h[a][0].time)-(h[b][0].end ?? h[b][0].time))[0];
         shift(h[oldest]);h.dropped_records=(h.dropped_records ?? 0)+1;
@@ -84,7 +86,7 @@ export function checkpoint(h,t,hours) {
     // Boundary records can be extended later; the reader merges by stable key.
     for(let k in LISTS)out[k]=filter(h[k] ?? [],x=>(x.updated ?? x.end ?? x.time)>=info.saved);
     prune(out,t-hours*3600);
-    if(!length(out.samples)&&!length(out.periods)&&!length(out.events)&&!length(out.surveys))return true;
+    if(!length(out.samples)&&!length(out.clients)&&!length(out.periods)&&!length(out.events)&&!length(out.surveys))return true;
     out.saved=t;out.retention_hours=hours;out.format=2;
     let data=sprintf('%J\n',out),path=DIRECTORY+'/batch-'+t+'.json';
     if(!fs.stat(DIRECTORY)&&!fs.mkdir(DIRECTORY,0700))return false;

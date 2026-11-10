@@ -43,7 +43,7 @@ return view.extend({
   ]);
   configured.filter(function(h){return h<=retain;}).forEach(function(h){exportPeriod.appendChild(E('option',{value:h},_('Last ')+h+(h==1?_(' hour'):_(' hours'))));});
   var exportDataset=E('select',{'class':'cbi-input-select','id':'wc-export-dataset'},[
-   ['periods','Channel placements'],['traffic','Traffic summaries'],['surveys','Spectrum surveys'],['radar','Radar detections'],['actions','Recent actions']
+   ['periods','Channel placements'],['clients','Client counts'],['traffic','Traffic summaries'],['surveys','Spectrum surveys'],['radar','Radar detections'],['actions','Recent actions']
   ].map(function(pair){return E('option',{value:pair[0]},_(pair[1]));}));
   function download(format){
    // A native POST download streams to the browser download manager. No Blob,

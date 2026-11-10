@@ -20,5 +20,6 @@ require('./history-refresh.cjs');
 require('./help.cjs');
 require('./settings.cjs');
 require('./graph-widths.cjs');
+require('./client-history.cjs');
 require('./time.cjs');
 require('./disclaimer.cjs');

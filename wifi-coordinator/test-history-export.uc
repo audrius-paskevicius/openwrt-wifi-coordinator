@@ -12,12 +12,17 @@ a.surveys=[{time:70,bands:[{start:5170,step:20,levels:[10,20],offsets:[0,0]}]},
 ram.surveys=[{time:150,cycle:1,bands:[{start:5170,step:20,levels:[40,50],offsets:[0,2]}]}];
 a.events=[{time:120,event:'test',reason:'=1+1',password:'must not export'}];b.events=a.events;
 ram.events=[{time:10,event:'old'},{time:201,event:'future'}];
+a.clients=[{radio:'radio0',source:'boot',start:90,end:110,count:0,mac:'not-exported'}];
+ram.clients=[{...a.clients[0],end:150},{radio:'radio0',source:'boot',start:150,end:190,count:2}];
 let sources=[a,b,ram],opts={format:'json',now:200,start:100,retained:50,hours:1,sources:['batch-a','batch-b','RAM'],version:'test',
  radar:{half_life:3600,events:[{time:20,center:5250,width:80,weight:1}]},bands:['5g']};
 let output='';
 let result=stream(opts,i=>sources[i],s=>{output+=s;});
 let data=json(output);
 check(result.complete&&data.result.complete,'valid complete JSON');
+check(length(data.datasets.clients)==2&&data.datasets.clients[0].end==150,'client intervals merge across archive/RAM and overlap window');
+check(data.datasets.clients[0].count==0&&!exists(data.datasets.clients[0],'mac'),'zero clients retained and identities excluded');
+check(data.datasets.clients[0].start_iso==iso(90),'client interval ISO timestamps');
 check(data.datasets.periods[0].end==190&&length(data.datasets.periods)==1,'newest residence deduplicated');
 check(length(data.datasets.traffic)==1&&data.datasets.traffic[0].traffic_avg_mbps==5,'traffic extends across batches');
 check(data.datasets.traffic[0].busy_avg_percent==25,'measured airtime average');
@@ -29,7 +34,7 @@ check(iso(0)=='1970-01-01T00:00:00Z','epoch ISO conversion');
 check(csv_cell(-61)=='"-61"','negative numeric signal stays numeric');
 check(csv_cell('  =1')=='"\'  =1"','formula injection neutralized');
 check(csv_cell('a,"b"\nc')=='"a,""b""\nc"','CSV quotes/newlines preserved');
-for(let k in ['periods','traffic','surveys','radar','actions']){
+for(let k in ['periods','clients','traffic','surveys','radar','actions']){
  output='';stream({...opts,format:'csv',dataset:k},i=>sources[i],s=>{output+=s;});
  check(index(output,'record_type,')==0&&index(output,'"summary"')>=0,'CSV header and completion '+k);
  check(index(output,'"metadata"')>=0&&index(output,'"data"')>=0,'CSV metadata/data '+k);
