@@ -1,12 +1,30 @@
 # Validation
 
-Source release: **0.7.0-r10**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r11**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r11 single-entry ribbon tooltips (2026-11-10)
+
+Closing a channel ribbon repeats its first corner. The tooltip now includes
+each recorded interval once even if multiple outline vertices are selected.
+Decorative fill/halo layers remain excluded. Distinct intervals and radios
+remain separate entries; event markers are unaffected.
+
+The actual Chart.js Chrome fixture reproduced the duplicate before the fix and
+passed afterward. It selects both closing vertices and decorative layers, and
+checks that distinct intervals/radios remain visible. Portable UI/cache checks
+also passed. This is a tooltip-only change; radio algorithms and recording are
+unchanged, so the full runtime/RF suite was not repeated.
+
+On the installed router History chart, selecting both closing vertices produced
+one tooltip entry. All 46 package payload files matched source; signatures and
+source/package secret scans passed. All six checked router configuration files
+remained unchanged.
 
 ## 0.7.0-r10 clearer comparison notes (2026-11-10)
 

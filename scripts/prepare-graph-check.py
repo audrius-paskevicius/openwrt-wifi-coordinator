@@ -33,6 +33,15 @@ try{
  const full=graph.channelChart(document.getElementById('full'),periods,names,start,end,surveys,radar,['2g','5g'],evidence);
  const five=graph.channelChart(document.getElementById('five'),periods,names,start,end,surveys,radar,['5g']);
  [full,five].forEach(c=>c.update('none'));
+ const outlineIndex=full.data.datasets.findIndex(d=>d.radio==='radio0'&&!d.wcFill&&!d.wcHalo);
+ const otherIndex=full.data.datasets.findIndex(d=>d.radio==='radio1'&&!d.wcFill&&!d.wcHalo);
+ const corner=full.getDatasetMeta(outlineIndex).data[0];
+ const closedCorners=full.data.datasets.flatMap((d,i)=>d.radio==='radio0'&&d.wcRole==='serving'?[{datasetIndex:i,index:0},{datasetIndex:i,index:4}]:[]);
+ full.tooltip.setActiveElements(closedCorners,{x:corner.x,y:corner.y});
+ assert(full.tooltip.dataPoints.length===1,'closed ribbon corner must produce one tooltip entry');
+ full.tooltip.setActiveElements([{datasetIndex:outlineIndex,index:0},{datasetIndex:outlineIndex,index:4},{datasetIndex:outlineIndex,index:6},{datasetIndex:otherIndex,index:0}],{x:corner.x,y:corner.y});
+ assert(full.tooltip.dataPoints.length===3,'distinct intervals and radios remain in the tooltip');
+ full.tooltip.setActiveElements([],{x:0,y:0});full.update('none');
  const markers=full.data.datasets.filter(d=>d.wcEvidence);
  assert(markers.length===3,'unknown, unavailable and action evidence shown independently');
  markers.forEach(d=>{
