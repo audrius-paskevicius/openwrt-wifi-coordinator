@@ -36,8 +36,13 @@ Live Chrome checks confirmed the shared control and Clients-page link, removal
 of the retired preference controls, and no page exceptions. After installation,
 both 5 GHz clients were on the preferred radio; two legacy clients remained
 connected on 2.4 GHz without a qualifying target measurement. There was no
-integration error or safety stop. This observation does not prove that the new
-escalation caused those arrivals: no live forced-return experiment was needed.
+integration error or safety stop. Later live history recorded gentle requests,
+Strong warnings approximately 30 seconds later, and one client arriving at the
+preferred radio six seconds after the warning. Another remained on the alternate
+radio; its disconnect was withheld, with a subsequent source signal of -81 dBm
+against the configured -70 dBm source threshold and no recent forced-disconnect
+budget use. No forced disconnection was needed for the successful return. These
+observations do not establish universal roaming success or improved throughput.
 Source, extracted package and release assets were checked for credentials before
 publication. Temporary signing material and the test browser login were removed.
 
