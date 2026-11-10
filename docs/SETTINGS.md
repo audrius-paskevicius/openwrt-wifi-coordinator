@@ -24,7 +24,7 @@ These are fresh-install defaults, not a migration that overwrites existing choic
 
 | Area | Default |
 | --- | --- |
-| Operation | Channel coordination and Radio Preference enabled; automatic channel planning; gentle preferred-radio recommendations |
+| Operation | Channel coordination and Radio Preference enabled; automatic channel planning; shared Decisive steering for preference and handoffs |
 | Channels and widths | Auto; separate radio spectrum preferred |
 | Survey | Paced, active where permitted; 10% scan duty; at least 3 seconds serving between occupied-radio visits |
 | Timing | 60 seconds between completed surveys/operations; 180-second minimum residence |
@@ -49,15 +49,15 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `min_dwell` | Avoids repeated moves after successful verification. Independent of survey frequency. |
 | `persist` | Whether verified wireless placements are checkpointed, at most every six hours. Separate from graph history and radar memory. |
 | `clear_stop` | One-shot acknowledgement after resolving a recovery failure, reset after use. Interrupted-operation and failed-radio recovery checks repeat automatically with capped backoff, resuming only after the relevant service checks pass. This acknowledgement clears the global stop and per-radio unresolved-failure flags after an administrator has checked recovery; it does not erase timed destination or client-specific exclusions. |
-| `handoff_wait` | Time to give compatible clients a chance to roam before restart. Skipped if no compatible target exists. |
-| `handoff_escalation` | Gentle, Strong or Decisive handoff requests. Does not disable the separately selected restart fallback. |
+| `handoff_wait` | Shared escalation window for preference and channel/radar handoffs. Gentle starts immediately, Strong at one third, Decisive at two thirds. The channel-change handoff wait is skipped if no compatible target exists. |
+| `handoff_escalation` | Single Gentle / Strong / Decisive setting for both preference and channel/radar handoffs. Missing measurements do not suppress Strong warnings. Does not disable the separately selected channel-restart fallback. |
 | `allow_reconnect` | Allows occupied restart after handoff fails. Protected clients and explicit quiet/empty policies still restrict it. |
 | `protected_clients` | Enter one Wi-Fi MAC address and click + to add it to the list; empty means none. Hover help explains where to find the address, private Wi-Fi addresses, adding/removing entries and Save & Apply. Protects selected clients from both preference and channel handoffs, and blocks occupied restart of their AP. Does not prohibit CSA, scans or kernel radar evacuation. |
 | `max_mbps` | Advanced: shared traffic threshold for quiet-only moves and low-traffic scanning. Irrelevant to paced scanning and Automatic CSA. |
 | `quiet_seconds` | Advanced: sustained duration below that threshold. Distinct from the threshold itself. |
 | `verify_unprobed` | Advanced: observation time for clients without usable ICMP probes (150–600 seconds). Handles differing client sleep/probe behavior. |
-| `handoff_target_min` | Advanced: weakest measured destination allowed for forced handoff. |
-| `handoff_source_min` | Advanced: proximity requirement when destination cannot be measured. Co-located radio estimate, not a promised destination signal. |
+| `handoff_target_min` | Advanced: shared minimum measured destination signal. Fresh weaker reports block steering; absent measurements still permit recommendations and warnings. |
+| `handoff_source_min` | Advanced: proximity requirement when destination cannot be measured. Used for forced steering only on the same band. Co-located radio estimate, not a promised destination signal. |
 | `dfs_mode` | Exclude DFS candidates, use already cleared channels, or prepare using an empty helper while other radios serve clients. Exclude does not force an existing DFS AP to leave its channel. Prepare supports opportunistic reuse after required clearance and kernel exclusion expiry; fresh evidence and service scoring still determine moves. Requires matching, known global/per-radio DFS regions (FCC, ETSI or Japan) under the configured country. |
 | `dfs_helper` | Optional explicit helper for installations with unequal radio coverage. Only shown for Prepare. Only that helper is eligible. If it cannot prepare the target, preparation is deferred rather than silently selecting another radio. |
 | `radar_half_life` | Default 3600 seconds (one hour): interruption-history weight halves each hour. Independent of mandatory kernel non-occupancy time. |
@@ -89,13 +89,11 @@ On WRT3200ACM/WRT32X, frequency Auto uses advertised CSA on radio0/radio1 unless
 | --- | --- |
 | `enabled` | Independent from channel planning. While enabled it owns steering and holds competing usteer policies passive. Previous policies are restored when the shared controller stops; channel planning also requires passive usteer. |
 | `preferred_radio` | Explicit target: differing radios have different capabilities/coverage. No silent fallback to another radio. |
-| `mode` | Gentle versus Strong recommendation when a fresh target measurement qualifies. Either mode sends Gentle when measurement support is absent or no usable report arrives within one minute of a measurement request. This fallback is shown in client status. Neither mode sets an AP disconnect timer. |
-| `min_rssi` | Required measured target signal. A fresh weaker report blocks recommendations. Without usable measurements, a gentle suggestion leaves suitability to the client. |
 | `settle_time` | Lets a new association settle before measurement/steering. |
-| `cooldown` | Minimum interval between ordinary recommendations. One extra gentle return request is allowed after an operation on the preferred radio. |
-| `max_attempts` | Burst limit before a longer pause (`cooldown × max_attempts`). Distinct from interval; budget also resets after one minute on the preferred radio. |
+| `cooldown` | Shared minimum interval between client/destination attempts in both paths. Stages within an attempt do not consume separate slots. One extra return attempt is allowed after an operation on the preferred radio. |
+| `max_attempts` | Burst limit before a longer pause (`cooldown × max_attempts`). Shared by both paths for each client and destination; expires automatically after the longer pause. |
 
-Channel handoffs and preferred-radio steering have separate signal/request policies because one prepares a necessary channel operation and the other merely recommends a favored AP. One controller reserves the affected radios to prevent conflicting actions. Busy/full or unavailable preferred APs now produce explicit client status rather than leaving a previous decision displayed.
+The shared strength, timing, protection and signal settings are on Channels / Clients (signal thresholds under Advanced). The Clients tab links there and keeps preferred-radio selection and shared retry controls. Retired preference `mode` and `min_rssi` are migrated and removed; see ARCHITECTURE.md.
 
 ## History
 

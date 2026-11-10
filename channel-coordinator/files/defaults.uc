@@ -5,6 +5,14 @@ import * as fs from 'fs';
 let c=uci.cursor(getenv('WIFI_COORDINATOR_CONFIG_DIR') ?? '/etc/config');
 for(let key in ['retry_delay','scan_wait','scan_batch','cac_timeout','csa_count','ban_seconds','wide_threshold'])
     c.delete('channel_coordinator','main',key);
+// One steering policy. Preserve an existing handoff choice; only infer it from
+// the retired preference setting when the shared setting is absent.
+if(c.get('channel_coordinator','main','handoff_escalation')==null)
+    c.set('channel_coordinator','main','handoff_escalation',c.get('radio_prefer','main','mode')=='advisory'?'gentle':'strong');
+let old_min=c.get('radio_prefer','main','min_rssi');
+if(old_min!=null&&match(old_min,/^-[0-9]+$/))
+    c.set('channel_coordinator','main','handoff_target_min',''+max(int(old_min),int(c.get('channel_coordinator','main','handoff_target_min') ?? '-72')));
+c.delete('radio_prefer','main','mode');c.delete('radio_prefer','main','min_rssi');
 let board=trim(fs.readfile('/tmp/sysinfo/board_name') ?? '');
 let wrt=index(['linksys,wrt3200acm','linksys,wrt32x'],board)>=0;
 let radios=[];c.foreach('wireless','wifi-device',r=>push(radios,r));

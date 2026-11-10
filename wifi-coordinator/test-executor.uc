@@ -20,7 +20,7 @@ function setup(method,occupied){
   if(method=='switch_chan'){if(!ignore)radio.current=group(args.freq,args.bandwidth);return {};}
   if(method=='get_clients')return {clients:radio.clients};
   if(method=='connected_clients')return {'hostapd.test0':{client:{'bss-transition-management':true}}};
-  if(method=='rrm_nr_get_own')return {value:[null,null,'020000000001ef19000080240900']};
+  if(method=='rrm_nr_get_own')return {value:[null,null,'020000000001ef190000802409']};
   return {};
  }
  let io={cfg,state:st,boot:'test',now:()=>T,save:()=>{},lease:()=>{},release:()=>{},call,

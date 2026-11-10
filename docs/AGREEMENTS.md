@@ -4,7 +4,7 @@ This review compares the requested behavior with the current implementation and 
 
 ## Current behavior review
 
-The current implementation uses native LuCI help on all 55 setting descriptions, including opaque tooltip backgrounds, keyboard and touch interaction. Applied methods and temporary restrictions remain visible during refreshes. The browser component fixture uses the target LuCI rendering and tooltip methods with synthetic configuration; it is not an authenticated end-to-end router test.
+The current implementation uses native LuCI help on all 53 setting descriptions, including opaque tooltip backgrounds, keyboard and touch interaction. Applied methods and temporary restrictions remain visible during refreshes. The browser component fixture uses the target LuCI rendering and tooltip methods with synthetic configuration; it is not an authenticated end-to-end router test.
 
 Width Auto follows advertised HT/VHT capabilities. The tested router advertises 160 MHz on radio0, 40 MHz on radio1, and 80 MHz on radio2 in 5 GHz. The joint planner compares estimated service across eligible widths rather than always ranking the widest first. Regulatory limits, coexistence and verification still apply. Historical fixes and their validation remain in [the test record](TESTING.md).
 
@@ -53,3 +53,5 @@ scoring and any active recovery restrictions still govern the next move.
 - **Upgrade preservation is implemented, a complete firmware-upgrade cycle is untested.** Keep-list entries and reinstallable signed APKs exist. The project is a GitHub/local package, not an accepted official OpenWrt feed package.
 
 These are explicit scope limits, not hidden runtime changes to administrator preferences.
+
+Preferred-radio steering and radar/channel handoffs share one Gentle / Strong / Decisive policy, escalation timing, protection rules and retry budgets. Failed return requests do not automatically penalize a channel placement.

@@ -1,12 +1,45 @@
 # Validation
 
-Source release: **0.7.0-r6**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r7**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
-Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
+Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 53 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r7 shared steering escalation (2026-11-10)
+
+Preference and channel/radar handoffs use the same escalation policy, neighbour
+request builder, signal/protection checks, client/destination attempt ledger and
+forced-disconnect budget. The separate preference strength and measured-signal
+threshold are migrated into the existing shared settings. Channel selection and
+failed-return placement penalties are not changed by this release.
+
+The full isolated OpenWrt suite passed, including 36 shared-policy and actual
+preference integration checks, 17 preference protocol checks, 1,127 executor cases,
+1,023 restart checks, 148 planner cases and the existing history/export/storage
+suites. The new tests exercise all three strengths, absent and weak measurements,
+cross-band safeguards, shared budgets, protection and placement changes, lost
+clients, successful return, expired reservations and shutdown cleanup. The native
+LuCI browser fixture passed with 53 setting descriptions and no page exceptions.
+These simulated checks do not establish universal client roaming support.
+
+The final signed APK and index passed native signature verification; all 44
+payload files matched the source or documented build substitutions. The installed
+application files matched that payload. An isolated migration test passed,
+including idempotence, and the live upgrade retained the existing Decisive choice
+and other settings apart from the documented migration. Network, wireless,
+firewall and DHCP configuration files remained byte-identical.
+
+Live Chrome checks confirmed the shared control and Clients-page link, removal
+of the retired preference controls, and no page exceptions. After installation,
+both 5 GHz clients were on the preferred radio; two legacy clients remained
+connected on 2.4 GHz without a qualifying target measurement. There was no
+integration error or safety stop. This observation does not prove that the new
+escalation caused those arrivals: no live forced-return experiment was needed.
+Source, extracted package and release assets were checked for credentials before
+publication. Temporary signing material and the test browser login were removed.
 
 ## 0.7.0-r6 client-aware movement balance (2026-11-10)
 

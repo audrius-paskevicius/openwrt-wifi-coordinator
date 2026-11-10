@@ -369,6 +369,7 @@ function candidates(r,radios,rules,revalidate) {
     let current=rated(r.current);
     s.rejected=filter(s.rejected ?? [],x=>x.until>t);
     s.planning_hold=!r.config.managed?'Excluded from planning':r.unsafe?'Unsupported or inactive configuration':s.failed||s.unavailable?(s.recovery_status ?? 'Automatic recovery check pending'):
+        index(steering?.reserved() ?? [],r.name)>=0?'Client reconnection observation':
         index(returns?.radios() ?? [],r.name)>=0?'Bounded preferred-radio return observation':
         s.recheck_until>t?'Previous service restored; waiting for fresh client evidence':
         !survey_covers(rules,r,scan_result.frequencies,dm)?'Incomplete fresh survey':
@@ -456,7 +457,7 @@ function record_radar(e){
 let io={cfg,state,boot,now,precise,save,lease,release,history,history_store,call,request,inventory,
     client_avoided,avoid_client,
     evidence_at:()=>scan_result?.at,
-    reserved:()=>uniq([...reservations(executor?.pending()),...(returns?.radios() ?? [])]),
+    reserved:()=>uniq([...reservations(executor?.pending()),...(returns?.radios() ?? []),...(steering?.reserved() ?? [])]),
     returning:name=>index(returns?.radios() ?? [],name)>=0,
     priority_bands:()=>{
         let preferred=filter(discovered,r=>r.name==steering?.config.preferred_radio)[0];
@@ -536,7 +537,7 @@ scanner=create_survey({...io,state:scan_state,progress:result=>{
     if(!executor?.busy()){state.status=scan_state.status;state.pending=scan_state.pending;}
     save();
 },complete:(result,radios)=>{accept_survey(result);if(!executor.busy())evaluate(radios);if(one_shot)uloop.end();}});
-steering=create_preference({bus,history});
+steering=create_preference({bus,history,shared:state,handoff_cfg:cfg,radios:()=>discovered,save});
 returns=create_returns({now,history});
 executor=create_executor(io);
 // Import existing raw detections without inventing geometry from CAC completion.
@@ -562,6 +563,7 @@ uloop.init();
 let stopping=false;
 let termination=uloop.signal('SIGTERM',()=>{
     stopping=true;
+    try{steering.stop();}catch(e){log('Stopping preference: '+e);}
     try{if(scanner.busy())scanner.cancel('Survey stopped for service shutdown');}catch(e){log('Stopping survey: '+e);}
     uloop.end();
 });

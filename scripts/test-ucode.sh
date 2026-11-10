@@ -11,6 +11,8 @@ trap 'rmdir "$LOCK"' EXIT HUP INT TERM
 cd "$BASE"
 ucode wifi-coordinator/test-policy.uc
 ucode wifi-coordinator/test-controller.uc
+ucode wifi-coordinator/test-handoff.uc
+sh tests/test-steering-migration.sh
 ucode wifi-coordinator/test-owner-errors.uc
 ucode wifi-coordinator/test-dfs-runtime.uc
 ucode wifi-coordinator/test-widths.uc

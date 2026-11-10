@@ -150,6 +150,7 @@ var actionNames={
  'operation-complete':'Radio operation finished','client-return':'Preferred-radio return',
  'switch-unconfirmed':'Radio ready; client stability unconfirmed',
  'steering-request':'Preferred-radio recommendation','steering-response':'Client response',
+ 'steering-disconnect':'Bounded preference disconnect','steering-complete':'Preference attempt completed',
  'method-unavailable':'Unsupported switching method learned'
 };
 return view.extend({

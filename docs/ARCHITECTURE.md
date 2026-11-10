@@ -1,6 +1,6 @@
 # Current architecture
 
-The daemon in `channel-coordinator/files/main.uc` owns surveying, placement, execution and preferred-radio steering in one event loop. `controller.uc` contains shared movement cost, reservations and bounded return accounting; `steering.uc` contains the preference policy. Hardware calls remain injected into survey and executor tests. One disruptive operation runs at a time. Its serving radio, helper, handoff source/destination and client-recovery destination are reserved in memory. Scans and preference on unrelated radios continue. Survey failures cancel/retry only the survey; execution failures enter the executor's recovery path. Shared inventory failures remain a common safety concern. There is no second steering daemon or cross-process lease.
+The daemon in `channel-coordinator/files/main.uc` owns surveying, placement, execution and preferred-radio steering in one event loop. `controller.uc` contains shared movement cost, reservations and bounded return accounting; `steering.uc` contains the preference policy. Hardware calls remain injected into survey and executor tests. One channel operation runs at a time; bounded preference reconnection watches reserve their affected radios. Its serving radio, helper, handoff source/destination and client-recovery destination are reserved in memory. Scans and preference on unrelated radios continue. Survey failures cancel/retry only the survey; execution failures enter the executor's recovery path. Shared inventory failures remain a common safety concern. There is no second steering daemon or cross-process lease.
 
 ## Surveying
 
@@ -60,7 +60,50 @@ A rejected CSA request retains its client baseline and checks actual service. An
 
 Switch methods default to Auto, which resolves driver support, known WRT execution behavior and recent CSA failures. Explicit methods remain fixed for planned moves; unsupported choices block their corresponding moves. Emergency restoration can still restart the affected radio. Configured/effective methods, reasons and timed destination exclusions are reported in the UI. See the [settings audit](SETTINGS.md) for every setting's scope and removed controls.
 
-Preferred-radio steering uses the selected recommendation strength when a fresh target signal measurement qualifies. A fresh weak report blocks the recommendation. If a client supports roaming recommendations but not active/passive beacon measurements, either mode sends a gentle, unmeasured suggestion. Otherwise it requests a measurement and waits up to 60 seconds before the same gentle fallback. The fallback never sets a disassociation warning or AP disconnect timer. Status identifies the unmeasured suggestion; normal settling, cooldown, attempt-limit, protected-client, compatibility, target-readiness and coordination checks still apply. Measurement waits are scoped to the source AP, target AP and target channel/width placement, so a changed destination starts a fresh wait. After each recommendation, the next eligible episode requests a new measurement. Clients without roaming-recommendation support remain untouched. After a successful operation on the preferred radio, its original/late-arriving clients get a 120-second return observation and at most one extra gentle recommendation, bypassing only the ordinary request cooldown/attempt budget. Settling, measurements, weak-signal vetoes, protection, compatibility and reservations still apply. The operation reports returned, elsewhere, absent and declined counts. Helper-only clients are excluded. For that bounded observation, the preferred radio is kept available: it is not moved again, scanned off-channel or borrowed for CAC. Other radios continue normally, and kernel radar evacuation still takes priority. Expiry releases the reservation even if clients decline; it does not claim that absent clients failed because of the move.
+Preferred-radio steering and channel/radar handoffs use the shared `handoff.uc`
+policy and `channel_coordinator.main.handoff_escalation` setting. Gentle sends a
+recommendation; Strong adds a disassociation warning after one third of the
+handoff window; Decisive may disconnect remaining eligible clients after two thirds.
+The default window is 90 seconds. Requests preserve the complete neighbour report,
+replace its preference subelement, and use no autonomous AP disconnect timer.
+The controller enforces the optional decisive step with a 20-second return ban.
+
+Measurement requests accompany the first gentle preference request instead of
+holding it for a minute. Missing reports never suppress the Strong warning. A
+fresh weak target report blocks both paths. Force requires a qualifying target
+report, or strong source signal on the same band; source-only inference cannot
+force an unmeasured 2.4 GHz client onto 5 GHz. A client without 802.11v support
+cannot receive warnings, but Decisive can still act if these eligibility checks pass.
+Protected clients remain excluded.
+
+Both paths share per-client/destination attempt budgets (normally a 300-second
+interval and three attempts) and the existing one-force-per-client/five-minute
+budget. Attempts include the whole escalation sequence, not each stage. The
+same-boot attempt ledger is capped at 256 entries and expires automatically.
+The old separate preference `mode` and `min_rssi` settings are retired. Migration
+preserves an existing handoff policy; if absent, it maps old Advisory to Gentle
+and otherwise chooses Strong. The shared measured-signal minimum retains the
+stricter of the previous two thresholds.
+
+Completion remains purpose-specific. Radar preparation requires the source radio
+empty and its tracked clients authorized elsewhere. Preference observes arrival
+on the preferred AP; association alone is not proof of working internet. It never
+restarts an AP to force preference. An unsuccessful attempt releases the temporary
+ban and permits service on the original AP. During the bounded forced-reconnection
+watch, the source and target are reserved against ordinary moves and scans. Channel
+operations can preempt other preference stages; source/target placement changes,
+weak target evidence, protection changes and deadline expiry cancel an episode.
+Shutdown clears outstanding bans when possible; their 20-second limit also bounds
+an abrupt process loss. Restart never replays a pending warning or disconnect.
+
+After a successful operation on the preferred radio, original/late-arriving clients
+get a 120-second return observation and at most one extra attempt using the same
+escalation policy. It can bypass the ordinary attempt budget, but not protection,
+compatibility, signal checks or the forced-disconnect budget. Returned, elsewhere,
+absent and declined counts remain separate; helper-only clients are excluded.
+The preferred radio stays available during that bounded return observation.
+Other radios continue normally, and kernel radar evacuation takes priority.
+Expiry releases the reservation without declaring a placement failure.
 
 ## DFS and radar memory
 

@@ -17,5 +17,6 @@ jobs:
         run: |
           sh -n wifi-coordinator/build-apk.sh
           sh -n scripts/test-ucode.sh
+          sh -n tests/test-steering-migration.sh
           sh -n channel-coordinator/files/channel-coordinator.init
           sh -n radio-prefer/files/radio-prefer.init

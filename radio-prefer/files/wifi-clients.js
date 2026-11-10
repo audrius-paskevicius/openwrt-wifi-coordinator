@@ -18,7 +18,15 @@ var reasons={
  'await-measurement':'Waiting up to one minute for the client to report the target signal',
  'target-weak':'Preferred radio is below the signal threshold',
  'recommend':'Sending a roaming recommendation',
- 'cooldown':'Waiting before another recommendation',
+ 'cooldown':'Waiting before another steering attempt',
+ 'gentle-request':'Gentle request sent; observing the client',
+ 'strong-request':'Escalated request; observing the client',
+ 'no-request-support':'Client cannot receive requests; Decisive still requires signal and retry eligibility',
+ 'checking-reconnection':'Checking reconnection after a bounded disconnect',
+ 'disconnect-not-eligible':'Disconnect withheld by signal or retry limits',
+ 'stayed-elsewhere':'Client remained connected elsewhere',
+ 'return-not-observed':'Return not observed; temporary restriction released',
+ 'steering-cancelled':'Steering stopped because conditions changed',
  'attempt-limit':'Attempt limit reached for this episode',
  'unsupported':'Client does not advertise 802.11v roaming support',
  'recommend-unmeasured':'Gentle recommendation; destination measurement unavailable',
@@ -48,24 +56,21 @@ return view.extend({
   poll.add(function(){return Promise.all([readState(),services('channel-coordinator')]).then(function(x){refresh(x[0],x[1]);});},5);
   var intro=E('div',{},[
    E('h2',{},_('Wi-Fi Coordinator: clients')),
-   E('p',{},_('A shared Wi-Fi name lets devices roam between radios, but each device decides when to move. A fresh qualifying signal measurement permits your selected recommendation strength. Without measurement support, or after one minute without a usable report, either mode sends a gentle suggestion and lets the client judge the destination. A fresh weak-signal report blocks the recommendation.')),
-   E('p',{},_('During channel work, preference pauses only on reserved radios. A completed preferred-radio operation allows one extra gentle return request and observes return for two minutes. Other radios continue independently. usteer supplies measurements and neighbour information; this package owns steering decisions.')),
-   status,clients,
-   E('p',{},_('802.11k supplies signal measurements; 802.11v carries roaming recommendations. A client may support one, both, or neither. Normal radio preference does not force disconnections. Channel-operation handoffs can use the stronger escalation policy configured on the Channels page.'))
+   E('p',{},_('Preferred-radio steering and radar/channel handoffs use the same Gentle / Strong / Decisive policy. Every attempt starts gently. Strong adds a warning after one third of the handoff window; Decisive may disconnect an eligible remaining client after two thirds, with a 20-second return restriction. Missing measurements do not suppress the stronger warning. Fresh weak measurements block the attempt.')),
+   E('p',{},_('During channel work, preference pauses only on reserved radios. A completed preferred-radio operation allows one extra return attempt using the shared escalation policy. Return is observed for two minutes. Other radios continue independently. usteer supplies measurements and neighbour information; this package owns steering decisions.')),
+   status,clients,E('p',{},E('a',{href:L.url('admin/network/wifi_coordinator/channels')},_('Shared client steering policy'))),
+   E('p',{},_('802.11k supplies signal measurements; 802.11v carries roaming recommendations. A client may support one, both, or neither. Decisive mode can force a bounded disconnect. Without a fresh destination measurement, this requires strong source signal on the same band. It never assumes that a 2.4 GHz client supports 5 GHz. Protected clients are excluded; unsuccessful attempts leave the original AP available.'))
   ]);
-  var m=new form.Map('radio_prefer',_('Client steering settings'),_('These settings choose a preferred radio. Candidate channels, radar preparation and temporary handoff policy are on the Channels page. Status refreshes every five seconds without changing unsaved settings.'));
+  var m=new form.Map('radio_prefer',_('Client steering settings'),_('These settings choose a preferred radio. The shared steering strength, handoff window, signal thresholds and protected-client list are on Channels / Clients. Retry settings below apply to both paths. Status refreshes every five seconds without changing unsaved settings.'));
   var s=m.section(form.NamedSection,'main','radio_prefer');s.anonymous=true;
   var o=s.option(form.Flag,'enabled',_('Enable preferred-radio steering'),_('Requires full wpad/hostapd with 802.11k/v support and usteer. While enabled, competing usteer steering rules are held passive. The shared controller restores previous rules when it stops, preserving administrator changes. Channel planning also keeps usteer passive.'));o.rmempty=false;
   o=s.option(form.ListValue,'preferred_radio',_('Radio to prefer'),_('Choose the radio with the capabilities and coverage you want to prefer. On a WRT3200ACM, radio0 is normally the main 5 GHz radio. The preferred AP must use the same Wi-Fi name, security credentials and LAN as the client\'s current AP.'));
   o.value('',_('Select a radio'));uci.sections('wireless','wifi-device').forEach(function(r){o.value(r['.name'],r['.name']+' ('+(r.band=='2g'?'2.4':'5')+' GHz)');});
   o.validate=function(section,v){return this.map.lookupOption('enabled',section)[0].formvalue(section)!='1'||v?true:_('Select a preferred radio.');};o.rmempty=false;
-  o=s.option(form.ListValue,'mode',_('How strongly to recommend a move'),_('Gentle sends a suggestion. With a fresh qualifying signal measurement, Strong also signals that disassociation is imminent, but sets no AP disconnect timer. If measurements are unsupported or no usable report arrives within one minute, both modes send Gentle instead; the client decides whether to move. Normal cooldowns and attempt limits apply. Channel-operation handoff escalation is configured separately on the Channels page.'));
-  o.value('advisory',_('Gentle recommendation'));o.value('strong',_('Stronger recommendation'));o.default='advisory';o.rmempty=false;
   function value(name,title,def,type,description){var v=s.option(form.Value,name,_(title),_(description));v.default=String(def);v.datatype='and(integer,'+type+')';v.rmempty=false;}
-  value('min_rssi','Minimum signal at the preferred radio (dBm)',-67,'range(-90,-30)','Less negative means stronger: -50 dBm is stronger than -70 dBm. At -67, a measured -60 qualifies; -75 does not. A lower threshold allows moves from farther away but may reduce speed.');
   value('settle_time','Wait after a client connects (seconds)',30,'range(10,300)','Lets a new connection settle before asking the client to measure or roam again.');
-  value('cooldown','Wait between recommendations (seconds)',300,'range(60,3600)','300 is five minutes per client. This avoids repeatedly disturbing a device that declines to move.');
-  value('max_attempts','Maximum recommendations per episode',3,'range(1,10)','After this many attempts, requests pause for this count multiplied by the recommendation interval. The budget also resets after one minute on the preferred radio. Declining a move does not block future recommendations forever.');
+  value('cooldown','Wait between steering attempts (seconds)',300,'range(60,3600)','300 is five minutes per client and destination radio, shared by preference and channel handoffs. Stages within one attempt use the shared handoff window. One post-operation return attempt may bypass this pause.');
+  value('max_attempts','Maximum steering attempts before a longer pause',3,'range(1,10)','After this many attempts toward the same radio, both paths pause for this count multiplied by the attempt interval. The budget expires automatically; channel changes do not erase it. Forced disconnections additionally share one five-minute budget per client.');
   help.compact(m);
   return m.render().then(function(node){return E('div',{'class':'wifi-coordinator'},[
    E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),intro,node]);});

@@ -1,6 +1,7 @@
 import * as system_fs from 'fs';
 import * as nl from 'nl80211';
 import {width_retry,learning_scope} from './controller.uc';
+import {next_step,begin_attempt,reserve_force,target_ok,transition_request} from './handoff.uc';
 import {channel,group,same,same_block,overlap,permitted,uses_dfs,dfs_ready,preparation_text,reconfigure_text,same_network,force_signal_ok,private_ipv4,liveness_progress,move_method,quiet_ready,placement_rejected} from './policy.uc';
 export function data_flow(previous,current){
     if(!previous||!current)return false;
@@ -162,13 +163,16 @@ handoff=function(r,radios,preferred,strong) {
     let nr=call('hostapd.'+target.ifname,'rrm_nr_get_own').value?.[2];
     if(!match(nr ?? '',/^[a-fA-F0-9]{26,}$/))return 0;
     let stations=call('usteer','connected_clients')['hostapd.'+r.ifname] ?? {},count=0;
+    pending.handoff_eligible=pending.handoff_eligible ?? {};
     for(let mac in keys(r.clients)){
         // Protected work devices must not be interrupted by handoff requests.
         if(index(cfg.protected_clients,lc(mac))>=0)continue;
+        if(!target_ok(stations[mac]?.measurements,'hostapd.'+target.ifname,cfg.target_min ?? -72))continue;
+        if(!strong&&pending.handoff_eligible[mac]==null)
+            pending.handoff_eligible[mac]=!begin_attempt(state,mac,target.name,now(),cfg,false);
+        if(!pending.handoff_eligible[mac])continue;
         if(!stations[mac]||!stations[mac]['bss-transition-management'])continue;
-        call('hostapd.'+r.ifname,'bss_transition_request',{addr:mac,disassociation_imminent:!!strong&&index(cfg.protected_clients,lc(mac))<0,
-            disassociation_timer:0,validity_period:100,neighbors:[substr(nr,0,26)+'0301ff'],abridged:true,
-            dialog_token:(now()%254)+1});count++;
+        call('hostapd.'+r.ifname,'bss_transition_request',transition_request(mac,nr,(now()%254)+1,strong));count++;
     }
     history({event:strong?'handoff-strong':'handoff-request',from:r.name,to:target.name,clients:count});
     return count;
@@ -193,21 +197,19 @@ function handoff_relocated(radios) {
     return !length(filter(pending.handoff_clients ?? [],m=>!length(filter(radios,r=>r.name!=pending.handoff_source&&r.authorized[m]))));
 }
 function escalate_handoff(r,radios) {
-    let elapsed=now()-pending.started;
-    if(elapsed>=int(cfg.handoff_wait/3)&&!pending.strong_sent&&cfg.escalation!='gentle'){
+    let step=next_step(pending,now(),cfg);
+    if(step=='strong'){
         handoff(r,radios,pending.handoff_target,true);pending.strong_sent=true;
     }
-    if(elapsed>=int(cfg.handoff_wait*2/3)&&pending.force_sent==null&&cfg.escalation=='decisive'){
+    if(step=='force'){
         pending.force_sent=now();
         let target=handoff_destination(r,radios,pending.handoff_target);if(!target)return;
         let clients=call('usteer','connected_clients')['hostapd.'+r.ifname] ?? {},count=0;
         state.forced=state.forced ?? {};
         for(let mac in keys(r.clients)){
-            if(index(cfg.protected_clients,lc(mac))>=0)continue;
-            if(now()-(state.forced[mac] ?? -100000)<300)continue;
-            if(state.forced[mac]==null&&length(state.forced)>=256)continue;
-            if(!force_signal_ok(clients[mac]?.measurements,'hostapd.'+target.ifname,r.signals[mac],cfg.target_min,cfg.source_min))continue;
-            state.forced[mac]=now();save(); // consume the retry budget before sending
+            if(!pending.handoff_eligible?.[mac])continue;
+            if(!reserve_force(state,mac,clients[mac]?.measurements,'hostapd.'+target.ifname,r.signals[mac],r.band==target.band,now(),cfg))continue;
+            save(); // consume the shared retry budget before sending
             pending.bans=pending.bans ?? [];pending.forced_clients=pending.forced_clients ?? [];
             push(pending.bans,{node:'hostapd.'+r.ifname,mac});push(pending.forced_clients,mac);pending.forced_source=r.name;
             call('hostapd.'+r.ifname,'del_client',{addr:mac,reason:12,deauth:true,ban_time:cfg.ban_seconds*1000});count++;
@@ -465,6 +467,7 @@ function operation(radios) {
             pending.kind='move-wait';pending.started=t-12;
             delete pending.strong_sent;delete pending.force_sent;delete pending.handoff_target;delete pending.forced_clients;
             delete pending.handoff_clients;delete pending.handoff_source;
+            delete pending.handoff_eligible;
         }
         else if(t-pending.started>=cfg.handoff_wait)die('Clients stayed on the spare radio; radar preparation deferred');
         save();return;

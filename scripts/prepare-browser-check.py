@@ -48,7 +48,7 @@ function E(tag,attrs,children){
  dom.append(node,children);return node;
 }
 const dom={append:eval('({'+payload.methods.append+'})').append,elem:x=>x instanceof Node,bindClassInstance:()=>{}};
-const L={Class:{extend:o=>o},resource:()=>'',bind:(f,self,...a)=>f.bind(self,...a),env:{sessionid:'synthetic-session'}};
+const L={Class:{extend:o=>o},resource:()=>'',url:p=>'/cgi-bin/luci/'+p,bind:(f,self,...a)=>f.bind(self,...a),env:{sessionid:'synthetic-session'}};
 const _=x=>x;
 const findParent=(n,s)=>n&&n.closest?n.closest(s):null;
 const tooltipDiv=document.body.appendChild(E('div',{'class':'cbi-tooltip'}));let tooltipTimeout=null;
