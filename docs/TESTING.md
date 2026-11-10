@@ -41,6 +41,15 @@ installed CGI passed 15 authorization/download checks. Temporary signing copies
 were removed. Source and package payloads were checked against private router
 credentials without publishing those values.
 
+Chrome verified the installed Comparison page with 161 candidate rows, direct
+movement costs and complete-route client exposure, without page exceptions. A
+live automatic operation prepared and shared DFS clearance, then reconsidered the
+move after newer survey evidence: the changed benefit did not meet the new
+uncertainty margin. It restored the helper and cancelled before moving the serving
+radio; no client departures were recorded. The coordinator continued scanning with
+no failure latch. Two additional authenticated download checks confirmed that the
+actual recorded decision fields appeared in both JSON and action CSV.
+
 These tests establish policy and serialization behaviour, not throughput benefit
 or the optimum movement frequency in a changing RF environment. The new exported
 figures support evaluating actual moves over time.
