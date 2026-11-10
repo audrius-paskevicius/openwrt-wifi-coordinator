@@ -23,7 +23,7 @@ for(let pair in split(raw,'&')){
  args[k]=v;
 }
 if(!match(args.sessionid ?? '',/^[a-f0-9]{32}$/)||args.sessionid=='00000000000000000000000000000000')fail('403 Forbidden','Log in to LuCI before exporting history.');
-if(index(['json','csv'],args.format)<0||!match(args.hours ?? '',/^(0|[1-9][0-9]{0,2})$/)||int(args.hours)>200||
+if(index(['json','csv'],args.format)<0||!match(args.hours ?? '',/^(0|[1-9][0-9]{0,2})$/)||int(args.hours)>120||
  (args.format=='csv'&&index(DATASETS,args.dataset)<0))fail('400 Bad Request','Invalid export choice.');
 let bus=ubus.connect();
 function allowed(scope,object,method){return bus?.call('session','access',{ubus_rpc_session:args.sessionid,scope,object,function:method})?.access==true;}
@@ -34,7 +34,9 @@ let warnings=[],names=fs.lsdir(dir);
 if(!names){if(fs.stat(dir))push(warnings,'Cannot list history archive');names=[];}
 names=sort(filter(names,n=>match(n,/^batch-[0-9]+\.json$/)));
 for(let n in names)if(!allowed('file',dir+n,'read'))fail('403 Forbidden','This session cannot read an archive batch.');
-let cursor=uci.cursor(),hours=max(1,min(200,int(cursor.get('channel_coordinator','main','history_hours') ?? 24))),now=time();
+let cursor=uci.cursor(),hours=max(1,min(120,int(cursor.get('channel_coordinator','main','history_hours') ?? 24))),now=time();
+// Skip closed batches that cannot overlap the supported retention window.
+names=filter(names,n=>int(match(n,/^batch-([0-9]+)\.json$/)[1])>=now-hours*3600);
 function read(path){
  // A bounded read also protects against a file growing after stat().
  let s=fs.lstat(path);if(!s||s.type!='file'||s.size>2097152)return null;

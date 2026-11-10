@@ -119,6 +119,8 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  const downloads=[];HTMLFormElement.prototype.submit=function(){downloads.push({action:this.getAttribute('action'),method:this.method,target:this.target,fields:Object.fromEntries(new FormData(this))});};
  const exportSection=document.querySelector('.wc-export');
  assert(exportSection.previousElementSibling.classList.contains('cbi-map'),'export follows retention');
+ assert(Math.max(...Array.from(document.querySelector('[data-fixture-page=history] select').options,o=>Number(o.value)))===120,'legacy 200-hour setting cannot extend Show beyond 120');
+ assert(Math.max(...Array.from(document.querySelector('#wc-export-period').options,o=>Number(o.value)||0))===120,'legacy export selector capped at 120');
  document.querySelector('#wc-export-period').value='6';exportSection.querySelector('[data-export-format=json]').click();
  assert(downloads[0].method==='post'&&downloads[0].fields.format==='json'&&downloads[0].fields.hours==='6','JSON uses selected window in native POST');
  assert(downloads[0].fields.sessionid==='synthetic-session'&&!downloads[0].action.includes('session'),'session is only in POST body');
@@ -128,6 +130,8 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  assert(!document.querySelector('form'),'temporary submission form removed');
  function fieldsOf(s){return s.children.flatMap(o=>o.subsection?fieldsOf(o.subsection):[o]);}
  const fields=maps.flatMap(m=>m.children.flatMap(fieldsOf));
+ const retention=fields.find(o=>o.option==='history_hours');
+ assert(retention.datatype==='range(1,120)'&&retention.cfgvalue()==='120','retention field clamps a legacy saved value and validates 120-hour maximum');
  const writes=[];
  const nativeLoad=eval('({'+payload.methods.valueLoad+'})').load;
  const nativeWrite=eval('({'+payload.methods.valueWrite+'})').write;

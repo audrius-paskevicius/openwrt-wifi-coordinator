@@ -1,12 +1,36 @@
 # Validation
 
-Source release: **0.7.0-r11**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r12**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
-Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
+Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 54 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r12 bounded history windows (2026-11-10)
+
+Retention, History Show and export Period now stop at 120 hours. Upgrade migration
+reduces larger saved values to 120 and preserves smaller values. The recorder
+also clamps legacy configurations. History and exports skip expired archive
+batches before reading them; cached batches expire without another fetch.
+Physical deletion keeps the existing six-hour schedule.
+
+Portable checks, the native LuCI fixture and actual Chart.js Chrome fixture
+passed. The UI fixture starts with a legacy 200-hour setting and verifies all
+three limits. Cache tests cover the cutoff boundary and expiry. The full isolated
+ucode suite passed, including migration/idempotency, 38 streaming export checks
+and 552 archive-storage checks: a 216-hour simulation retained all 4,323 original
+samples and 1,441 surveys in the final 120-hour window (21 boundary-inclusive
+batches). No live RF experiment was required for this storage change.
+
+The signed APK verified and all 46 payload files matched source. Source and
+extracted-package secret scans passed, including comparison with saved router
+credentials. Installation changed only history retention from 200 to 120 among
+the six checked configuration files. The live recorder reported 120 hours; all
+three charts rendered without warnings or browser exceptions. Retention, Show
+and export selectors stopped at 120. Authenticated 121/200-hour requests returned
+400; a one-hour JSON export completed with retention metadata of 120.
 
 ## 0.7.0-r11 single-entry ribbon tooltips (2026-11-10)
 

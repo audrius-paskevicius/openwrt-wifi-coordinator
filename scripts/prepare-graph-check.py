@@ -91,7 +91,7 @@ try{
  const cp=clients.ctx.getImageData(Math.round(cx)-2,Math.round(cy)-2,5,5).data;
  assert(Array.from({length:25},(_,i)=>i*4).some(i=>cp[i]>150&&cp[i+1]<80&&cp[i+2]>100),'actual client-count line painted');
  const localStart=new Date(2026,10,7,9,0).getTime()/1000;
- [300,950].forEach(width=>[ [localStart,localStart+21600], [localStart,localStart+200*3600], [localStart+14*3600,localStart+16*3600] ].forEach(([a,b])=>{
+ [300,950].forEach(width=>[ [localStart,localStart+21600], [localStart,localStart+120*3600], [localStart+14*3600,localStart+16*3600] ].forEach(([a,b])=>{
   const c=graph.channelChart(document.getElementById('dates'),[],[],a,b,[],{},['2g','5g']);
   const t=graph.trafficChart(document.getElementById('times'),[],names,a,b);
   [c,t].forEach(g=>g.resize(width,400));
@@ -104,7 +104,7 @@ try{
   c.destroy();t.destroy();
  }));
  document.getElementById('legend').innerHTML=names.map((r,i)=>'<span style="color:'+graph.colour(r,i)+';margin-right:24px"><i style="display:inline-block;width:25px;height:12px;border:2px solid;'+graph.patternStyle(r,i)+'"></i> '+r+'</span>').join('');
- document.getElementById('result').textContent='PASS: actual Chart.js render, spectrum geometry, dense surveys, shared ISO ticks at narrow/wide sizes, same-day, midnight and 200-hour views';
+ document.getElementById('result').textContent='PASS: actual Chart.js render, spectrum geometry, dense surveys, shared ISO ticks at narrow/wide sizes, same-day, midnight and 120-hour views';
  document.getElementById('result').dataset.status='pass';
 }catch(e){document.getElementById('result').textContent='FAIL: '+e.stack;document.getElementById('result').dataset.status='fail';}
 '''

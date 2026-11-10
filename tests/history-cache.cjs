@@ -11,7 +11,7 @@
  data[path+'history.json']=JSON.stringify({...archive,samples:[{...sample,time:1}]});
  listing=[{name:'history.json',type:'file'},{name:'batch-210.json',type:'file'},{name:'unrelated.txt',type:'file'},{name:'batch-211.json.new',type:'file'}];
  const fs={list:async()=>listing,read:async()=>{throw Error('History must bypass size-limited ubus reads');},read_direct:async(p,type)=>{check(type==='text','streamed reads preserve byte accounting');calls.push(p);if(!(p in data))throw Object.assign(Error('No such file'),{name:'NotFoundError'});return data[p];}};
- const read=new Function('fs',prefix+';return readHistory;')(fs);
+ const read=new Function('fs','Date',prefix+';return readHistory;')(fs,{now:()=>1000000});
  data['/tmp/channel-coordinator-state.json']=JSON.stringify({declared_bands:['5g']});
  let h=await read();check(h.declared_bands.join(' ')==='5g','band declaration comes from PHY status, independent of history');check(h.samples.length===1&&h.samples[0].n===2,'boundary sample dedup and obsolete archive ignored');
  check(h.periods.length===1&&h.periods[0].end===250,'residence extension dedup');
@@ -51,5 +51,16 @@
  check(rows.length===3,'dedup window is anchored to first report and regions stay distinct');
  rows=reconstruct(Array.from({length:140},(_,i)=>({...detection,time:detection.time+i*10})),[],[]);
  check(rows.length===140,'retained graph history is not capped by planner memory limit');
+ let clock=1000000000,expiredReads=[];
+ const cutoff=clock/1000-120*3600;
+ const ages=[cutoff-1,cutoff,cutoff+21600];
+ const agedFs={list:async()=>ages.map(t=>({name:'batch-'+t+'.json',type:'file'})),read_direct:async(p)=>{
+  const batch=/batch-([0-9]+)\.json$/.exec(p);if(!batch)return '{}';
+  expiredReads.push(Number(batch[1]));return JSON.stringify({events:[{time:Number(batch[1]),event:'retained'}]});
+ }};
+ const agedRead=new Function('fs','Date',prefix+';return readHistory;')(agedFs,{now:()=>clock});
+ h=await agedRead();check(expiredReads.join(',')===ages.slice(1).join(','),'expired batches are never fetched; boundary batch is retained');
+ clock+=2000;expiredReads=[];h=await agedRead();
+ check(!expiredReads.length&&h.events.length===1&&h.events[0].time===ages[2],'expired cached batch is evicted without refetching retained batches');
  return {passed:checks};
 })().then(r=>console.log('PASS: '+r.passed+' history/cache cases')).catch(e=>{console.error(e);process.exitCode=1;});

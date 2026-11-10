@@ -14,8 +14,8 @@
    [state]:JSON.stringify({declared_bands:['2g','5g'],radar:{half_life:3600,events:[{time:100,center:5250,width:160,weight:1}]}})
   },fail:{},calls:[],waits:[]};
   async function request(path){f.calls.push(path);if(f.fail[path])await f.fail[path]();return path===dir?f.listing:f.data[path];}
-  f.read=new Function('fs','setTimeout',prefix+';return readHistory;')(
-   {list:()=>request(dir),read_direct:p=>request(p)},(fn,ms)=>{f.waits.push(ms);fn();});
+  f.read=new Function('fs','setTimeout','Date',prefix+';return readHistory;')(
+   {list:()=>request(dir),read_direct:p=>request(p)},(fn,ms)=>{f.waits.push(ms);fn();},{now:()=>1000000});
   return f;
  }
  let f=fixture(),h=await f.read();

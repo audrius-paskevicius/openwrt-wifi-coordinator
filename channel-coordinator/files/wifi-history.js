@@ -86,6 +86,10 @@ async function loadHistory(){
    files=archiveFiles||[];if(archiveCache.size)usedCache=true;
   }
  }
+ // Expired batches cannot contribute to the supported 120-hour window.
+ var oldest=Date.now()/1000-120*3600;
+ files=files.filter(f=>Number(f.name.slice(6,-5))>=oldest);
+ archiveCache.forEach((v,k)=>{if(Number(k.slice(6,-5))<oldest)archiveCache.delete(k);});
  // Only a successful listing (including a confirmed missing directory) can
  // establish deletion. A failed request must never empty the archive cache.
  if(listed){archiveFiles=files;var names=new Set(files.map(function(f){return f.name;}));archiveCache.forEach(function(v,k){if(!names.has(k))archiveCache.delete(k);});}
@@ -132,7 +136,7 @@ function congestionCell(sample,surveys){
  if(estimate)detail+=' Survey observed: '+stamp(estimate.oldest)+(estimate.oldest!=estimate.newest?' – '+stamp(estimate.newest):'')+'. Coverage: '+estimate.coverage.toFixed(0)+'%.';
  return E('div',{'title':detail},lines);
 }
-var retentionChoices=[1,3,6,12,24,48,72,96,120,168,200];
+var retentionChoices=[1,3,6,12,24,48,72,96,120];
 var actionNames={
  'planning-complete':'Planning calculation completed','planning-discarded':'Planning calculation discarded','planning-failed':'Planning calculation failed','slow-stage':'Slow controller stage','observation-gap':'Missed observations','radio-unavailable':'Confirmed radio unavailability','placement-observed':'Channel placement changed','client-departure':'Station departed',
  'radio-recovered':'Radio service recovered automatically','restart-retry':'Automatic restart-recovery check','switch-request-failed':'Channel switch request failed',
@@ -160,8 +164,8 @@ return view.extend({
  render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));},
  renderPage:function(data){
   var instances=[],frame=null;
-  var history=data[1],retain=Math.max(1,Math.min(200,Number(uci.get('channel_coordinator','main','history_hours'))||24)),hours=Math.min(6,retain),display=E('div'),selector=E('select',{'class':'cbi-input-select'});
-  function setRetention(value){retain=Math.max(1,Math.min(200,Number(value)||24));hours=Math.min(hours,retain);
+  var history=data[1],retain=Math.max(1,Math.min(120,Number(uci.get('channel_coordinator','main','history_hours'))||24)),hours=Math.min(6,retain),display=E('div'),selector=E('select',{'class':'cbi-input-select'});
+  function setRetention(value){retain=Math.max(1,Math.min(120,Number(value)||24));hours=Math.min(hours,retain);
    var choices=retentionChoices.filter(function(h){return h<=retain;});if(choices.indexOf(retain)<0)choices.push(retain);
    selector.replaceChildren.apply(selector,choices.map(function(h){return E('option',{value:h},'Last '+h+' hour'+(h==1?'':'s'));}));
    if(choices.indexOf(hours)<0)hours=choices[choices.length-1];selector.value=String(hours);

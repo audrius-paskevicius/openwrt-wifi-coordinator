@@ -13,6 +13,9 @@ let old_min=c.get('radio_prefer','main','min_rssi');
 if(old_min!=null&&match(old_min,/^-[0-9]+$/))
     c.set('channel_coordinator','main','handoff_target_min',''+max(int(old_min),int(c.get('channel_coordinator','main','handoff_target_min') ?? '-72')));
 c.delete('radio_prefer','main','mode');c.delete('radio_prefer','main','min_rssi');
+let history_hours=c.get('channel_coordinator','main','history_hours');
+if(match(history_hours ?? '',/^[0-9]+$/)&&int(history_hours)>120)
+    c.set('channel_coordinator','main','history_hours','120');
 let board=trim(fs.readfile('/tmp/sysinfo/board_name') ?? '');
 let wrt=index(['linksys,wrt3200acm','linksys,wrt32x'],board)>=0;
 let radios=[];c.foreach('wireless','wifi-device',r=>push(radios,r));
@@ -30,5 +33,5 @@ for(let r in radios){
 if(ARGV[0]=='--apply'){
     for(let config in ['channel_coordinator','radio_prefer'])
         if(length(c.changes(config) ?? {})&&!c.commit(config))die('Could not save inferred radio roles\n');
-    print('Missing radio roles filled; existing settings preserved\n');
+    print('Missing radio roles filled; history retention limited to 120 hours\n');
 }else print(sprintf('%J\n',c.changes()));

@@ -69,6 +69,7 @@ if(index(['gentle','strong','decisive'],cfg.escalation)<0)die('Invalid handoff e
 if(!(cfg.max_mbps>=0.01&&cfg.max_mbps<=1000))die('Invalid traffic threshold\n');
 for(let mac in cfg.protected_clients)if(length(mac)&&!match(mac,/^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/))die('Invalid protected client address\n');
 let boot=trim(fs.readfile('/proc/sys/kernel/random/boot_id'));
+// Accept legacy saved values; the recorder enforces the 120-hour maximum.
 let history_store=open_history(boot,raw.history_enabled!='0',number('history_hours',24,1,200));
 if(raw.clear_history=='1'&&!length(ARGV)){history_store.clear();cursor.set('channel_coordinator','main','clear_history','0');cursor.commit('channel_coordinator');}
 function private_json(path,data) {

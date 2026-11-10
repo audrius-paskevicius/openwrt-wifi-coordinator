@@ -7,7 +7,7 @@
 'require poll';
 'require wifi-coordinator.help as help';
 'require wifi-coordinator.time as timefmt';
-var retentionChoices=[1,3,6,12,24,48,72,96,120,168,200];
+var retentionChoices=[1,3,6,12,24,48,72,96,120];
 async function readStorage(){
  var errors=[],ram={},files=[];
  try { var raw=await fs.read_direct('/tmp/wifi-coordinator-history.json','text');ram=JSON.parse(raw);ram.ram_bytes=new TextEncoder().encode(raw).length; }
@@ -20,7 +20,7 @@ return view.extend({
  load:function(){return Promise.all([uci.load('channel_coordinator'),readStorage()]);},
  render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));},
  renderPage:function(data){
-  var retain=Math.max(1,Math.min(200,Number(uci.get('channel_coordinator','main','history_hours'))||24));
+  var retain=Math.max(1,Math.min(120,Number(uci.get('channel_coordinator','main','history_hours'))||24));
   var storageBody=E('div'),storageDetails=E('details',{'class':'wc-history-storage'},[E('summary',{},_('History storage')),storageBody]);
   function redrawStorage(h){
    var nodes=(h.read_errors||[]).map(function(e){return E('p',{'class':'alert-message warning'},e);});
@@ -34,7 +34,7 @@ return view.extend({
   var m=new form.Map('channel_coordinator',_('History retention'),_('Keep history for the selected duration. Recent records stay in RAM and are saved to flash every six hours and during an orderly shutdown.'));
   var s=m.section(form.NamedSection,'main','coordinator');s.anonymous=true;
   var o=s.option(form.Flag,'history_enabled',_('Record Wi-Fi history'),_('Turn off to pause new recording. Existing graphs and actions are kept until their retention period expires. Use Clear recorded history to delete them.'));o.default='1';o.rmempty=false;
-  o=s.option(form.ListValue,'history_hours',_('Retain up to this many hours'),_('Show follows this selection. Reducing retention hides older records immediately; the next scheduled offload prunes the archive without an extra flash rewrite.'));o.default='24';o.datatype='range(1,200)';o.rmempty=false;
+  o=s.option(form.ListValue,'history_hours',_('Retain up to this many hours'),_('Show follows this selection. Reducing retention hides older records immediately; the next scheduled offload prunes the archive without an extra flash rewrite.'));o.default='24';o.datatype='range(1,120)';o.rmempty=false;o.cfgvalue=function(){return String(retain);};
   var configured=retentionChoices.slice();if(configured.indexOf(retain)<0)configured.push(retain);configured.sort(function(a,b){return a-b;}).forEach(function(h){o.value(String(h),h+' hour'+(h==1?'':'s'));});
   o=s.option(form.Flag,'clear_history',_('Clear recorded history'),_('Delete recorded graphs, surveys and actions from RAM and flash when settings are applied. This switch resets itself. Recording follows the setting above; radar-avoidance memory is preserved.'));o.default='0';o.rmempty=false;
   help.compact(m);

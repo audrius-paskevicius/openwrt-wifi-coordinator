@@ -3,7 +3,7 @@ import {pressure} from './policy.uc';
 import {RAM_LIMIT,INTERVAL,archive_info,clear_archive,expire_archive,prune,bounded,checkpoint} from './history-storage.uc';
 const PATH='/tmp/wifi-coordinator-history.json',LIMIT=RAM_LIMIT;
 export function open_history(boot,enabled,hours) {
-    hours=max(1,min(200,hours));
+    hours=max(1,min(120,hours));
     let h={boot,started:time(),periods:[],samples:[],clients:[],events:[],surveys:[]},last_record=0,last_flush=0;
     try { if((fs.stat(PATH)?.size ?? LIMIT+1)<=LIMIT){let old=json(fs.readfile(PATH));
         if(old.boot==boot&&type(old.periods)=='array'&&type(old.samples)=='array'&&type(old.events)=='array'&&type(old.surveys)=='array')

@@ -133,8 +133,10 @@ All shared strength, timing, protection, signal and retry controls are on Settin
 | Key | Why keep it / precise scope |
 | --- | --- |
 | `history_enabled` | Pauses new recording without deleting existing history. |
-| `history_hours` | Maximum retention and both graph/export selection ranges (up to 200 hours), subject to the documented RAM/free-flash safeguards. |
+| `history_hours` | Maximum retention and both graph/export selection ranges (up to 120 hours), subject to the documented RAM/free-flash safeguards. |
 | `clear_history` | Explicit one-shot deletion, reset after use. Independent of pausing recording; does not erase radar memory. |
+
+Upgrades reduce saved retention above 120 hours to 120; smaller settings are preserved. The recorder also enforces the cap when reading an older configuration. History and exports skip archive batches older than the supported window; physical deletion remains part of the scheduled six-hour cleanup.
 
 These settings are on **Storage & export**. History's Show and exports' Period selectors are independent local viewing/download choices, each limited by saved retention. They do not change recording or stored retention.
 
