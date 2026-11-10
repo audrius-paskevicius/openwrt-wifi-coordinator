@@ -68,6 +68,10 @@ clients['hostapd.dst'].client=clients['hostapd.src'].client;delete clients['host
 radios[0].authorized={};radios[1].authorized={client:true};tick(1);
 check(!preference.state.clients.client.episode&&preference.state.clients.client.decision=='on-preferred-radio','target association completes preference goal');
 check(length(filter(events,e=>e.event=='steering-complete'&&e.reason=='on-preferred-radio'))==1,'completion recorded once');
+check(preference.state.clients.client.attempts==1,'successful return still reports the active shared attempt budget');
+shared_state.handoff_attempts['client|good']={at:T,count:3};tick(1);
+check(preference.state.clients.client.attempts==3,'display follows attempts consumed by either steering path');
+tick(901);check(preference.state.clients.client.attempts==0,'display clears an expired shared budget without a new request');
 setup();shared_state.forced={client:T-1};tick(31);tick(31);
 check(!length(disconnects()),'a prior channel-operation force blocks preference force');
 setup();common.protected_clients=['client'];tick(31);

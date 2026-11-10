@@ -1,63 +1,71 @@
 {
- "admin/network/wifi_coordinator": {
-  "depends": {
-   "acl": [
-    "luci-app-channel-coordinator",
-    "luci-app-radio-prefer"
-   ]
+  "admin/network/wifi_coordinator": {
+    "depends": {
+      "acl": [
+        "luci-app-channel-coordinator",
+        "luci-app-radio-prefer"
+      ]
+    },
+    "order": 65,
+    "action": {
+      "type": "firstchild"
+    },
+    "title": "Wi-Fi Coordinator"
   },
-  "order": 65,
-  "action": {
-   "type": "firstchild"
+  "admin/network/wifi_coordinator/channels": {
+    "order": 10,
+    "action": {
+      "type": "view",
+      "path": "wifi-channels"
+    },
+    "title": "Channels"
   },
-  "title": "Wi-Fi Coordinator"
- },
- "admin/network/wifi_coordinator/channels": {
-  "order": 10,
-  "action": {
-   "type": "view",
-   "path": "wifi-channels"
+  "admin/network/wifi_coordinator/storage": {
+    "order": 35,
+    "action": {
+      "type": "view",
+      "path": "wifi-storage"
+    },
+    "title": "Storage & export"
   },
-  "title": "Channels"
- },
- "admin/network/wifi_coordinator/storage": {
-  "order": 35,
-  "action": {
-   "type": "view",
-   "path": "wifi-storage"
+  "admin/network/wifi_coordinator/clients": {
+    "order": 20,
+    "action": {
+      "type": "view",
+      "path": "wifi-clients"
+    },
+    "title": "Clients"
   },
-  "title": "Storage & export"
- },
- "admin/network/wifi_coordinator/clients": {
-  "order": 20,
-  "action": {
-   "type": "view",
-   "path": "wifi-clients"
+  "admin/network/wifi_coordinator/history": {
+    "order": 30,
+    "action": {
+      "type": "view",
+      "path": "wifi-history"
+    },
+    "title": "History"
   },
-  "title": "Clients"
- },
- "admin/network/wifi_coordinator/history": {
-  "order": 30,
-  "action": {
-   "type": "view",
-   "path": "wifi-history"
+  "admin/network/wifi_coordinator/disclaimer": {
+    "order": 40,
+    "action": {
+      "type": "view",
+      "path": "wifi-disclaimer"
+    },
+    "title": "Experimental, AI-generated software. Use at your own risk."
   },
-  "title": "History"
- },
- "admin/network/wifi_coordinator/disclaimer": {
-  "order": 40,
-  "action": {
-   "type": "view",
-   "path": "wifi-disclaimer"
+  "admin/network/wifi_coordinator/comparison": {
+    "order": 25,
+    "action": {
+      "type": "view",
+      "path": "wifi-comparison"
+    },
+    "title": "Comparison"
   },
-  "title": "Experimental, AI-generated software. Use at your own risk."
- },
- "admin/network/wifi_coordinator/comparison": {
-  "order": 25,
-  "action": {
-   "type": "view",
-   "path": "wifi-comparison"
-  },
-  "title": "Comparison"
- }
+  "admin/network/wifi_coordinator/settings": {
+    "order": 32,
+    "action": {
+      "type": "view",
+      "path": "wifi-settings"
+    },
+    "title": "Settings"
+  }
 }

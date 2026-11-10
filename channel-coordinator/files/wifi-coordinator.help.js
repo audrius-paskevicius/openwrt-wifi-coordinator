@@ -2,10 +2,11 @@
 'require ui';
 
 var summaries={
- enabled:'Enable or stop this controller.',
- mode:'Choose how this controller acts.',
+ enabled:'Enable channel surveys and placement planning.',
+ preference_enabled:'Steer clients independently of channel planning mode.',
+ mode:'Observe or apply channel changes; steering is independent.',
  interval:'Pause between completed spectrum surveys.',
- improvement:'Minimum service gain before moving, including width changes.',
+ improvement:'Base movement cost and required net gain; higher resists disruption.',
  min_dwell:'Minimum time to stay after a successful move.',
  radar_half_life:'Time for remembered radar risk to halve.',
  persist:'Save verified channel settings every six hours.',
@@ -17,8 +18,8 @@ var summaries={
  allow_reconnect:'Allow a brief radio restart if handoff cannot finish.',
  protected_clients:'Enter a Wi-Fi MAC address, then click + to add it. Empty means none.',
  verify_unprobed:'How long to watch clients that cannot answer reachability probes.',
- handoff_target_min:'Shared minimum measured destination signal.',
- handoff_source_min:'Required nearby signal when the destination cannot be measured.',
+ handoff_target_min:'Fresh weaker reports block requests and disconnections.',
+ handoff_source_min:'Decisive only: same-band source signal for an unmeasured destination.',
  dfs_mode:'Choose whether and how to use channels requiring radar clearance.',
  dfs_helper:'Choose a spare radio for the radar check.',
  scan_policy:'Choose when occupied radios may scan.',
@@ -26,7 +27,7 @@ var summaries={
  scan_gap:'Minimum serving time between paced scan visits.',
  scanner:'Choose a scanner, or let the controller select one.',
  scan_type:'Choose passive listening or active probes where allowed.',
- max_age:'Maximum age of evidence used for planning.',
+ max_age:'Evidence lifetime and initial retry wait after uncertain results.',
  separate_radios:'Prefer non-overlapping placements for our radios.',
  overlap_penalty:'Cost of overlap when strict separation is disabled.',
  managed:'Include this radio in automatic channel planning.',
@@ -35,7 +36,7 @@ var summaries={
  width_method:'Auto, follow channel method, or a fixed method.',
  channels:'Use Auto, or list primary channels. Width is chosen separately.',
  widths:'Use auto, or list widths in MHz to compare.',
- preferred_radio:'Radio to recommend when its signal is sufficient.',
+ preferred_radio:'Preferred destination when network and safeguards permit.',
  settle_time:'Wait after connection before recommending a move.',
  cooldown:'Shared pause between client/destination steering attempts.',
  max_attempts:'Shared attempt limit before a longer pause.',
@@ -88,6 +89,7 @@ function compact(element){
   if(!shortText)shortText=(full.match(/^.*?[.!?](?:\s|$)/)||[full])[0].trim();
   element.description=explain(_(shortText),full,element.title);
  }
+ if(element.subsection)compact(element.subsection);
  (element.children||[]).forEach(compact);
  return element;
 }

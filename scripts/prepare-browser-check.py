@@ -21,6 +21,9 @@ form = (resources / 'form.js').read_text(encoding='utf-8')
 ui = (resources / 'ui.js').read_text(encoding='utf-8')
 luci = (resources / 'luci.js').read_text(encoding='utf-8')
 methods = {
+    'valueLoad': portion(form[form.index('const CBIAbstractValue='):], 'load(section_id){', ',getUIElement(section_id){'),
+    'valueWrite': portion(form[form.index('const CBIAbstractValue='):], 'write(section_id,formvalue){', ',remove(section_id){'),
+    'valueParse': portion(form[form.index('const CBIAbstractValue='):], 'parse(section_id){', ',write(section_id,formvalue){'),
     'append': portion(luci, 'append(node,children){', ',content(node,children){'),
     'frame': portion(form, 'renderFrame(section_id,in_table,option_index,nodes){', ',renderWidget(section_id,option_index,cfgvalue){'),
     'section': portion(form[form.index('const CBINamedSection='):], 'renderContents(data){', ',render(){'),
@@ -30,6 +33,7 @@ methods = {
 sources = {name: (root / file).read_text(encoding='utf-8') for name, file in [
     ('time', 'channel-coordinator/files/wifi-coordinator.time.js'),
     ('help', 'channel-coordinator/files/wifi-coordinator.help.js'),
+    ('settings', 'channel-coordinator/files/wifi-settings.js'),
     ('channels', 'channel-coordinator/files/wifi-channels.js'),
     ('comparison', 'channel-coordinator/files/wifi-comparison.js'),
     ('clients', 'radio-prefer/files/wifi-clients.js'),
@@ -64,28 +68,31 @@ const renderContents=eval('({'+payload.methods.section+'})').renderContents;
 const maps=[],polls=[];
 class Option{
  constructor(section,type,name,title,description){Object.assign(this,{section,map:section.map,type,option:name,title,description,values:[],dependencies:[]});}
+ cfgvalue(){return this.default;}
+ formvalue(){return undefined;}
  value(key,label){this.values.push([key,label]);}
  depends(key,value){this.dependencies.push([key,value]);}
  transformDepList(){return [];}
  cbid(sid){return this.map.config+'.'+sid+'.'+this.option;}
  handleValueChange(){}
- render(){const widget=this.values.length?E('select',{},this.values.map(v=>E('option',{value:v[0]},v[1]))):E('input',{type:this.type==='flag'?'checkbox':'text',value:this.default||''});return renderFrame.call(this,this.section.section,false,0,widget);}
+ render(){if(this.subsection)return this.subsection.render();if(this.renderWidget)return renderFrame.call(this,this.section.section,false,0,this.renderWidget());const widget=this.values.length?E('select',{},this.values.map(v=>E('option',{value:v[0]},v[1]))):E('input',{type:this.type==='flag'?'checkbox':'text',value:this.default||''});return renderFrame.call(this,this.section.section,false,0,widget);}
 }
 class Section{
- constructor(map,name,type,title,description){Object.assign(this,{map,section:name,sectiontype:type,title,description,children:[]});}
- tab(){}
- option(...args){const o=new Option(this,...args);this.children.push(o);return o;}
- taboption(tab,...args){return this.option(...args);}
+ constructor(map,name,type,title,description){Object.assign(this,{map,section:name,sectiontype:type,title,description,children:[],tabs:{}});}
+ tab(name){this.tabs[name]={children:[]};}
+ option(...args){const o=new Option(this,...args);if(args[0]==='section'){o.title=null;o.description=null;o.subsection=new Section(this.map,...args.slice(3));}this.children.push(o);return o;}
+ taboption(tab,...args){const o=this.option(...args);this.tabs[tab].children.push(o);return o;}
  renderContents(data){return renderContents.call(this,data);}
  render(){return this.renderContents([{},this.children.map(o=>o.render())]);}
 }
 class FormMap{
- constructor(config,title,description){Object.assign(this,{config,title,description,children:[]});maps.push(this);}
+ constructor(config,title,description){Object.assign(this,{config,title,description,children:[],tabs:{}});maps.push(this);}
  section(type,...args){const s=new Section(this,...args);this.children.push(s);return s;}
+ chain(){}
  checkDepends(){}
  render(){return Promise.resolve(E('div',{'class':'cbi-map'},[E('h2',{},this.title),E('div',{},this.description),...this.children.map(s=>s.render())]));}
 }
-const form={Map:FormMap,NamedSection:Section,Value:'text',ListValue:'select',Flag:'flag',DynamicList:'list'};
+const form={Map:FormMap,NamedSection:Section,Value:'text',ListValue:'select',Flag:'flag',DynamicList:'list',SectionValue:'section',DummyValue:'dummy'};
 const radios=[{'.name':'radio0',band:'5g'},{'.name':'radio1',band:'2g'},{'.name':'radio2',band:'5g'}];
 const state={updated:100,radios:{radio0:{requested_method:'auto',method:'csa',requested_width_method:'auto',width_method:'idle_reconfigure',method_reason:'Driver advertises CSA',width_reason:'Width changes require restart',rejected:[{until:700,target:{freq:5500,width:80},reason:'Synthetic connectivity failure'}]},radio1:{},radio2:{}}};
 state.proposal={evaluated_at:1700000000,evaluated_uptime:90,neighbors:12,alternatives:[{radio:'radio0',channels:[36,100],widths:[80,40,20],candidates:[{channel:36,width:80,current:true,cost:7,occupancy:7,capacity:74,shared:0}]}]};
@@ -102,8 +109,8 @@ function page(name){return new Function('view','form','uci','rpc','fs','poll','h
 function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));assert(tooltipDiv.style.opacity==='1','hover must open native tooltip');assert(tooltipDiv.textContent.includes(node.dataset.tooltip),'hover must expose full explanation');assert(tooltipDiv.getBoundingClientRect().right<=innerWidth+1,'tooltip must fit viewport');}
 (async()=>{
  let comparisonPoll;
- for(const name of ['channels','clients','history','storage','comparison']){
-  const pane=await page(name).renderPage(name==='comparison'?[null,{state:state}]:['history','storage'].includes(name)?[null,{}]:[null,null,state,{}]);
+ for(const name of ['settings','channels','clients','history','storage','comparison']){
+  const pane=await page(name).renderPage(name==='settings'?[null,null,null,state]:name==='comparison'?[null,{state:state}]:['history','storage'].includes(name)?[null,{}]:[null,null,state,{}]);
   pane.dataset.fixturePage=name;if(name==='comparison')comparisonPoll=polls[polls.length-1];
   // Fixture uses locally embedded style, never navigates to the router.
   pane.querySelectorAll('link').forEach(n=>n.remove());
@@ -119,7 +126,33 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  exportSection.querySelector('[data-export-format=csv]').click();
  assert(downloads[1].fields.hours==='0'&&downloads[1].fields.dataset==='actions'&&downloads[1].fields.format==='csv','CSV all-retained selection');
  assert(!document.querySelector('form'),'temporary submission form removed');
- const fields=maps.flatMap(m=>m.children.flatMap(s=>s.children));
+ function fieldsOf(s){return s.children.flatMap(o=>o.subsection?fieldsOf(o.subsection):[o]);}
+ const fields=maps.flatMap(m=>m.children.flatMap(fieldsOf));
+ const writes=[];
+ const nativeLoad=eval('({'+payload.methods.valueLoad+'})').load;
+ const nativeWrite=eval('({'+payload.methods.valueWrite+'})').write;
+ const configMap=maps.find(m=>m.config==='channel_coordinator'&&m.children[0].children.some(o=>o.option==='preference_enabled'));
+ configMap.data={get:(...args)=>args.join('.'),set:(...args)=>writes.push(args)};
+ for(const key of ['preference_enabled','preferred_radio','settle_time','cooldown','max_attempts']){
+  const o=fields.find(o=>o.map===configMap&&o.option===key),stored=key==='preference_enabled'?'enabled':key;
+  assert(nativeLoad.call(o,'main')==='radio_prefer.main.'+stored,'native preference load binding '+key);
+  nativeWrite.call(o,'main','synthetic-value');assert(JSON.stringify(writes.pop())===JSON.stringify(['radio_prefer','main',stored,'synthetic-value']),'native preference write binding '+key);
+ }
+ const channelEnable=fields.find(o=>o.map===configMap&&o.option==='enabled');
+ assert(nativeLoad.call(channelEnable,'main')==='channel_coordinator.main.enabled','channel enable remains independent');
+ const radioWidth=fields.find(o=>o.map===configMap&&o.option==='widths'&&o.section.section==='radio0');
+ nativeWrite.call(radioWidth,'radio0','80');assert(JSON.stringify(writes.pop())===JSON.stringify(['channel_coordinator','radio0','widths','80']),'nested radio write binding');
+ const nativeParse=eval('({'+payload.methods.valueParse+'})').parse;
+ for(const key of ['scanner','dfs_helper']){
+  const o=fields.find(o=>o.map===configMap&&o.option===key);let removed=0;
+  await nativeParse.call({...o,isActive:()=>true,isValid:()=>true,cfgvalue:()=>'',formvalue:()=>'',remove:()=>removed++},'main');
+  assert(removed===1,'native parse accepts Automatic as empty '+key);
+ }
+ for(const key of ['preferred_radio','settle_time','handoff_source_min','allow_reconnect','widths']){
+  const o=fields.find(o=>o.map===configMap&&o.option===key);let removed=0;
+  await nativeParse.call({...o,isActive:()=>false,remove:()=>removed++},'main');
+  assert(removed===0,'native parse preserves hidden '+key);
+ }
  const explanations=document.querySelectorAll('.cbi-value-description .wc-setting-help');
  assert(explanations.length===fields.filter(o=>o.description).length,'every setting description must survive the native form renderer');
  for(const node of explanations){assert(node.getBoundingClientRect().height>0,'short help must be visible');tooltip(node);}

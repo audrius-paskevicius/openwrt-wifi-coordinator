@@ -284,6 +284,10 @@ function tick(reserved) {
         }
     }
     for(let mac,s in state.clients)if(!s.episode&&t-s.last_seen>300)delete state.clients[mac];
+    for(let mac,s in state.clients){
+        let attempt=shared.handoff_attempts?.[lc(mac)+'|'+cfg.preferred_radio];
+        s.attempts=attempt&&t-attempt.at<cfg.cooldown*cfg.max_attempts?attempt.count:0;
+    }
     state.updated_uptime=t;fs.writefile(STATE,sprintf('%J\n',state));
 }
 

@@ -1,12 +1,45 @@
 # Validation
 
-Source release: **0.7.0-r7**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r8**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
-Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 53 setting descriptions.
+Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r8 configuration audit and settings redesign (2026-11-10)
+
+One Settings page owns both existing configuration namespaces. Channels and
+Clients are status-only views. All active operational controls are retained;
+conditional values remain saved. Explanations cover shared-policy scope,
+independent Observe/steering behaviour, signal restrictions, movement-cost
+scaling and evidence/retry coupling. Recovery acknowledgement is contextual.
+Client Recent attempts now reports the current shared budget and its expiry.
+
+The full isolated OpenWrt suite passed, including 39 shared steering/integration
+checks, 1,127 executor cases, 1,023 restart checks, 148 planner cases, 33 export
+checks and 668 storage checks. The added counter cases verify shared-path updates
+and expiry. Portable checks and the native LuCI fixture passed with 52 setting
+descriptions, explicit cross-configuration read/write bindings, Automatic empty
+choices, retained hidden values, nested radio forms and delegated help.
+
+Live Chrome exercised the real form dependency and parse methods with writes
+intercepted: independent enable/configuration bindings, preference-only versus
+shared controls, hidden-value retention and Automatic helper/scanner selections.
+The live test found and corrected an unqualified cross-namespace validation lookup
+and the former required-empty Automatic choices. Draft changes were discarded;
+no experimental policy changes were applied. Live checks also passed for draft
+timing updates, managed-radio versus scanning quiet dependencies, the direct
+steering link, and status pages without save controls. There were no page
+exceptions in the final live checks; the test browser was logged out and closed.
+
+The signed APK and index passed native verification. All 45 payload files matched
+source/generated content, and installed application files matched the package.
+All six configuration files remained byte-identical after installation and UI
+tests. The coordinator reported no safety stop or steering integration error.
+Source and extracted package scans found no credentials; private signing material
+remained outside the repository and was removed from temporary build locations.
 
 ## 0.7.0-r7 shared steering escalation (2026-11-10)
 

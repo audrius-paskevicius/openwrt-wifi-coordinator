@@ -4,6 +4,39 @@ This reference follows the current [package version](../VERSION) and its source.
 
 The applied channel and width-change methods appear beside each radio's settings, with reasons. CSA command rejection or confirmed radio failure affects Auto for six hours; explicit methods remain fixed. Confirmed failed destinations and unresolved client compatibility receive six-hour deferrals, with the reason and remaining time displayed. Inconclusive client evidence initially uses the evidence-freshness interval; verified alternate service instead creates a client-specific six-hour steering restriction. See the recovery policy in ARCHITECTURE.md. Choosing a fixed method does not erase failed-destination evidence. Unsupported explicit methods prevent the corresponding moves. Status describes applied settings until Save & Apply.
 
+## Where settings live
+
+**Channels** and **Clients** are status pages. All operational configuration is in
+**Settings**, using one LuCI form and one Save & Apply workflow for the existing
+`channel_coordinator` and `radio_prefer` configurations:
+
+| Settings tab | Responsibility |
+| --- | --- |
+| Operation | Independent channel-planning and preferred-steering enable switches, Observe/Automatic channel mode, verified-placement persistence; recovery acknowledgement only when state reports a global or per-radio recovery problem. |
+| Radios | Per-radio management, occupied-radio restrictions and candidate channels/widths; each radio has Placement and Driver overrides tabs. Applied methods and limitations remain visible beside that radio. |
+| Client steering | Preferred radio, shared Gentle/Strong/Decisive strength, protected clients, restart fallback permission, window, signal safeguards and shared retries. The selected-sequence preview follows unsaved edits. |
+| Survey & radar | Survey policy, cadence, duty/gap, scanner, method, evidence lifetime, DFS mode and helper. |
+| Advanced | Separation priority, overlap cost, movement caution, minimum residence, radar-memory decay, quiet-traffic controls and unprobeable-client verification. |
+
+Conditional fields retain their saved values. Preferred radio and connection
+settling are shown when preference is enabled; shared retries stay available
+because channel handoffs use them too. The source-signal fallback appears only
+for Decisive steering. Restart fallback appears for enabled Automatic channel
+planning. Quiet settings appear for sustained-quiet scanning or a quiet-only
+radio policy. Paced scanning, DFS-helper and overlap dependencies remain explicit.
+Per-radio overrides are retained when management is disabled. A hidden field is
+not an instruction to erase its configuration.
+
+Observe applies only to channel planning: enabled preferred-radio steering can
+still act. Disabling channel planning does not disable preferred-radio steering.
+Excluding a radio from management fixes its placement; it does not turn the radio
+off or prohibit scanning or steering. Protected clients are not exempt from
+mandatory radar evacuation, CSA announcements or scans.
+
+The [algorithm-to-settings audit](SETTINGS-AUDIT.md) explains retained controls,
+couplings, conditional use and compatibility. This revision changes organisation
+and explanations without rewriting saved settings or changing movement policy.
+
 ## Removed controls
 
 The defaults script removes these seven retired UCI keys when the services start, including during installation. Six timing controls became fixed implementation constants; the obsolete width-selection threshold has no replacement knob. None is a hidden advanced override.
@@ -38,14 +71,14 @@ The one-hour radar half-life, six-hour compatibility exclusions and six-hour fla
 
 ## Channel coordination: retained controls
 
-Every remaining control has a distinct operational purpose. Specialist controls are on the Advanced tab; conditional controls appear only in their applicable mode. Numeric integer settings reject fractional or malformed values rather than truncating them.
+Every remaining control has a distinct operational purpose. Controls are grouped by the responsibility table above; driver overrides stay with each radio. Conditional controls retain their saved values. Numeric integer settings reject fractional or malformed values rather than truncating them.
 
 | Key | Why keep it / precise scope |
 | --- | --- |
-| `enabled` | Stops this controller; distinct from observation, which still scans and proposes. Client steering has its own switch. |
+| `enabled` | Stops channel surveys/planning; distinct from observation, which still scans and proposes. Client steering has its own switch. |
 | `mode` | Observe versus automatic planner-initiated channel changes. Observe still allows interrupted-operation recovery and kernel radar evacuation. Does not control preferred-radio steering. |
 | `interval` | Administrator's scan-overhead budget: minimum wait after completed surveys/operations, including close comparisons. Startup begins after 15 seconds. |
-| `improvement` | Minimum net service-index gain after movement cost, including widening. Also sets the movement-cost unit, which scales with affected clients, recent CSA departures, helpers and staging. Every step repays this margin against current evidence. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
+| `improvement` | Labelled Movement caution: minimum net service-index gain after movement cost, including widening. Also sets the movement-cost unit, which scales with affected clients, recent CSA departures, helpers and staging. Every step repays this margin against current evidence. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
 | `min_dwell` | Avoids repeated moves after successful verification. Independent of survey frequency. |
 | `persist` | Whether verified wireless placements are checkpointed, at most every six hours. Separate from graph history and radar memory. |
 | `clear_stop` | One-shot acknowledgement after resolving a recovery failure, reset after use. Interrupted-operation and failed-radio recovery checks repeat automatically with capped backoff, resuming only after the relevant service checks pass. This acknowledgement clears the global stop and per-radio unresolved-failure flags after an administrator has checked recovery; it does not erase timed destination or client-specific exclusions. |
@@ -56,8 +89,8 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `max_mbps` | Advanced: shared traffic threshold for quiet-only moves and low-traffic scanning. Irrelevant to paced scanning and Automatic CSA. |
 | `quiet_seconds` | Advanced: sustained duration below that threshold. Distinct from the threshold itself. |
 | `verify_unprobed` | Advanced: observation time for clients without usable ICMP probes (150–600 seconds). Handles differing client sleep/probe behavior. |
-| `handoff_target_min` | Advanced: shared minimum measured destination signal. Fresh weaker reports block steering; absent measurements still permit recommendations and warnings. |
-| `handoff_source_min` | Advanced: proximity requirement when destination cannot be measured. Used for forced steering only on the same band. Co-located radio estimate, not a promised destination signal. |
+| `handoff_target_min` | Client steering: shared minimum measured destination signal. Fresh weaker reports block steering; absent measurements still permit recommendations and warnings. |
+| `handoff_source_min` | Client steering, Decisive only: proximity requirement when destination cannot be measured. Used for forced steering only on the same band. Co-located radio estimate, not a promised destination signal. |
 | `dfs_mode` | Exclude DFS candidates, use already cleared channels, or prepare using an empty helper while other radios serve clients. Exclude does not force an existing DFS AP to leave its channel. Prepare supports opportunistic reuse after required clearance and kernel exclusion expiry; fresh evidence and service scoring still determine moves. Requires matching, known global/per-radio DFS regions (FCC, ETSI or Japan) under the configured country. |
 | `dfs_helper` | Optional explicit helper for installations with unequal radio coverage. Only shown for Prepare. Only that helper is eligible. If it cannot prepare the target, preparation is deferred rather than silently selecting another radio. |
 | `radar_half_life` | Default 3600 seconds (one hour): interruption-history weight halves each hour. Independent of mandatory kernel non-occupancy time. |
@@ -65,8 +98,8 @@ Every remaining control has a distinct operational purpose. Specialist controls 
 | `scan_duty` | Paced only: maximum off-channel duty calculated from measured visit duration. |
 | `scan_gap` | Paced only: minimum serving time between occupied-radio visits; duty may require a longer gap. |
 | `scan_type` | Passive or active where legal. Restricted frequencies always use passive listening, with an explicit status reason. |
-| `scanner` | Advanced: Auto or a fixed scanner. A fixed scanner is never silently substituted; unreachable bands can therefore remain unmeasured. |
-| `max_age` | Advanced: freshness ceiling for evidence; also supplies the initial retry pause when setup retains a narrower width. Repeated refusals double the pause up to six hours, with attempts retained across pause expiry and forgotten after a day without another refusal. The active width constraint and remaining time are shown. An actual service failure at 20 MHz has its own restriction, which also excludes HT40 requests that could fall back to it. Too short for a full scan can prevent decisions; unknown spectrum is never assumed clear. |
+| `scanner` | Survey & radar: Auto or a fixed scanner. A fixed scanner is never silently substituted; unreachable bands can therefore remain unmeasured. |
+| `max_age` | Survey & radar: freshness ceiling for evidence; also supplies the initial retry pause when setup retains a narrower width. Repeated refusals double the pause up to six hours, with attempts retained across pause expiry and forgotten after a day without another refusal. The active width constraint and remaining time are shown. An actual service failure at 20 MHz has its own restriction, which also excludes HT40 requests that could fall back to it. Too short for a full scan can prevent decisions; unknown spectrum is never assumed clear. |
 | `separate_radios` | Whether separation ranks before total estimated service, or overlap becomes a cost penalty. Distinct priorities, not interchangeable thresholds. |
 | `overlap_penalty` | Shown only when strict separation is disabled: allows the administrator to trade overlap against other costs. |
 
@@ -93,7 +126,7 @@ On WRT3200ACM/WRT32X, frequency Auto uses advertised CSA on radio0/radio1 unless
 | `cooldown` | Shared minimum interval between client/destination attempts in both paths. Stages within an attempt do not consume separate slots. One extra return attempt is allowed after an operation on the preferred radio. |
 | `max_attempts` | Burst limit before a longer pause (`cooldown × max_attempts`). Shared by both paths for each client and destination; expires automatically after the longer pause. |
 
-The shared strength, timing, protection and signal settings are on Channels / Clients (signal thresholds under Advanced). The Clients tab links there and keeps preferred-radio selection and shared retry controls. Retired preference `mode` and `min_rssi` are migrated and removed; see ARCHITECTURE.md.
+All shared strength, timing, protection, signal and retry controls are on Settings / Client steering, together with preferred-radio selection. Clients links there and displays live decisions. Recent attempts reports the still-active shared client/destination budget, including attempts consumed by channel handoffs; it counts attempts, not individual request frames. Retired preference `mode` and `min_rssi` are migrated and removed; see ARCHITECTURE.md.
 
 ## History
 

@@ -29,7 +29,7 @@ sed -i 's|../../channel-coordinator/files/handoff.uc|../channel-coordinator/hand
 cp "$CC/files/history-export.uc" "$ROOT/usr/share/channel-coordinator/"
 mkdir -p "$ROOT/www/cgi-bin"
 sed "s/@WIFI_COORDINATOR_VERSION@/$VERSION/g" "$CC/files/wifi-coordinator-export" > "$ROOT/www/cgi-bin/wifi-coordinator-export"
-cp "$CC/files/wifi-channels.js" "$CC/files/wifi-comparison.js" "$CC/files/wifi-history.js" "$CC/files/wifi-storage.js" "$CC/files/wifi-disclaimer.js" "$RP/files/wifi-clients.js" "$ROOT/www/luci-static/resources/view/"
+cp "$CC/files/wifi-settings.js" "$CC/files/wifi-channels.js" "$CC/files/wifi-comparison.js" "$CC/files/wifi-history.js" "$CC/files/wifi-storage.js" "$CC/files/wifi-disclaimer.js" "$RP/files/wifi-clients.js" "$ROOT/www/luci-static/resources/view/"
 for view in "$ROOT/www/luci-static/resources/view/"*.js; do
  sed -i "s/@WIFI_COORDINATOR_VERSION@/$VERSION/g" "$view"
 done
@@ -61,6 +61,7 @@ cat > "$ROOT/lib/upgrade/keep.d/wifi-coordinator" <<'EOF'
 /usr/share/radio-prefer/
 /www/cgi-bin/wifi-coordinator-export
 /www/luci-static/resources/view/wifi-channels.js
+/www/luci-static/resources/view/wifi-settings.js
 /www/luci-static/resources/view/wifi-comparison.js
 /www/luci-static/resources/view/wifi-clients.js
 /www/luci-static/resources/view/wifi-history.js

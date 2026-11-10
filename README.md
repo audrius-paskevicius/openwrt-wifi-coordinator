@@ -17,7 +17,7 @@ Coordinated channel selection and client steering for OpenWrt, developed and liv
 
 The package combines channel planning, Radio Preference, and a LuCI interface under **Network → Wi-Fi Coordinator**. It uses `usteer` for measurements while keeping competing steering decisions passive. It preserves your Wi-Fi names, passwords, and LAN/WAN topology; automatic operation changes radio channels and widths.
 
-The six tabs are **Channels**, **Clients**, **Comparison**, **History**, **Storage & export**, and the full disclaimer. Comparison explains the last completed placement assessment directly; Channels keeps operating status and settings. History displays observations; Storage & export controls retention and downloads, with an independent export-period selector.
+The tabs are **Channels**, **Clients**, **Comparison**, **History**, **Settings**, **Storage & export**, and the full disclaimer. Channels and Clients show live operation without save controls. Comparison explains the last completed placement assessment. Settings brings channel and steering configuration together, preserving their existing storage and policies. History displays observations; Storage & export controls retention and downloads, with an independent export-period selector.
 
 ## What it does
 

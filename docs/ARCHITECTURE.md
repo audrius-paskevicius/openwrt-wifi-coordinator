@@ -36,7 +36,7 @@ Transitions may use one neutral staging move; with separation enabled, no interm
 
 Evidence uncertainty starts at one point with complete measured airtime, otherwise three. Changes in usable capacity between surveys can raise it to 15; a changed scanner imposes a floor of six. It is converted to service-index units using the radio's maximum width and advertised streams. Supporting-survey counts are explanatory; repetition alone does not shrink uncertainty. Net benefit, after movement cost, must exceed both the configured minimum and current comparison uncertainty. Improved separation can bypass that margin. Every prepared step reruns the joint planner against current observations, client occupancy and legal placements before disruption. Its own retry gate is bypassed for this check; configuration, coverage, compatibility and regulatory restrictions remain. An old multi-step plan has no privileged admission.
 
-The last completed comparison is retained in the RAM state file across surveys, moves and service restarts within the same boot. It is explanatory evidence, never an execution queue. Sampling marks placement changes; the UI shows evaluation time, age and current progress, and labels all placement, pool and exclusion data as belonging to that snapshot. A completed evaluation replaces it. The dedicated Comparison tab before History displays this assessment directly; Channels contains operating status and settings. Unchanged comparison tables retain their DOM while live status updates. Failed refreshes retain the last results with a warning, and comparisons older than the configured survey freshness limit are labelled.
+The last completed comparison is retained in the RAM state file across surveys, moves and service restarts within the same boot. It is explanatory evidence, never an execution queue. Sampling marks placement changes; the UI shows evaluation time, age and current progress, and labels all placement, pool and exclusion data as belonging to that snapshot. A completed evaluation replaces it. The dedicated Comparison tab before History displays this assessment directly; Channels contains operating status; Settings owns configuration. Unchanged comparison tables retain their DOM while live status updates. Failed refreshes retain the last results with a warning, and comparisons older than the configured survey freshness limit are labelled.
 
 The comparison table includes the direct movement cost for each alternative; the summary includes complete-route cost and estimated client exposure. The comparison table shows individual alternatives sorted by sharing with peer placements at comparison time, then decreasing service index. Estimated usable width is before stream weighting but after the radar discount; primary/block congestion shows per-primary and mean block estimates. These are not percentages of measured airtime. The table is not the joint-plan ranking: the joint plan can also move peers.
 
@@ -161,3 +161,15 @@ History exports use a read-only ucode CGI and `history-export.uc`, with the exis
 ## Process supervision
 
 Both services use procd respawn with a 30-second delay and no retry-count limit. Steering preparation runs inside the supervised process, so a transient preparation failure is retried too. Disabled services remain disabled; invalid configuration or competing controllers are still reported, not silently overridden. This does not guarantee recovery from hardware faults or certify years of unattended uptime. The retry-limit semantics follow [OpenWrt procd](https://lxr.openwrt.org/source/procd/service/instance.c).
+
+## Configuration presentation
+
+The Settings view chains the existing `channel_coordinator` and `radio_prefer`
+UCI namespaces in one native LuCI map. Preference fields explicitly bind to their
+original namespace and section; the independent enable switches do not alias one
+another. Nested radio sections preserve per-radio keys. Conditional controls use
+retention, so selecting another policy does not delete previously configured
+values. No schema migration or algorithm-policy change accompanies this layout.
+The steering counter now displays the current shared attempt ledger rather than
+the cached count at the most recent preference attempt. See the
+[configuration audit](SETTINGS-AUDIT.md) for the algorithm/UI boundary.

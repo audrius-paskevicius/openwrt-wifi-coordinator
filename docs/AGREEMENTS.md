@@ -4,7 +4,7 @@ This review compares the requested behavior with the current implementation and 
 
 ## Current behavior review
 
-The current implementation uses native LuCI help on all 53 setting descriptions, including opaque tooltip backgrounds, keyboard and touch interaction. Applied methods and temporary restrictions remain visible during refreshes. The browser component fixture uses the target LuCI rendering and tooltip methods with synthetic configuration; it is not an authenticated end-to-end router test.
+The current implementation uses native LuCI help on all setting descriptions (52 in the healthy three-radio fixture; recovery acknowledgement adds one when needed), including opaque tooltip backgrounds, keyboard and touch interaction. Applied methods and temporary restrictions remain visible during refreshes. The browser component fixture uses the target LuCI rendering and tooltip methods with synthetic configuration; it is not an authenticated end-to-end router test.
 
 Width Auto follows advertised HT/VHT capabilities. The tested router advertises 160 MHz on radio0, 40 MHz on radio1, and 80 MHz on radio2 in 5 GHz. The joint planner compares estimated service across eligible widths rather than always ranking the widest first. Regulatory limits, coexistence and verification still apply. Historical fixes and their validation remain in [the test record](TESTING.md).
 
@@ -27,7 +27,7 @@ scoring and any active recovery restrictions still govern the next move.
 | Actual libraries and native styling | Charts use Chart.js; forms and help use LuCI's renderer and tooltip behavior. No separate tooltip library or custom help button appearance. |
 | Auto channel lists for all radios; manual primary lists independent of width | Per-PHY live capabilities supply Auto. Manual primary-channel and width lists are separate plain text fields. Secondary frequencies still undergo regulatory/driver checks. |
 | Auto can adapt, explicit choices stay explicit | Fixed planned CSA/restart choices remain fixed; Auto adapts to capabilities and recent failures. Applied choices and reasons are visible. Emergency service recovery remains possible. |
-| Fewer settings, short explanations, detailed help | Six internal timing knobs and the obsolete narrowing threshold were removed; specialist controls are under Advanced. Conditional controls preserve their saved values while hidden. [Settings reference](SETTINGS.md) records why each remaining control exists. |
+| Fewer settings, short explanations, detailed help | Six internal timing knobs and the obsolete narrowing threshold were removed; settings are consolidated by algorithm responsibility, with driver overrides per radio. Conditional controls preserve their saved values while hidden. [Settings reference](SETTINGS.md) records why each remaining control exists. |
 | Paced scans without requiring silence | Paced scanning schedules short visits and serving gaps; quiet-only scanning remains an explicit alternate policy. Live r11 completed 41/41 requested frequencies. |
 | Coordinate radios and prefer useful width | The joint planner ranks separation and hardware-based service for present and future clients; it checks overlap at intermediate steps. Missing evidence is not treated as empty spectrum. |
 | Try handoff first, then move despite stubborn clients | The common reconnect policy applies to all serving radios, subject to explicit protected-client and quiet/empty restrictions. No compatible target skips an impossible handoff wait. |
@@ -55,3 +55,5 @@ scoring and any active recovery restrictions still govern the next move.
 These are explicit scope limits, not hidden runtime changes to administrator preferences.
 
 Preferred-radio steering and radar/channel handoffs share one Gentle / Strong / Decisive policy, escalation timing, protection rules and retry budgets. Failed return requests do not automatically penalize a channel placement.
+
+The settings redesign retains operational controls after tracing their consumers; it does not reduce configurability to meet a UI target. See [the audit](SETTINGS-AUDIT.md). Channels and Clients have no Save/Apply controls; shared steering policy appears once in Settings.
