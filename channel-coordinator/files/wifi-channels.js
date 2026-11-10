@@ -36,22 +36,21 @@ return view.extend({
    var items=[E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[header,E('tbody',{},rows)]))],cards=[];
    if(st.scan_coverage)cards.push(E('div',{'class':'wc-summary'},[
     E('h4',{},_('Last survey coverage')),E('p',{},st.scan_coverage.completed+' of '+st.scan_coverage.requested+' frequencies measured ('+st.scan_coverage.policy+').'),
-    E('p',{},'Completed at '+timefmt.stamp(st.scan_coverage.at)+'. Only radios with complete fresh coverage may move; missing coverage on another band does not block them.')
+    E('p',{},'Completed at '+timefmt.stamp(st.scan_coverage.at))
    ]));
    if(dfs){var phase={listening:'Listening for radar',restoring:'Restoring the spare radio',ready:'Completed and shared',recovered:'Restored after an interrupted check',inactive:'Previous check ended','restored-after-error':'Restored after an error'};cards.push(E('div',{'class':'wc-summary'},[
     E('h4',{},_('Last radar preparation')),E('p',{},phase[dfs.phase]||dfs.phase),
     E('p',{},'Channel '+dfs.channel+' / '+dfs.width+' MHz'+(dfs.helper?' using '+dfs.helper:'')),
-    dfs.elapsed!=null?E('p',{},'Preparation elapsed: '+dfs.elapsed+' seconds (includes radio setup).'):''
+    dfs.elapsed!=null?E('p',{},'Total preparation time: '+dfs.elapsed+' seconds'):''
    ]));}
    if(cards.length)items.push(E('div',{'class':'wc-summaries'},cards));
-   if(st.updated)items.push(E('small',{'class':'wc-caption'},'Updates every 5 seconds. Traffic is measured between samples; it is not a speed-test result.'));
+   if(st.updated)items.push(E('small',{'class':'wc-caption'},'Traffic shows current usage. Updated every 5 seconds.'));
    details.replaceChildren.apply(details,items);
   }
   refresh(state);
   poll.add(function(){return Promise.all([readState(),service('channel-coordinator')]).then(function(x){status.textContent=statusText(x[0],x[1]);status.setAttribute('data-level',x[0].halted&&!x[0].restart_check?'warning':'normal');refresh(x[0]);});},5);
   var intro=E('div',{},[
    E('h2',{},_('Wi-Fi Coordinator: channels')),
-   E('p',{'class':'wc-caption'},_('Current radio operation. Comparison explains placement decisions; Settings controls the policy.')),
    status,details
   ]);
   return E('div',{'class':'wifi-coordinator'},[

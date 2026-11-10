@@ -182,7 +182,11 @@ return view.extend({
    var radioNames=Array.from(new Set(periods.map(function(p){return p.radio;}).concat(samples.map(function(s){return s.radio;}),clients.map(function(s){return s.radio;})))).sort();
    var warnings=(h.read_errors||[]).map(function(e){return E('p',{'class':'alert-message warning'},'History is incomplete. '+e);});
    if(h.refresh_warning)warnings.unshift(E('p',{'class':'alert-message warning'},h.refresh_warning));
-   if(!radioNames.length){display.replaceChildren.apply(display,warnings.concat([E('p',{'class':'wc-status'},'History is collecting, or has been disabled. Recent history is in RAM; archived history survives reboot.')]));return;}
+   if(!radioNames.length){
+    var recording=h.enabled==null?uci.get('channel_coordinator','main','history_enabled')!='0':h.enabled;
+    var message=warnings.length?'No history available to display.':recording?'No observations in the selected period. History recording is enabled.':'No observations in the selected period. History recording is disabled.';
+    display.replaceChildren.apply(display,warnings.concat([E('p',{'class':'wc-status'},_(message))]));return;
+   }
    var start=Math.min(now-1,Math.max(cutoff,Math.min.apply(null,periods.map(function(p){return p.start;}).concat(clients.map(function(s){return s.start;}),samples.map(function(s){return s.time;}),surveys.map(function(s){return s.time;})))));
    var channelCanvas=E('canvas',{'role':'img','aria-label':'Channel and width of each radio over time'});
    var clientCanvas=E('canvas',{'role':'img','aria-label':'Clients on each radio over time'});
@@ -191,17 +195,17 @@ return view.extend({
    function legend(patterns,fins){return E('p',{'class':'wc-legend'},radioNames.map(function(r,i){return E('span',{'style':'color:'+graphs.colour(r,i)+';margin-right:22px;font-weight:600;'},[E('span',{'class':fins?'wc-fin-key':patterns?'wc-pattern-key':'wc-line-key','style':fins?graphs.clientFinStyle(r,i):patterns?graphs.patternStyle(r,i):'border-color:'+graphs.colour(r,i),'title':patterns?graphs.patternName(r,i):r}),r]);}));}
    var radarHalf=Number(h.radar&&h.radar.half_life)||3600;
    function elapsedLabel(seconds){return seconds>=3600?+(seconds/3600).toFixed(1)+' h':+(seconds/60).toFixed(1)+' min';}
-   var radarKey=E('div',{'class':'wc-radar-key','title':'Amber marks radar detections. Detection: 100%; after '+elapsedLabel(radarHalf)+': 50%; after '+elapsedLabel(2*radarHalf)+': 25%; after '+elapsedLabel(3*radarHalf)+': 12.5%. White represents zero remembered strength. Percentages describe avoidance strength, not probability. Radar clearance rules still apply.'},[
+   var radarKey=E('div',{'class':'wc-radar-key','title':'Amber shows remembered radar activity, fading by half every '+elapsedLabel(radarHalf)+'. The scale shows avoidance strength, not the probability of radar. Radar clearance is still required.'},[
     E('span',{},_('Radar memory')),
     E('div',{'class':'wc-radar-ramp'},[
      E('div',{'class':'wc-amber-scale','aria-hidden':'true','style':'background:'+graphs.radarGradient()}),
      E('div',{'class':'wc-radar-ticks'},[100,75,50,25,0].map(function(n){return E('span',{},n+'%');}))
     ])
    ]);
-   var nodes=[heading(_('Where each radio spent its time'),_('Ribbons show each radio’s channel and width. // marks gaps in spectrum. Hover or tap for details. Each declared band shows its standard channel plan; displayed channels may not be permitted locally or supported by your radio. Dashed outlines indicate radar listening. Grey squares mark unknown observation gaps; red crosses mark confirmed unavailability. Triangles mark recorded radio actions. These markers do not imply that a previous channel remained active during a gap.')+(surveys.length?'':' '+_('Survey background appears after the next scan.'))),
+   var nodes=[heading(_('Where each radio spent its time'),_('Ribbons show channel and width; dashed outlines show radar listening. // marks breaks in the spectrum axis. Squares mark missing observations, crosses mark unavailability, and triangles mark actions. Hover or tap for details.')),
     E('div',{'class':'wc-chart wc-spectrum-chart'},channelCanvas),legend(true),
     E('div',{'class':'wc-spectrum-keys'},[E('div',{'class':'wc-survey-key','title':'Estimated congestion ranges from 0 (lowest) to 100 (highest estimated congestion). Darker grey means more or stronger overlapping networks, adjusted for advertised load. This is an estimate, not measured airtime or a percentage. Hover over the graph for measurement times.'},[E('span',{},_('Estimated congestion')),E('div',{'class':'wc-survey-ramp'},[E('div',{'class':'wc-grey-scale','aria-hidden':'true'}),E('div',{'class':'wc-scale-ticks'},[0,25,50,75,100].map(function(n){return E('span',{},String(n));}))])]),radarKey]),
-    heading(_('Clients on each radio over time'),_('Associated clients, sampled every five seconds. Whole-number steps show count changes. Gaps mean no observations; older history contains no client-count intervals. Grey squares mark unknown gaps; red crosses mark confirmed unavailability; triangles mark recorded actions. Hover or tap for details.')),
+    heading(_('Clients on each radio over time'),_('Number of connected clients on each radio. Gaps mean observations are missing. Hover or tap for counts and events.')),
     E('div',{'class':'wc-chart wc-traffic-chart'},clientCanvas),legend(false,true),
     heading(_('Observed traffic over time'),_('Upload + download, averaged over five minutes. This shows usage, not a speed test. Hover or tap for details.')),
     E('div',{'class':'wc-chart wc-traffic-chart'},trafficCanvas),legend()];

@@ -86,6 +86,6 @@ module.exports=page.renderPage([null,null,null,state]).then(async()=>{
  assert(JSON.stringify(status).includes('channel 13 / 20 MHz'));
  assert(JSON.stringify(status).includes('2 minutes remaining'));
  await polls[0]();
- assert(JSON.stringify(status).includes('Only Auto adapts'));
+ assert(JSON.stringify(status).includes('Auto will use an alternative'));
  console.log('PASS: consolidated settings, namespace bindings, retained conditional values, recovery visibility, status-only views and refreshed constraints');
 }).catch(e=>{console.error(e);process.exitCode=1;});

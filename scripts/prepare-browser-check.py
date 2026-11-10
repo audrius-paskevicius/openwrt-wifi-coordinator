@@ -182,7 +182,7 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  state.proposal={...state.proposal,evaluated_uptime:150,evaluated_at:1700000060,placements_changed:false,alternatives:[{radio:'radio0',channels:[149],widths:[80],candidates:[{channel:149,width:80,current:true,cost:2,occupancy:2,capacity:78,shared:0}]}]};
  await comparisonPoll();assert(comparison.querySelector('tbody').textContent.includes('149 / 80 MHz'),'completed evaluation replaces previous rows');
  state.proposal={...state.proposal,movement_cost:12,affected_clients:3,client_moves:5,alternatives:[{...state.proposal.alternatives[0],hold:'Minimum residence after verified move',candidates:[{...state.proposal.alternatives[0].candidates[0],movement:{cost:6}},{channel:36,width:80,cost:4,occupancy:4,capacity:70,shared:0,movement:{cost:9}}]}]};
- await comparisonPoll();assert(comparison.textContent.includes('Movement cost: 12.0 points; 3 currently associated')&&comparison.textContent.includes('5 estimated client moves'),'complete route exposure displayed');
+ await comparisonPoll();assert(comparison.textContent.includes('Movement cost: 12.0 points.')&&comparison.textContent.includes('Affected clients: 3; estimated client moves: 5.'),'complete route exposure displayed');
  assert(comparison.querySelectorAll('tbody tr').length===2&&comparison.textContent.includes('Minimum residence'),'hold keeps visible alternatives');
  assert(comparison.querySelector('thead').textContent.includes('Move cost')&&comparison.querySelector('tbody').textContent.includes('6.0'),'direct candidate movement cost displayed');
  const clientReason='Radio serves other clients; affected clients lack verified alternate service';
@@ -209,7 +209,11 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  const after=fresh.querySelector('.wc-setting-help');tooltip(after);after.click();assert(tooltipDiv.style.opacity==='1','delegation must survive form rerender');
  const failedHistory=await page('history').renderPage([null,{read_errors:['Synthetic unreadable recent history']}]);
  assert(failedHistory.querySelector('.alert-message.warning').textContent.includes('History is incomplete'),'failed reads must stay visible even without any radio records');
- assert(failedHistory.textContent.indexOf('History is incomplete')<failedHistory.textContent.indexOf('History is collecting'),'read failure must precede the empty-history message');
+ assert(failedHistory.textContent.indexOf('History is incomplete')<failedHistory.textContent.indexOf('No history available'),'read failure must precede the empty-history message');
+ const disabledHistory=await page('history').renderPage([null,{enabled:false}]);
+ assert(disabledHistory.textContent.includes('recording is disabled'),'empty history reports recording disabled');
+ const enabledHistory=await page('history').renderPage([null,{enabled:true}]);
+ assert(enabledHistory.textContent.includes('recording is enabled'),'empty history reports recording enabled without claiming observations exist');
  const recent=Math.floor(Date.now()/1000);
  const historyData={periods:[{radio:'radio0',channel:36,width:80,start:recent-60,end:recent}],samples:[],events:[{time:recent,event:'operation-complete',reason:'switch-verified',estimated_gain:12,movement_cost:6,affected_clients:3,observed_clients:4,departed_clients:2,operation_seconds:65}],surveys:[],ram_bytes:100,archive_bytes:0,archive_files:0};
  graphs.channelChart=graphs.clientChart=graphs.trafficChart=()=>({destroy(){}});

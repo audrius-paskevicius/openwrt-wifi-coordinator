@@ -17,13 +17,13 @@ var reasons={
  'cooldown':'Waiting before another steering attempt',
  'gentle-request':'Gentle request sent; observing the client',
  'strong-request':'Escalated request; observing the client',
- 'no-request-support':'Client cannot receive requests; Decisive still requires signal and retry eligibility',
- 'checking-reconnection':'Checking reconnection after a bounded disconnect',
+ 'no-request-support':'Client cannot receive roaming requests',
+ 'checking-reconnection':'Checking whether the client reconnected',
  'disconnect-not-eligible':'Disconnect withheld by signal or retry limits',
  'stayed-elsewhere':'Client remained connected elsewhere',
- 'return-not-observed':'Return not observed; temporary restriction released',
+ 'return-not-observed':'Client has not returned to the preferred radio',
  'steering-cancelled':'Steering stopped because conditions changed',
- 'attempt-limit':'Shared attempt limit reached; waiting for the budget to expire',
+ 'attempt-limit':'Attempt limit reached; waiting before trying again',
  'unsupported':'Client does not advertise 802.11v roaming support',
  'coordinator-reservation':'Radio reserved by channel coordination',
  'client-placement-cooldown':'This client recovered elsewhere; avoiding the previous placement temporarily',
@@ -40,7 +40,7 @@ return view.extend({
    status.textContent=!running?'Client preference is stopped.':st.integration_error?'Waiting: '+st.integration_error:
     st.coordination_pause?'Channel operation has priority: '+st.coordination_pause:'Client preference is running. Preferred radio: '+(st.preferred_radio||'not selected')+'.';
    status.setAttribute('data-level',st.integration_error?'warning':'normal');
-   var header=E('thead',{},E('tr',{},['Client address','Current connection','Decision','Recent attempts'].map(function(x){return E('th',{'scope':'col'},_(x));}))),rows=[];
+   var header=E('thead',{},E('tr',{},['Client address','Current connection','Decision','Recent attempts'].map(function(x){return E('th',{'scope':'col','title':x=='Recent attempts'?'Attempts to move this client to the preferred radio. One attempt can include several requests.':null},_(x));}))),rows=[];
    Object.keys(st.clients||{}).forEach(function(mac){var c=st.clients[mac];rows.push(E('tr',{},[
     mac,(c.source||'Unknown').replace('hostapd.',''),(reasons[c.decision]||c.decision||'Waiting')+
      (c.decision=='client-placement-cooldown'?' ('+Math.max(0,Math.ceil((c.compatibility_until-st.updated_uptime)/60))+' minutes remaining)':''),String(c.attempts||0)
@@ -51,7 +51,6 @@ return view.extend({
   poll.add(function(){return Promise.all([readState(),services('channel-coordinator')]).then(function(x){refresh(x[0],x[1]);});},5);
   var intro=E('div',{},[
    E('h2',{},_('Wi-Fi Coordinator: clients')),
-   E('p',{'class':'wc-caption'},_('Current preferred-radio steering decisions. Recent attempts counts shared attempts toward the preferred radio, not individual requests.')),
    status,clients,E('p',{},E('a',{href:L.url('admin/network/wifi_coordinator/settings')+'#clients'},_('Client steering settings')))
 
   ]);

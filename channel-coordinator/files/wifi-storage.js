@@ -24,17 +24,19 @@ return view.extend({
   var storageBody=E('div'),storageDetails=E('details',{'class':'wc-history-storage'},[E('summary',{},_('History storage')),storageBody]);
   function redrawStorage(h){
    var nodes=(h.read_errors||[]).map(function(e){return E('p',{'class':'alert-message warning'},e);});
-   nodes.push(E('small',{'class':'wc-caption'},'RAM buffer: '+Math.round((h.ram_bytes||0)/1024)+' / 1024 KiB. Flash history: '+((h.archive_bytes||0)/1048576).toFixed(2)+' MiB in '+(h.archive_files||0)+' batch file(s). Offload every 6 hours; the most recent hour stays cached in RAM. '+(h.archive_saved?'Last offload: '+timefmt.stamp(h.archive_saved)+'. ':'First offload has not happened yet. ')+(h.archive_next?'Next eligible offload: '+timefmt.stamp(h.archive_next)+'. ':'')+'Refreshes every minute. An orderly reboot saves pending history to flash. Unexpected power loss can lose recent data since the last successful offload.'));
+   nodes.push(E('p',{},'Memory: '+Math.round((h.ram_bytes||0)/1024)+' / 1024 KiB. Saved history: '+((h.archive_bytes||0)/1048576).toFixed(2)+' MiB.'));
+   nodes.push(E('p',{},(h.archive_saved?'Last saved: '+timefmt.stamp(h.archive_saved)+'. ':'No saved archive yet. ')+(h.archive_next?'Next save due: '+timefmt.stamp(h.archive_next)+'.':'')));
+   nodes.push(E('p',{'class':'wc-caption'},_('History is saved every six hours and during an orderly shutdown. A power failure can lose observations since the last save.')));
    if(h.archive_error)nodes.push(E('p',{'class':'alert-message warning'},h.archive_error));
    if(h.dropped_records)nodes.push(E('p',{'class':'alert-message warning'},h.dropped_records+' records were dropped because the recent RAM buffer filled before a successful offload.'));
    storageBody.replaceChildren.apply(storageBody,nodes);
   }
   redrawStorage(data[1]||{});
   poll.add(function(){return readStorage().then(redrawStorage);},60);
-  var m=new form.Map('channel_coordinator',_('History retention'),_('Keep history for the selected duration. Recent records stay in RAM and are saved to flash every six hours and during an orderly shutdown.'));
+  var m=new form.Map('channel_coordinator',_('History retention'));
   var s=m.section(form.NamedSection,'main','coordinator');s.anonymous=true;
   var o=s.option(form.Flag,'history_enabled',_('Record Wi-Fi history'),_('Turn off to pause new recording. Existing graphs and actions are kept until their retention period expires. Use Clear recorded history to delete them.'));o.default='1';o.rmempty=false;
-  o=s.option(form.ListValue,'history_hours',_('Retain up to this many hours'),_('Show follows this selection. Reducing retention hides older records immediately; the next scheduled offload prunes the archive without an extra flash rewrite.'));o.default='24';o.datatype='range(1,120)';o.rmempty=false;o.cfgvalue=function(){return String(retain);};
+  o=s.option(form.ListValue,'history_hours',_('Retain up to this many hours'),_('Limits the history available to view and export. Reducing this period removes access to older observations.'));o.default='24';o.datatype='range(1,120)';o.rmempty=false;o.cfgvalue=function(){return String(retain);};
   var configured=retentionChoices.slice();if(configured.indexOf(retain)<0)configured.push(retain);configured.sort(function(a,b){return a-b;}).forEach(function(h){o.value(String(h),h+' hour'+(h==1?'':'s'));});
   o=s.option(form.Flag,'clear_history',_('Clear recorded history'),_('Delete recorded graphs, surveys and actions from RAM and flash when settings are applied. This switch resets itself. Recording follows the setting above; radar-avoidance memory is preserved.'));o.default='0';o.rmempty=false;
   help.compact(m);
@@ -54,7 +56,7 @@ return view.extend({
   }
   var exportSection=E('section',{'class':'wc-export'},[
    E('h3',{},_('Export history')),
-   E('p',{'class':'wc-caption','title':'Read-only download: no temporary export file or flash writes. The file includes UTC timestamps, units and a final completeness report. Survey context and radar memory may start before the selected window. Original interval boundaries are preserved.'},_('Download graph data and actions directly.')),
+   E('p',{'class':'wc-caption'},_('Choose one dataset for CSV, or download all datasets as JSON. Export timestamps use UTC.')),
    E('p',{},[E('label',{'for':'wc-export-period'},_('Period: ')),exportPeriod]),
    E('p',{},[E('label',{'for':'wc-export-dataset'},_('CSV data: ')),exportDataset,' ',E('button',{type:'button','class':'cbi-button cbi-button-action','data-export-format':'csv','aria-label':_('Download CSV data'),click:function(){download('csv');}},_('Download'))]),
    E('p',{},[_('JSON data: All graph data and actions '),E('button',{type:'button','class':'cbi-button cbi-button-action','data-export-format':'json','aria-label':_('Download JSON data'),click:function(){download('json');}},_('Download'))]),

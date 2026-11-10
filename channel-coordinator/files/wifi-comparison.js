@@ -80,17 +80,14 @@ return view.extend({
    var nodes=[];
    nodes.push(E('div',{'class':'wc-summary'},[
     E('h4',{},_('Last completed comparison')),E('p',{},p.neighbors+' nearby networks.'),
-    E('p',{},'Estimated benefit after movement cost: '+Number(p.improvement||0).toFixed(1)+' points. Spectrum separation takes priority when enabled; this is a capacity estimate, not a speed measurement.'),
-    p.movement_cost!=null?E('p',{},'Movement cost: '+Number(p.movement_cost).toFixed(1)+' points; '+p.affected_clients+' currently associated clients on affected radios; '+p.client_moves+' estimated client moves including helpers and staging.'):'',
+    E('p',{},'Estimated benefit after movement cost: '+Number(p.improvement||0).toFixed(1)+' points.'),
+    p.movement_cost!=null?E('p',{},'Movement cost: '+Number(p.movement_cost).toFixed(1)+' points. Affected clients: '+p.affected_clients+'; estimated client moves: '+p.client_moves+'.'):'',
     (p.changes||[]).length?E('ul',{},p.changes.map(function(c){return E('li',{},'Compared target '+c.radio+': channel '+c.from+' to '+c.to+' ('+c.width+' MHz)');})):E('p',{},_('Placement at comparison retained.')),
-    p.placements_changed?E('p',{},_('Radio placements have changed since this comparison.')):'',
-    p.separate?E('p',{},_('Separate spectrum takes priority. Each intermediate move must also avoid increasing overlap.')):'',
+    p.separate?E('p',{},_('Priority: reduce overlap between our radios.')):'',
     p.decision?E('p',{},p.decision.reason+(p.decision.margin!=null?' (required benefit '+Number(p.decision.margin).toFixed(1)+' points; '+Object.keys(p.decision.comparisons||{}).map(function(name){return name+': '+p.decision.comparisons[name]+' supporting surveys';}).join(', ')+')':'')):'',
-    p.steps?E('ol',{},p.steps.map(function(c){return E('li',{},c.radio+' to '+c.to+' / '+c.width+' MHz'+(c.staging?' (staging step)':''));})):'',   ]));
+    p.steps&&p.steps.length>1?E('ol',{'aria-label':_('Order of channel changes')},p.steps.map(function(c){return E('li',{},c.radio+' to '+c.to+' / '+c.width+' MHz'+(c.staging?' (staging step)':''));})):'',   ]));
    nodes.push(
-    E('p',{},_('The planner jointly maximizes estimated service after applying your spectrum-separation policy. Higher service is better: usable bandwidth is weighted by advertised radio spatial streams. The primary channel matters to narrow clients and to fallback transmissions. Wide channels earn their extra capacity only where the secondary spectrum is usable. This is hardware headroom for present and future clients, not predicted Mbps or a score fitted to currently connected devices.')),
-    E('p',{},_('Grey history shows average neighbour pressure. Planning also accounts for the primary channel, bonded subchannels, fresh external busy counters and radar memory. A neighbour spanning a wide channel is counted once per bonded block. Our own traffic is excluded from busy-airtime evidence. Unknown airtime raises uncertainty; a white background does not prove zero interference.')),
-    E('p',{},_('A move must repay its disruption cost and meet the evidence margin. Cost grows with the number of affected clients, includes helpers and staging, and rises when recent channel announcements were accompanied by client departures. Small primary-channel changes face an additional cost. These are score points, not outage seconds. Temporary residence and retry holds keep alternatives visible but prevent their execution. Repeated scans alone do not erase uncertainty. Each step is checked again before execution. Only improved spectrum separation can bypass the service margin. Sharing below refers to peers at comparison time; a joint plan can move those peers too.')),
+    E('p',{'class':'wc-caption'},_('Higher service scores indicate more estimated capacity, not measured speed. Channel changes must justify their disruption to clients.')),
     E('div',{},p.alternatives.map(function(a){return E('div',{},[
      E('h4',{},a.radio),
      E('p',{'class':'wc-comparison-context'},_('At the last comparison')),
@@ -101,7 +98,16 @@ return view.extend({
       E('strong',{},note.title),E('p',{},note.text),note.expiry?E('p',{'class':'wc-restriction-end'},'Retry restriction end: '+note.expiry):''
      ]);})),
      E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[
-      E('thead',{},E('tr',{},['Channel / width','Service index','Congestion: primary / block','Estimated usable width','Sharing','Radar memory','Evidence uncertainty','Move cost'].map(function(x){return E('th',{},x);}))),
+      E('thead',{},E('tr',{},[
+       ['Channel / width','Candidate channel and width at the time of comparison.'],
+       ['Service index','Estimated capacity: higher is better. This is not a speed measurement.'],
+       ['Congestion: primary / block','Estimated interference on the primary channel and across the full width. Lower is better.'],
+       ['Estimated usable width','How much of the channel width is estimated to be usable.'],
+       ['Sharing','Overlap with our other radios at comparison time. A joint plan can move those radios too.'],
+       ['Radar memory','Remembered radar activity. This is avoidance strength, not a probability.'],
+       ['Evidence uncertainty','Allowance for incomplete or uncertain measurements. Higher values require stronger evidence before a move.'],
+       ['Move cost','Estimated disruption to clients, including any helper radio moves. Score points, not outage seconds.']
+      ].map(function(x){return E('th',{'scope':'col','tabindex':'0','data-tooltip':x[1]},x[0]);}))),
       E('tbody',{},a.candidates.slice().sort(function(x,y){return (p.separate?x.shared-y.shared:0)||x.cost-y.cost;}).map(function(c){return E('tr',{},[
        c.channel+' / '+c.width+' MHz'+(c.current?' (used then)':''),c.service!=null?Number(c.service).toFixed(1):'--',Number(c.primary_occupancy!=null?c.primary_occupancy:c.occupancy).toFixed(0)+' / '+Number(c.occupancy).toFixed(0),Number(c.capacity).toFixed(1)+' MHz',Number(c.shared*100).toFixed(0)+'%',Math.round((c.radar_risk||0)*100)+'%',Number(c.uncertainty||0).toFixed(1),c.movement?Number(c.movement.cost).toFixed(1):'--'
       ].map(function(x){return E('td',{},x);}));}))

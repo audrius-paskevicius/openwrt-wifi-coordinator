@@ -48,6 +48,14 @@ scoring and any active recovery restrictions still govern the next move.
 
 ## Boundaries still requiring explicit distinction
 
+UI text describes current state, the meaning of displayed values, and consequences
+of user choices. Temporary migration notes and implementation history belong in
+release notes or technical documentation. Graph help explains how to read the
+graph; setting help explains the choice and its effects. Comparison column help
+defines the scores beside their headings. Empty history distinguishes disabled
+recording, enabled recording without observations, and unavailable data.
+Avoid repeating the same explanation across status, captions and help text.
+
 - **Hardware scope is HT/VHT.** Auto now covers this router's advertised contiguous widths. HE/EHT, 6 GHz and noncontiguous 80+80 require separate support; this router advertises none of them.
 - **Connectivity is verified, not guaranteed seamless.** Some clients ignore roaming requests; restarts and CAC can interrupt service. Historical live reconnect testing recorded an interruption. DFS helper preparation still requires an empty helper; it does not strand attached clients for a long radar check.
 - **A spectrum score is not a throughput measurement.** Survey and airtime evidence guide decisions; they do not prove a global maximum speed in a changing environment. Hardware/client coverage remains specific to the documented tests.

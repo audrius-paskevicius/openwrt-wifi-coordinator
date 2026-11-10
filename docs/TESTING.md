@@ -1,12 +1,35 @@
 # Validation
 
-Source release: **0.7.0-r15**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r16**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 54 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r16 UI wording and empty-history state (2026-11-10)
+
+Status and help text across Channels, Clients, Comparison, History, Settings
+and Storage & export now focus on current state, value meanings and user
+choices. Historical migration notes, repeated notices and internal bookkeeping
+explanations were removed. Comparison column help retains score definitions;
+setting help retains disruption, recovery, radar and data-loss consequences.
+Empty History distinguishes recording enabled, recording disabled and a failed
+history read, using the recorder state with configured recording as fallback.
+
+Portable source and UI checks passed. The actual LuCI Chrome fixture passed
+with 52 setting descriptions, hover/focus/tap help, retained editing during
+polling, comparison refresh, export selectors and the empty-history states.
+There were no browser exceptions. Backend coordination, scoring, steering,
+recording and export logic are unchanged; the runtime suite was not repeated
+for this UI revision.
+
+The signed APK and package index verified, all 46 payload files matched source,
+and source/package sensitive-data scans passed. Installation preserved all six
+checked configuration files. All six live LuCI pages rendered without warnings
+or browser exceptions; History displayed all three charts with the revised
+help. Comparison and Settings were also visually reviewed in Chrome.
 
 ## 0.7.0-r15 quiet zero-congestion areas and survey documentation (2026-11-10)
 
