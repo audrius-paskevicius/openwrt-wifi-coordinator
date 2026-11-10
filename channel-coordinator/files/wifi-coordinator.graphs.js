@@ -64,10 +64,10 @@ function baseOptions(start,end){return {
  interaction:{mode:'nearest',intersect:false},
  plugins:{legend:{display:false},tooltip:{displayColors:true}},
  scales:{x:{type:'linear',min:start,max:end,grid:{color:'#e5e5e5'},border:{color:'#999'},
-  afterBuildTicks:function(s){s.ticks=timefmt.ticks(start,end,s.chart.width-120).map(v=>({value:v}));},
+  afterBuildTicks:function(s){s.ticks=timefmt.ticks(start,end,s.chart.width-100).map(v=>({value:v}));},
   ticks:{color:'#444',autoSkip:false,maxRotation:0,callback:function(v,i,ticks){return timefmt.label(v,start,end,ticks.map(t=>t.value));}},
   title:{display:false}},
- y:{type:'linear',grid:{color:'#e5e5e5'},border:{color:'#999'},ticks:{color:'#444'},afterFit:function(s){s.width=100;}}}
+ y:{type:'linear',grid:{color:'#e5e5e5'},border:{color:'#999'},ticks:{color:'#444'},afterFit:function(s){s.width=80;}}}
 };}
 function line(label,data,color,extra){return Object.assign({label:label,data:data,borderColor:color,backgroundColor:color,fill:false,pointRadius:0,pointHoverRadius:3,borderWidth:2.5,tension:0,spanGaps:false},extra||{});}
 function channelData(periods,names,start,end,axis){
@@ -203,6 +203,35 @@ function clientChart(canvas,intervals,names,start,end){
  options.scales.y.title={display:true,text:'Clients',color:'#444'};
  options.plugins.tooltip.callbacks={title:function(items){var p=items[0]&&items[0].raw.interval;return p?dated(p.start)+' – '+dated(p.end):'';},
   label:function(c){return c.dataset.label+': '+c.raw.y+' client'+(c.raw.y==1?'':'s');}};
- return new chartlib.Chart(canvas,{type:'line',data:{datasets:clientData(intervals,names,start,end)},options:options});
+ options.layout={padding:{top:10}};
+ return new chartlib.Chart(canvas,{type:'line',data:{datasets:clientData(intervals,names,start,end)},options:options,plugins:[clientFinPlugin]});
 }
-return baseclass.extend({spectrumAxis:spectrumAxis,channelChart:channelChart,clientChart:clientChart,trafficChart:trafficChart,colour:colour,keyStyle:keyStyle,patternStyle:patternStyle,patternName:patternName,geometry:geometry,channelData:channelData,clientData:clientData,trafficData:trafficData,surveyData:surveyData,radarData:radarData,radarColour:radarColour,radarGradient:radarGradient});
+function finSlant(r,i){return [-8,0,8][radioIndex(r,i)%3];}
+function clientFinStyle(r,i){
+ var dx=finSlant(r,i),c=colour(r,i);
+ var svg='<svg xmlns="http://www.w3.org/2000/svg" width="28" height="14" viewBox="0 0 28 14"><path d="M0 12H28 M8 12L'+(8+dx)+' 4 M20 12L'+(20+dx)+' 4" fill="none" stroke="'+c+'" stroke-width="1.7"/></svg>';
+ return 'display:inline-block;width:28px;height:14px;margin-right:7px;vertical-align:baseline;background:no-repeat center url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
+}
+function clientFinMarks(chart){
+ var marks=[],area=chart.chartArea,spacing=12,total=chart.data.datasets.length;
+ chart.data.datasets.forEach(function(d,i){
+  if(!chart.isDatasetVisible(i))return;
+  for(var j=0;j+1<d.data.length;j++){
+   var p=d.data[j],q=d.data[j+1];
+   if(!p.interval||p.interval!==q.interval||p.y==null||p.y!==q.y)continue;
+   var a=Math.max(area.left,chart.scales.x.getPixelForValue(p.x)),b=Math.min(area.right,chart.scales.x.getPixelForValue(q.x)),y=chart.scales.y.getPixelForValue(p.y);
+   if(b-a<2||y<area.top||y>area.bottom)continue;
+   var phase=area.left+spacing*(i+0.5)/Math.max(1,total),first=phase+Math.ceil((a-phase)/spacing)*spacing;
+   // Even a short newly recorded interval gets a fin for each radio.
+   if(first>b)first=a+(b-a)*(i+1)/(total+1);
+   for(var x=first;x<=b;x+=spacing)marks.push({x:x,y:y,dx:finSlant(d.radio,i),color:d.borderColor});
+  }
+ });return marks;
+}
+var clientFinPlugin={id:'wcClientFins',afterDatasetsDraw:function(chart){
+ var ctx=chart.ctx,a=chart.chartArea;
+ ctx.save();ctx.beginPath();ctx.rect(a.left,a.top-9,a.right-a.left,a.bottom-a.top+9);ctx.clip();ctx.lineWidth=1.7;
+ clientFinMarks(chart).forEach(function(m){ctx.strokeStyle=m.color;ctx.beginPath();ctx.moveTo(m.x,m.y);ctx.lineTo(m.x+m.dx,m.y-8);ctx.stroke();});
+ ctx.restore();
+}};
+return baseclass.extend({spectrumAxis:spectrumAxis,channelChart:channelChart,clientChart:clientChart,trafficChart:trafficChart,colour:colour,keyStyle:keyStyle,patternStyle:patternStyle,patternName:patternName,geometry:geometry,channelData:channelData,clientData:clientData,clientFinStyle:clientFinStyle,clientFinMarks:clientFinMarks,trafficData:trafficData,surveyData:surveyData,radarData:radarData,radarColour:radarColour,radarGradient:radarGradient});

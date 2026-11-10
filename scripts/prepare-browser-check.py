@@ -31,6 +31,7 @@ sources = {name: (root / file).read_text(encoding='utf-8') for name, file in [
     ('time', 'channel-coordinator/files/wifi-coordinator.time.js'),
     ('help', 'channel-coordinator/files/wifi-coordinator.help.js'),
     ('channels', 'channel-coordinator/files/wifi-channels.js'),
+    ('comparison', 'channel-coordinator/files/wifi-comparison.js'),
     ('clients', 'radio-prefer/files/wifi-clients.js'),
     ('history', 'channel-coordinator/files/wifi-history.js'),
     ('storage', 'channel-coordinator/files/wifi-storage.js')
@@ -91,7 +92,8 @@ state.proposal={evaluated_at:1700000000,evaluated_uptime:90,neighbors:12,alterna
 let retentionValue='200';
 const uci={sections:()=>radios,get:(c,s,k)=>k==='history_hours'?retentionValue:true};
 const rpc={declare:()=>()=>Promise.resolve({})};
-const fs={read:()=>Promise.resolve(JSON.stringify(state))};
+let failState=false;
+const fs={read:()=>Promise.resolve(JSON.stringify(state)),read_direct:()=>failState?Promise.reject(Error('Synthetic interruption')):Promise.resolve(JSON.stringify(state))};
 const poll={add:fn=>polls.push(fn)};
 const view={extend:x=>x};
 const graphs={};
@@ -99,8 +101,10 @@ const timefmt=new Function('baseclass',payload.sources.time)({extend:x=>x});
 function page(name){return new Function('view','form','uci','rpc','fs','poll','help','E','_','L','graphs','timefmt',payload.sources[name])(view,form,uci,rpc,fs,poll,help,E,_,L,graphs,timefmt);}
 function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));assert(tooltipDiv.style.opacity==='1','hover must open native tooltip');assert(tooltipDiv.textContent.includes(node.dataset.tooltip),'hover must expose full explanation');assert(tooltipDiv.getBoundingClientRect().right<=innerWidth+1,'tooltip must fit viewport');}
 (async()=>{
- for(const name of ['channels','clients','history','storage']){
-  const pane=await page(name).renderPage(['history','storage'].includes(name)?[null,{}]:[null,null,state,{}]);
+ let comparisonPoll;
+ for(const name of ['channels','clients','history','storage','comparison']){
+  const pane=await page(name).renderPage(name==='comparison'?[null,{state:state}]:['history','storage'].includes(name)?[null,{}]:[null,null,state,{}]);
+  pane.dataset.fixturePage=name;if(name==='comparison')comparisonPoll=polls[polls.length-1];
   // Fixture uses locally embedded style, never navigates to the router.
   pane.querySelectorAll('link').forEach(n=>n.remove());
   document.getElementById('pages').appendChild(pane);
@@ -126,18 +130,23 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  node.click();assert(tooltipDiv.style.opacity==='1','tap must open help');node.click();assert(tooltipDiv.style.opacity==='0','second tap must close help');
  const statuses=document.querySelectorAll('.cbi-section-descr .wc-caption');assert(statuses.length===3,'all three applied-method descriptions must render');
  assert(statuses[0].textContent.includes('Synthetic connectivity failure'),'temporary exclusions must be visible');
- const comparison=document.querySelector('details');comparison.open=true;
+ const comparison=document.querySelector('[data-fixture-page=comparison]');
+ assert(!comparison.querySelector('details'),'comparison is displayed directly');
+ assert(!document.querySelector('[data-fixture-page=channels]').textContent.includes('Compare all eligible placements'),'comparison removed from Channels');
  const textNodes=document.createTreeWalker(document.getElementById('pages'),NodeFilter.SHOW_TEXT);
  while(textNodes.nextNode())assert(textNodes.currentNode.textContent.trim()!=='null','absent optional lines must not render literal null');
  const unsaved=document.querySelector('input[type="text"]');unsaved.value='unsaved edit';
  state.pending='scan';state.status='Paced survey in progress';state.updated=150;state.proposal.placements_changed=true;
- await polls[0]();assert(statuses[0].isConnected,'status must remain attached after polling');
+ state.proposal.evaluated_at=Math.floor(Date.now()/1000)-60;
+ await polls[0]();await comparisonPoll();assert(statuses[0].isConnected,'status must remain attached after polling');
  assert(comparison.querySelector('tbody').textContent.includes('36 / 80 MHz (used then)'),'previous comparison rows must remain during a survey');
  assert(comparison.textContent.includes('60 seconds')||comparison.textContent.includes('1 minutes'),'comparison age must advance');
  assert(comparison.textContent.includes('Paced survey in progress')&&comparison.textContent.includes('Radio placements have changed'),'current progress and changed placement must be explicit');
  state.proposal={...state.proposal,evaluated_uptime:150,evaluated_at:1700000060,placements_changed:false,alternatives:[{radio:'radio0',channels:[149],widths:[80],candidates:[{channel:149,width:80,current:true,cost:2,occupancy:2,capacity:78,shared:0}]}]};
- await polls[0]();assert(comparison.querySelector('tbody').textContent.includes('149 / 80 MHz'),'completed evaluation replaces previous rows');
- assert(comparison.open,'comparison panel must stay expanded during refresh');
+ await comparisonPoll();assert(comparison.querySelector('tbody').textContent.includes('149 / 80 MHz'),'completed evaluation replaces previous rows');
+ const retainedTable=comparison.querySelector('table');await comparisonPoll();assert(comparison.querySelector('table')===retainedTable,'unchanged results keep table DOM during refresh');
+ failState=true;await comparisonPoll();assert(comparison.querySelector('table')===retainedTable&&!comparison.querySelector('.alert-message').hidden,'failed read retains results and warns');
+ failState=false;await comparisonPoll();assert(comparison.querySelector('.alert-message').hidden,'successful refresh clears warning');
  assert(unsaved.value==='unsaved edit','polling must preserve unsaved input');
  const map=maps[0],fresh=await map.render();document.getElementById('pages').appendChild(fresh);
  const after=fresh.querySelector('.wc-setting-help');tooltip(after);after.click();assert(tooltipDiv.style.opacity==='1','delegation must survive form rerender');
@@ -146,7 +155,8 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  assert(failedHistory.textContent.indexOf('History is incomplete')<failedHistory.textContent.indexOf('History is collecting'),'read failure must precede the empty-history message');
  const recent=Math.floor(Date.now()/1000);
  const historyData={periods:[{radio:'radio0',channel:36,width:80,start:recent-60,end:recent}],samples:[],events:[],surveys:[],ram_bytes:100,archive_bytes:0,archive_files:0};
- graphs.channelChart=graphs.trafficChart=()=>({destroy(){}});
+ graphs.channelChart=graphs.clientChart=graphs.trafficChart=()=>({destroy(){}});
+ graphs.clientFinStyle=()=>'';
  graphs.colour=()=>'#005dff';graphs.patternStyle=()=>'';graphs.patternName=()=>'diagonal lines';graphs.radarGradient=()=> '#fff';
  fs.list=async()=>[];fs.read_direct=async path=>JSON.stringify(path.includes('state')?state:historyData);
  const historyPane=await page('history').renderPage([null,historyData]);

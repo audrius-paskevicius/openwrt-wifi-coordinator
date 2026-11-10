@@ -1,12 +1,31 @@
 # Validation
 
-Source release: **0.7.0-r4**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r5**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r5 Comparison tab and history presentation (2026-11-10)
+
+The full placement comparison moved from Channels to a dedicated Comparison tab
+before History, displayed directly. The page retains its completed results through
+scans and read failures, shows current operation and comparison age, and preserves
+the table DOM when only status changes. Channels retains settings and live status.
+The package also includes the client-line fins, matching legend, 80-pixel aligned
+axis gutter and Recent actions title tooltip previously tried on the router.
+
+Portable source/UI checks passed, including ten JavaScript syntax checks. The
+native LuCI browser fixture passed all 55 setting descriptions and its updated
+comparison checks: direct display, retained results, replacement, stable table DOM,
+failed-read warning and recovery. Chrome verified the installed menu order, 152
+candidate rows, removal from Channels, fin legend and Recent actions tooltip with
+no page exceptions. The actual Chart.js render fixture passed after the fin and
+axis changes. The signed APK/index verified; all 43 payload files matched source
+or generated content. Six configuration hashes were preserved. Runtime, storage
+and radio algorithms are unchanged, so native RF/storage suites were not repeated.
 
 ## 0.7.0-r4 client-count history (2026-11-10)
 

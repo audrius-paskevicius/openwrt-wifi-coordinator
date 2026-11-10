@@ -181,7 +181,7 @@ return view.extend({
    var clientCanvas=E('canvas',{'role':'img','aria-label':'Clients on each radio over time'});
    function heading(title,detail){return E('h3',{},E('span',{'class':'wc-setting-help','role':'button','tabindex':'0','data-tooltip':detail,'data-tooltip-style':'wc-help-tooltip','aria-label':title+'. '+detail},title));}
    var trafficCanvas=E('canvas',{'role':'img','aria-label':'Observed radio traffic over time'});
-   function legend(patterns){return E('p',{'class':'wc-legend'},radioNames.map(function(r,i){return E('span',{'style':'color:'+graphs.colour(r,i)+';margin-right:22px;font-weight:600;'},[E('span',{'class':patterns?'wc-pattern-key':'wc-line-key','style':patterns?graphs.patternStyle(r,i):'border-color:'+graphs.colour(r,i),'title':patterns?graphs.patternName(r,i):r}),r]);}));}
+   function legend(patterns,fins){return E('p',{'class':'wc-legend'},radioNames.map(function(r,i){return E('span',{'style':'color:'+graphs.colour(r,i)+';margin-right:22px;font-weight:600;'},[E('span',{'class':fins?'wc-fin-key':patterns?'wc-pattern-key':'wc-line-key','style':fins?graphs.clientFinStyle(r,i):patterns?graphs.patternStyle(r,i):'border-color:'+graphs.colour(r,i),'title':patterns?graphs.patternName(r,i):r}),r]);}));}
    var radarHalf=Number(h.radar&&h.radar.half_life)||3600;
    function elapsedLabel(seconds){return seconds>=3600?+(seconds/3600).toFixed(1)+' h':+(seconds/60).toFixed(1)+' min';}
    var radarKey=E('div',{'class':'wc-radar-key','title':'Amber marks radar detections. Detection: 100%; after '+elapsedLabel(radarHalf)+': 50%; after '+elapsedLabel(2*radarHalf)+': 25%; after '+elapsedLabel(3*radarHalf)+': 12.5%. White represents zero remembered strength. Percentages describe avoidance strength, not probability. Radar clearance rules still apply.'},[
@@ -195,7 +195,7 @@ return view.extend({
     E('div',{'class':'wc-chart wc-spectrum-chart'},channelCanvas),legend(true),
     E('div',{'class':'wc-spectrum-keys'},[E('div',{'class':'wc-survey-key','title':'Estimated congestion ranges from 0 (lowest) to 100 (highest estimated congestion). Darker grey means more or stronger overlapping networks, adjusted for advertised load. This is an estimate, not measured airtime or a percentage. Hover over the graph for measurement times.'},[E('span',{},_('Estimated congestion')),E('div',{'class':'wc-survey-ramp'},[E('div',{'class':'wc-grey-scale','aria-hidden':'true'}),E('div',{'class':'wc-scale-ticks'},[0,25,50,75,100].map(function(n){return E('span',{},String(n));}))])]),radarKey]),
     heading(_('Clients on each radio over time'),_('Associated clients, sampled every five seconds. Whole-number steps show count changes. Gaps mean no observations; older history contains no client-count intervals. Hover or tap for details.')),
-    E('div',{'class':'wc-chart wc-traffic-chart'},clientCanvas),legend(),
+    E('div',{'class':'wc-chart wc-traffic-chart'},clientCanvas),legend(false,true),
     heading(_('Observed traffic over time'),_('Upload + download, averaged over five minutes. This shows usage, not a speed test. Hover or tap for details.')),
     E('div',{'class':'wc-chart wc-traffic-chart'},trafficCanvas),legend()];
    var latest=radioNames.map(function(r){return samples.filter(function(s){return s.radio==r;}).slice(-1)[0];}).filter(Boolean);
@@ -208,8 +208,7 @@ return view.extend({
     ].map(function(x){return E('td',{},x);}));}))
    ])));
    var events=(h.events||[]).filter(function(e){return e.time>=cutoff;}).slice().reverse();
-   nodes.push(E('h3',{},_('Recent actions')));
-   nodes.push(E('p',{'class':'wc-caption'},'Newest first, within the selected time window.'));
+   nodes.push(heading(_('Recent actions'),_('Newest first, within the selected time window.')));
    nodes.push(E('div',{'class':'wc-table-wrap wc-log-wrap'},E('table',{'class':'table wc-table'},[
     E('thead',{},E('tr',{},['Time','Action','Details'].map(function(x){return E('th',{'scope':'col'},_(x));}))),
     E('tbody',{},events.map(function(e){var detail=e.reason||[

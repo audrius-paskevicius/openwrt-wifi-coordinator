@@ -51,5 +51,13 @@
    "path": "wifi-disclaimer"
   },
   "title": "Experimental, AI-generated software. Use at your own risk."
+ },
+ "admin/network/wifi_coordinator/comparison": {
+  "order": 25,
+  "action": {
+   "type": "view",
+   "path": "wifi-comparison"
+  },
+  "title": "Comparison"
  }
 }
