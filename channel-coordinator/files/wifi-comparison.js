@@ -17,6 +17,53 @@ function comparisonTime(p,st) {
  return _('Last comparison: ')+timefmt.stamp(p.evaluated_at)+
   (Number.isFinite(age)?' ('+(age<60?Math.floor(age)+' seconds':Math.floor(age/60)+' minutes')+' ago).':'.');
 }
+function rejectionDescription(reason){
+ var messages={
+  'Radio serves other clients; affected clients lack verified alternate service':['Client service not verified','The controller had not confirmed that affected clients could continue working through another radio.'],
+  'Known client-placement conflict; alternate service did not verify':['Client service not verified','Some clients had trouble on this placement, and a working connection through another radio had not been confirmed.'],
+  'Known client-placement conflict; no permitted compatible fallback':['No suitable alternative connection','Some clients had trouble on this placement, and no permitted alternative radio could serve them.'],
+  'Client service recovered on previous placement; six-hour compatibility cooldown':['Clients recovered on the previous channel','Client service returned after restoring the previous placement. This placement was paused before another attempt.'],
+  'Radio did not establish the requested placement':['Channel change did not succeed','The radio did not establish service on the requested channel and width. Another attempt was temporarily deferred.'],
+  'Driver left the original channel/width unchanged':['Channel change was not applied','The driver kept the previous channel and width. Another attempt was temporarily deferred.'],
+  'Client check inconclusive; short retry deferral pending recovery evidence':['Client check inconclusive','The check could not establish whether client service was working. A short pause allows time for further recovery checks.']
+ },width=/^(\d+) MHz retained during (\d+) MHz setup: coexistence or driver constraint$/.exec(reason||'');
+ if(width)return {title:'Requested width not applied',text:'The radio stayed at '+width[1]+' MHz when '+width[2]+' MHz was requested.',actual:Number(width[1]),requested:Number(width[2])};
+ var m=messages[reason];return m?{title:m[0],text:m[1]}:{title:'Previous attempt did not pass verification',text:reason||'The connection check did not confirm working service.'};
+}
+function restrictionTime(until,p){
+ if(!Number.isFinite(until)||!Number.isFinite(p.evaluated_at)||!Number.isFinite(p.evaluated_uptime))return null;
+ var t=p.evaluated_at+until-p.evaluated_uptime;
+ return timefmt.sameDay(t,p.evaluated_at)?timefmt.clock(t,true):timefmt.stamp(t);
+}
+function channelList(channels){
+ var values=Array.from(new Set(channels)).sort((a,b)=>a-b).map(String);
+ return values.length<2?values[0]:values.slice(0,-1).join(', ')+' and '+values[values.length-1];
+}
+function comparisonNotes(a,p){
+ var notes=[],groups=new Map(),limit=a.width_limit;
+ if(limit){
+  notes.push({title:'Channel width limited to '+limit.actual+' MHz',
+   text:'The radio stayed at '+limit.actual+' MHz when '+limit.requested+' MHz was requested. Wider widths were temporarily paused before another attempt.',
+   expiry:restrictionTime(limit.until,p)});
+ }
+ (a.rejected||[]).forEach(function(x){
+  if(!x.target)return;
+  var d=rejectionDescription(x.reason);
+  // A radio-wide width pause already explains these narrower per-channel holds.
+  if(limit&&d.actual===limit.actual&&d.requested===limit.requested&&x.until<=limit.until)return;
+  var key=JSON.stringify([x.target.width,d.title,d.text]),g=groups.get(key),f=x.target.freq,ch=f===2484?14:f<3000?(f-2407)/5:(f-5000)/5;
+  if(!g){g={width:x.target.width,description:d,channels:[],ends:new Map()};groups.set(key,g);}
+  g.channels.push(ch);
+  var end=restrictionTime(x.until,p);
+  if(!g.ends.has(end))g.ends.set(end,[]);g.ends.get(end).push(ch);
+ });
+ groups.forEach(function(g){
+  var channels=channelList(g.channels),plural=new Set(g.channels).size>1;
+  var expiry=g.ends.size===1?Array.from(g.ends.keys())[0]:Array.from(g.ends).map(([end,chs])=>(chs.length>1?'Channels ':'Channel ')+channelList(chs)+': '+(end||'time not recorded')).join('; ');
+  notes.push({title:(plural?'Channels ':'Channel ')+channels+' ('+g.width+' MHz) deferred — '+g.description.title.toLowerCase(),text:g.description.text,expiry});
+ });
+ return notes;
+}
 return view.extend({
  load:function(){return Promise.all([uci.load('channel_coordinator'),readState().then(function(state){return {state:state};},function(e){return {error:e.message||String(e)};})]);},
  render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));},
@@ -45,11 +92,14 @@ return view.extend({
     E('p',{},_('Grey history shows average neighbour pressure. Planning also accounts for the primary channel, bonded subchannels, fresh external busy counters and radar memory. A neighbour spanning a wide channel is counted once per bonded block. Our own traffic is excluded from busy-airtime evidence. Unknown airtime raises uncertainty; a white background does not prove zero interference.')),
     E('p',{},_('A move must repay its disruption cost and meet the evidence margin. Cost grows with the number of affected clients, includes helpers and staging, and rises when recent channel announcements were accompanied by client departures. Small primary-channel changes face an additional cost. These are score points, not outage seconds. Temporary residence and retry holds keep alternatives visible but prevent their execution. Repeated scans alone do not erase uncertainty. Each step is checked again before execution. Only improved spectrum separation can bypass the service margin. Sharing below refers to peers at comparison time; a joint plan can move those peers too.')),
     E('div',{},p.alternatives.map(function(a){return E('div',{},[
-     E('h4',{},a.radio+(a.hold?' — at comparison: '+a.hold:'')),
-     E('p',{},_('Channel pool at comparison: ')+(a.channels||[]).join(' ')),
-     E('p',{},_('Widths at comparison: ')+(a.widths||[]).join(' / ')+' MHz'),
-     a.width_limit?E('p',{},'Width constraint at comparison: '+a.width_limit.reason+'; widths above '+a.width_limit.actual+' MHz temporarily deferred.'):'',
-     ...((a.rejected||[]).length?[E('p',{},'Excluded at comparison: '+a.rejected.map(function(x){return (x.target.freq<3000?(x.target.freq-2407)/5:(x.target.freq-5000)/5)+' / '+x.target.width+' MHz — '+(x.reason||'Connectivity check failed');}).join('; ')+'.')]:[]),
+     E('h4',{},a.radio),
+     E('p',{'class':'wc-comparison-context'},_('At the last comparison')),
+     a.hold?E('p',{},_('Channel changes paused: ')+a.hold):'',
+     E('p',{},_('Channel pool: ')+(a.channels||[]).join(' ')),
+     E('p',{},_('Widths: ')+(a.widths||[]).join(' / ')+' MHz'),
+     E('div',{'class':'wc-comparison-notes'},comparisonNotes(a,p).map(function(note){return E('div',{'class':'wc-comparison-note'},[
+      E('strong',{},note.title),E('p',{},note.text),note.expiry?E('p',{'class':'wc-restriction-end'},'Retry restriction end: '+note.expiry):''
+     ]);})),
      E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[
       E('thead',{},E('tr',{},['Channel / width','Service index','Congestion: primary / block','Estimated usable width','Sharing','Radar memory','Evidence uncertainty','Move cost'].map(function(x){return E('th',{},x);}))),
       E('tbody',{},a.candidates.slice().sort(function(x,y){return (p.separate?x.shared-y.shared:0)||x.cost-y.cost;}).map(function(c){return E('tr',{},[

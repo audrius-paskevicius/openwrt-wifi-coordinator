@@ -212,7 +212,7 @@ function evidenceData(rows,names,start,end,events,axis){
  });return sets;
 }
 function evidenceTitle(raw){return dated(raw.evidence.start)+(raw.evidence.end!=raw.evidence.start?' – '+dated(raw.evidence.end):'');}
-function evidenceLabel(raw){return [raw.evidence.radio+': '+raw.evidence.detail,'Marker height uses the nearest recorded value; it is not a measurement during the gap.'];}
+function evidenceLabel(raw){return raw.evidence.radio+': '+raw.evidence.detail;}
 function channelChart(canvas,periods,names,start,end,surveys,radar,bands,events){
  var options=baseOptions(start,end),axis=spectrumAxis(bands),ticks=axis.ticks;
  options.scales.y.min=-6;options.scales.y.max=Math.max(1,axis.max)+6;

@@ -1,12 +1,34 @@
 # Validation
 
-Source release: **0.7.0-r9**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r10**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r10 clearer comparison notes (2026-11-10)
+
+Comparison separates width restrictions from deferred channels and groups
+channels sharing a reason and width. The notes explain the observed result and
+client-service restrictions in plain language. End times are derived from the
+saved comparison's wall clock and uptime; older snapshots without both omit
+the time. A radio-wide width pause replaces redundant per-channel width notes
+only when it covers the same width reduction and at least the same interval.
+Event tooltips keep the description and timestamp without the marker-height
+explanation. This release changes presentation only.
+
+Portable UI checks, the actual LuCI browser fixture and Chart.js render fixture
+passed. The LuCI fixture verifies grouped reasons, distinct width notes, correct
+snapshot-based end times, missing-time handling and retained tables across
+refreshes. The graph fixture checks concise event tooltips. Runtime algorithms
+are unchanged; the full ucode/RF suite was not rerun for this presentation change.
+
+The signed APK verified and all 46 payload files matched source. Secret scans
+passed for source and extracted payload. On the router, the Comparison page
+showed separate width/client notes, grouped channels 12 and 13 and their distinct
+end times without warnings. All six checked configuration files remained unchanged.
 
 ## 0.7.0-r9 responsive planning and history evidence (2026-11-10)
 

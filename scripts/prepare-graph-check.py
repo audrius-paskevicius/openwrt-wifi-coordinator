@@ -38,7 +38,8 @@ try{
  markers.forEach(d=>{
   const raw=d.data[0];
   assert(full.options.plugins.tooltip.callbacks.title([{raw}]).length>0,'evidence tooltip timestamp');
-  assert(full.options.plugins.tooltip.callbacks.label({raw}).length===2,'evidence tooltip explains marker position');
+  const label=full.options.plugins.tooltip.callbacks.label({raw});
+  assert(typeof label==='string'&&label.includes(raw.evidence.detail)&&!label.includes('Marker height'),'evidence tooltip keeps only the event description');
  });
  assert(full.scales.y.ticks.filter(t=>t.label==='//').length===2,'two standard breaks');
  assert(five.scales.y.ticks.filter(t=>t.label==='//').length===1,'5 GHz-only has one break');

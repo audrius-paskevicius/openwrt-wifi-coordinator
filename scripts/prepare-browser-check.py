@@ -181,6 +181,22 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  await comparisonPoll();assert(comparison.textContent.includes('Movement cost: 12.0 points; 3 currently associated')&&comparison.textContent.includes('5 estimated client moves'),'complete route exposure displayed');
  assert(comparison.querySelectorAll('tbody tr').length===2&&comparison.textContent.includes('Minimum residence'),'hold keeps visible alternatives');
  assert(comparison.querySelector('thead').textContent.includes('Move cost')&&comparison.querySelector('tbody').textContent.includes('6.0'),'direct candidate movement cost displayed');
+ const clientReason='Radio serves other clients; affected clients lack verified alternate service';
+ state.proposal.alternatives[0].width_limit={actual:20,requested:40,until:750};
+ state.proposal.alternatives[0].rejected=[
+  {target:{freq:2472,width:20},until:750,reason:clientReason},
+  {target:{freq:2467,width:20},until:750,reason:clientReason},
+  {target:{freq:2442,width:40},until:700,reason:'20 MHz retained during 40 MHz setup: coexistence or driver constraint'}
+ ];
+ await comparisonPoll();
+ assert(comparison.querySelectorAll('.wc-comparison-note').length===2,'width note and grouped channels are distinct; covered width rejection is not repeated');
+ assert(comparison.textContent.includes('Channels 12 and 13 (20 MHz) deferred')&&comparison.textContent.includes('could continue working through another radio'),'client-service explanation groups channels');
+ assert(comparison.textContent.includes('stayed at 20 MHz when 40 MHz was requested'),'width note explains the observed result');
+ const ends=[...comparison.querySelectorAll('.wc-restriction-end')].map(n=>n.textContent);
+ assert(ends.length===2&&ends.every(t=>t.includes(timefmt.clock(1700000660,true))),'expiry uses comparison wall time and uptime, not latest status uptime');
+ delete state.proposal.evaluated_uptime;await comparisonPoll();
+ assert(!comparison.querySelector('.wc-restriction-end'),'older snapshots never invent an expiry');
+ state.proposal.evaluated_uptime=150;await comparisonPoll();
  const retainedTable=comparison.querySelector('table');await comparisonPoll();assert(comparison.querySelector('table')===retainedTable,'unchanged results keep table DOM during refresh');
  failState=true;await comparisonPoll();assert(comparison.querySelector('table')===retainedTable&&!comparison.querySelector('.alert-message').hidden,'failed read retains results and warns');
  failState=false;await comparisonPoll();assert(comparison.querySelector('.alert-message').hidden,'successful refresh clears warning');
