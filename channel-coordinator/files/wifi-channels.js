@@ -30,7 +30,7 @@ return view.extend({
    var header=E('thead',{},E('tr',{},['Radio','Channel / width','Clients','Traffic','Minimum residence','Radar check'].map(function(x){return E('th',{'scope':'col'},_(x));}))),rows=[];
    Object.keys(st.radios||{}).forEach(function(name){var r=st.radios[name];rows.push(E('tr',{},[
     name,(r.channel||'?')+' / '+(r.width||'?')+' MHz',String(r.clients||0),Number(r.mbps||0).toFixed(3)+' Mbps',
-    (r.cooldown_left||0)+' s',r.dfs?(r.dfs_ready?'Cleared DFS channel':'DFS clearance required'):'Not a DFS channel'
+    timefmt.seconds(r.cooldown_left||0)+' s',r.dfs?(r.dfs_ready?'Cleared DFS channel':'DFS clearance required'):'Not a DFS channel'
    ].map(function(v){return E('td',{},v);})));});
    var p=st.proposal, dfs=st.dfs;
    var items=[E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[header,E('tbody',{},rows)]))],cards=[];
@@ -41,7 +41,7 @@ return view.extend({
    if(dfs){var phase={listening:'Listening for radar',restoring:'Restoring the spare radio',ready:'Completed and shared',recovered:'Restored after an interrupted check',inactive:'Previous check ended','restored-after-error':'Restored after an error'};cards.push(E('div',{'class':'wc-summary'},[
     E('h4',{},_('Last radar preparation')),E('p',{},phase[dfs.phase]||dfs.phase),
     E('p',{},'Channel '+dfs.channel+' / '+dfs.width+' MHz'+(dfs.helper?' using '+dfs.helper:'')),
-    dfs.elapsed!=null?E('p',{},'Total preparation time: '+dfs.elapsed+' seconds'):''
+    dfs.elapsed!=null?E('p',{},'Total preparation time: '+timefmt.seconds(dfs.elapsed)+' seconds'):''
    ]));}
    if(cards.length)items.push(E('div',{'class':'wc-summaries'},cards));
    if(st.updated)items.push(E('small',{'class':'wc-caption'},'Traffic shows current usage. Updated every 5 seconds.'));

@@ -1,12 +1,30 @@
 # Validation
 
-Source release: **0.7.0-r16**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r17**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 54 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r17 History header and readable durations (2026-11-10)
+
+The History period selector sits at the right of the page title and wraps below
+it when the available width is too narrow. Its label remains associated with
+the native select control. Viewing-window behavior and graph data are unchanged.
+Displayed elapsed times use at most two decimal places, removing floating-point
+precision tails in Recent actions, radar preparation and residence times. Stored
+values and export precision are unchanged. Portable UI checks passed; no backend
+behavior changed in this revision.
+
+The signed package and index verified; all 46 payload files matched source and
+sensitive-data checks passed. Installation preserved the six checked router
+configuration files. Live Chrome checks at 1280 and 390 pixels verified title
+alignment, narrow-screen wrapping, the associated label and period changes.
+Floating-point examples displayed as 0.2, 2.52, 3.58 and 0.28 seconds; live action
+rows contained no long decimal tails. The clean navigation check completed
+without browser exceptions.
 
 ## 0.7.0-r16 UI wording and empty-history state (2026-11-10)
 

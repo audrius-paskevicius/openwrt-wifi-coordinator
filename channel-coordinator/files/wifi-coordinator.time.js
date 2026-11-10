@@ -5,6 +5,7 @@ function pad(n){return String(n).padStart(2,'0');}
 function date(t){var d=new Date(t*1000);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
 function clock(t,seconds){var d=new Date(t*1000);return pad(d.getHours())+':'+pad(d.getMinutes())+(seconds?':'+pad(d.getSeconds()):'');}
 function stamp(t){return date(t)+' '+clock(t,true);}
+function seconds(value){return String(Number(Number(value).toFixed(2)));}
 function zone(){return Intl.DateTimeFormat().resolvedOptions().timeZone||'Browser local time';}
 function offset(t){var n=-new Date(t*1000).getTimezoneOffset();return 'UTC'+(n<0?'-':'+')+pad(Math.floor(Math.abs(n)/60))+':'+pad(Math.abs(n)%60);}
 function sameDay(start,end){return date(start)===date(end);}
@@ -28,4 +29,4 @@ function label(t,start,end,values){
  if((values||[]).some(v=>v!==t&&date(v)===date(t)&&clock(v,seconds)===c))lines.push(offset(t));
  return lines.length===1?lines[0]:lines;
 }
-return baseclass.extend({date:date,clock:clock,stamp:stamp,zone:zone,offset:offset,sameDay:sameDay,showDate:showDate,ticks:ticks,label:label});
+return baseclass.extend({date:date,clock:clock,stamp:stamp,seconds:seconds,zone:zone,offset:offset,sameDay:sameDay,showDate:showDate,ticks:ticks,label:label});
