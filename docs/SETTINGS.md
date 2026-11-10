@@ -6,7 +6,7 @@ The applied channel and width-change methods appear beside each radio's settings
 
 ## Where settings live
 
-**Channels** and **Clients** are status pages. All operational configuration is in
+**Channels** and **Clients** are status pages. Channel-planning and steering configuration is in
 **Settings**, using one LuCI form and one Save & Apply workflow for the existing
 `channel_coordinator` and `radio_prefer` configurations:
 
@@ -34,12 +34,11 @@ off or prohibit scanning or steering. Protected clients are not exempt from
 mandatory radar evacuation, CSA announcements or scans.
 
 The [algorithm-to-settings audit](SETTINGS-AUDIT.md) explains retained controls,
-couplings, conditional use and compatibility. This revision changes organisation
-and explanations without rewriting saved settings or changing movement policy.
+couplings, conditional use and compatibility. The 0.7.0-r8 settings reorganisation preserved saved policies. Separately, 0.7.0-r12 capped history retention at 120 hours and migrates larger saved values as described below.
 
 ## Removed controls
 
-The defaults script removes these seven retired UCI keys when the services start, including during installation. Six timing controls became fixed implementation constants; the obsolete width-selection threshold has no replacement knob. None is a hidden advanced override.
+The defaults script removes these seven retired UCI keys when the shared service starts, including during installation. Six timing controls became fixed implementation constants; the obsolete width-selection threshold has no replacement knob. None is a hidden advanced override.
 
 | Retired key | Current behavior |
 | --- | --- |
@@ -136,7 +135,7 @@ All shared strength, timing, protection, signal and retry controls are on Settin
 | `history_hours` | Maximum retention and both graph/export selection ranges (up to 120 hours), subject to the documented RAM/free-flash safeguards. |
 | `clear_history` | Explicit one-shot deletion, reset after use. Independent of pausing recording; does not erase radar memory. |
 
-Upgrades reduce saved retention above 120 hours to 120; smaller settings are preserved. The recorder also enforces the cap when reading an older configuration. History and exports skip archive batches older than the supported window; physical deletion remains part of the scheduled six-hour cleanup.
+Upgrades reduce saved retention above 120 hours to 120; smaller settings are preserved. The recorder also enforces the cap when reading an older configuration. History skips batches older than 120 hours before reading; a shorter saved retention filters what it displays. Exports skip batches older than the saved retention. Physical deletion remains part of scheduled six-hour maintenance while the controller runs, or orderly shutdown. Reload an already open History or Storage page after applying a new retention value so its selectors use the saved limit.
 
 These settings are on **Storage & export**. History's Show and exports' Period selectors are independent local viewing/download choices, each limited by saved retention. They do not change recording or stored retention.
 

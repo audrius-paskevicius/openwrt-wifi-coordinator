@@ -1,12 +1,35 @@
 # Validation
 
-Source release: **0.7.0-r12**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r13**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 54 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r13 documentation alignment (2026-11-10)
+
+The current documentation was traced against the LuCI menu and views, settings
+parsers/defaults, service scripts, history reader/recorder, exporter and package
+hooks. Corrections cover all seven tabs, the single supervised service, the
+standalone Comparison page, client-count clearing/exports and the exact 120-hour
+read limits. The settings audit now distinguishes the earlier presentation change
+from the later retention migration. Historical validation remains dated evidence.
+
+This release changes documentation and the package version only. Runtime source
+is unchanged from r12. Portable source/link/privacy and UI checks passed; the full
+isolated runtime suite passed for r12 and is not repeated for these documentation
+changes.
+
+The APK and package index signatures verified. All 46 extracted payload files
+matched source; comparison with the r12 payload confirmed that only embedded
+version strings changed. Source and package secret scans passed, including checks
+against saved router credentials. Installation changed none of the six checked
+configuration files. The shared service ran, retention remained 120 hours, and
+History rendered all three charts without warnings or exceptions on a clean
+reload. Live Storage/export checks confirmed the 120-hour selectors, rejected
+121/200-hour requests and completed a one-hour JSON export tagged r13.
 
 ## 0.7.0-r12 bounded history windows (2026-11-10)
 

@@ -32,7 +32,7 @@ The tabs are **Channels**, **Clients**, **Comparison**, **History**, **Settings*
 - Uses live channel-switch announcements where supported. Otherwise it tries a compatible client handoff, then briefly restarts only the changing radio if clients remain.
 - Checks reconnection and service after a change, with rollback and temporary exclusions after failures.
 - Uses eligible DFS spectrum opportunistically, preparing it on an empty compatible helper while another radio serves clients when possible. Recent radar detections add a planning penalty with a one-hour default half-life, separate from mandatory kernel clearance and exclusion periods.
-- Records channel placement, spectrum surveys, traffic summaries, and actions. Recent history stays in RAM; older history moves to flash in six-hour batches. Orderly shutdown saves pending records.
+- Records channel placement, client counts, spectrum surveys, traffic summaries, and actions for up to 120 hours (24 hours by default). Recent history stays in RAM; older history moves to flash in six-hour batches. Orderly shutdown saves pending records.
 - Draws history locally with bundled Chart.js; no CDN is required.
 - Keeps observation and steering responsive while a read-only worker calculates placements. History distinguishes unknown gaps, confirmed AP unavailability and recorded actions; calculation timings and missed samples are included in Actions exports.
 - Streams authenticated JSON and CSV [history downloads](docs/EXPORT.md) without creating export files or writing flash.

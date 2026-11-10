@@ -1,6 +1,6 @@
 # Algorithm-to-settings audit
 
-Reviewed for 0.7.0-r8. The algorithm determines which administrator choices are
+The settings redesign was reviewed for 0.7.0-r8; this reference was rechecked against 0.7.0-r13. The algorithm determines which administrator choices are
 needed. This review traces controls through configuration parsing and their
 runtime consumers, rather than treating a parsed key as proof of an effect.
 The [settings reference](SETTINGS.md) lists every key and its precise scope.
@@ -67,13 +67,13 @@ algorithms or independent copies of the same settings.
 
 ## Compatibility and boundaries
 
-All UCI names, defaults and configured policy values remain unchanged. One chained
+The 0.7.0-r8 settings redesign preserved UCI names, defaults and configured policy values. One chained
 LuCI map writes both original namespaces, with explicit bindings for the second
 enable flag and preference fields. Nested radio forms retain the original radio
 section names. No new write ACL, daemon API or network service is required.
 
-The only runtime change is the displayed attempt count; it does not admit or
+In 0.7.0-r8, the only runtime change was the displayed attempt count; it does not admit or
 reject attempts. Planner scoring, movement admission, DFS, escalation, signal
-checks, retry budgets and recovery algorithms are unchanged by this revision.
+checks, retry budgets and recovery algorithms are unchanged by that presentation revision. The later 0.7.0-r12 history cap is separate: retention, Show and export periods stop at 120 hours; larger saved retention values are reduced on installation or service startup. This does not change movement policy.
 Any future consolidation should be judged against those behaviours and tested
 separately from presentation work.

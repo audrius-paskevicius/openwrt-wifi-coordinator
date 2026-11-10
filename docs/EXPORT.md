@@ -5,13 +5,13 @@ Open **Network / Wi-Fi Coordinator / Storage & export**, then **Export history**
 - **CSV data** selects channel placements, client counts, traffic summaries, spectrum surveys, radar detections or actions, followed by its Download button.
 - **JSON data** downloads all six datasets below in one structured file using its separate Download button.
 
-The Period selector above these rows applies to both downloads.
+The Period selector above these rows applies to both downloads. Requests over 120 hours are rejected by the endpoint as well as excluded by the UI. Older saved retention values are clamped to 120. Batches saved before that retention cutoff are skipped; a shorter export period still reads retained sources to preserve earlier survey context. Whole intervals overlapping the cutoff may begin earlier than it.
 
 The router sends the response directly to the browser download manager. It creates no export file and performs no flash writes. Existing history remains in its normal RAM buffer and flash archive. The exporter holds a fixed RAM snapshot, one bounded archive batch from the retention window, a lightweight deduplication index for one dataset, and a small output buffer. Index memory grows with the number of retained records; the entire archive or completed download is never assembled in memory. Closing a download stops processing when the next output write detects the closed connection.
 
 ## Time, units and completeness
 
-Every export has a fixed request-time cutoff, the saved retention limit, package/schema versions, units and UTC timestamps. ISO timestamps end in `Z`; original Unix seconds are also retained. These are UTC even when the page displays local time. Rows are emitted in source order; sort by `start` or `time` if chronological ordering is required.
+Every export has a fixed request-time cutoff, the saved retention limit clamped to 120 hours, package/schema versions, units and UTC timestamps. ISO timestamps end in `Z`; original Unix seconds are also retained. These are UTC even when the page displays local time. Rows are emitted in source order; sort by `start` or `time` if chronological ordering is required.
 
 Placements and five-minute traffic summaries retain their original interval boundaries. An overlapping interval may begin before the selected window; no estimated partial-bucket traffic is invented. Surveys include the earlier retained observations needed to establish each frequency bin at the beginning of the window.
 
@@ -116,7 +116,7 @@ Survey CSV expands each selected frame into frequency bins with `observed_iso`, 
 
 ## Access and privacy
 
-Downloads use a POST with the existing LuCI session token in the request body, never the URL. The endpoint checks session authorization for coordinator configuration, the history directory, RAM/state files and every selected archive batch. There are no user-supplied paths or shell commands. Cookies alone do not authorize a download. Expired or insufficient sessions receive an error in the download-status area; log in again and retry.
+Downloads use a POST with the existing LuCI session token in the request body, never the URL. The endpoint checks session authorization for coordinator configuration, the history directory, RAM/state files and every listed batch filename before filtering expired batches. There are no user-supplied paths or shell commands. Cookies alone do not authorize a download. Expired or insufficient sessions receive an error in the download-status area; log in again and retry.
 
 Only history fields and the graph's radar/band context are exported. Full controller state, UCI settings, Wi-Fi credentials and per-client runtime state are not included. Exports still describe your radio activity and operational errors; review them before publishing. See [runtime privacy](ARCHITECTURE.md#history-persistence-and-privacy).
 
