@@ -41,6 +41,30 @@ different things. Older records omit these optional fields. They contain counts,
 not client addresses. A `switch-unconfirmed` outcome means the AP was ready but
 the bounded observation did not establish stable client service.
 
+From 0.7.0-r6, `plan-start` and admitted `operation-complete` records can also include:
+
+| Field | Meaning |
+| --- | --- |
+| `estimated_gain` | Net service-score benefit after movement cost |
+| `movement_cost` | Whole-route movement penalty, in score points |
+| `required_gain` | Evidence/minimum-improvement margin at admission |
+| `affected_clients` | Sum of current associations on affected radios, counting each radio once |
+| `client_moves` | Estimated exposure including repeated staging and helper moves |
+| `scan_age` | Age of the oldest combined survey snapshot, in seconds |
+| `observed_clients` | Clients tracked during this operation, including helper handoffs |
+| `departed_clients` | Distinct tracked clients observed leaving during the operation |
+| `operation_seconds` | Total operation duration; **not** measured outage time |
+
+`width-constrained` records also retain `requested_width` alongside the actual
+`width`. These optional fields use the existing bounded recorder and retention.
+They appear in JSON actions and in the JSON `details` cell of action CSV, without
+changing existing CSV columns or schema version. Older records omit them; absence
+means unknown, not zero. Departures can be voluntary and do not by themselves
+establish service loss or prove that a move caused an outage. Estimated affected
+counts describe the admitted route, while observed counts describe the completed
+step. Replanning can change the estimates between start and admission. No client
+addresses, names or traffic contents are included.
+
 `result` ends the document with `complete`, `warnings` and record `counts`. Survey counts count frames, not individual bins.
 
 Client counts are sampled every five seconds and stored as whole-number intervals.

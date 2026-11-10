@@ -11,7 +11,7 @@ import {assess,choose,decide,spatial_streams} from './planner.uc';
 import {open_memory} from './radar.uc';
 import {create_survey} from './survey.uc';
 import {create_executor} from './executor.uc';
-import {reservations,action_valid,create_returns} from './controller.uc';
+import {reservations,action_valid,create_returns,refresh_learning,learn_disruption,learning_scope,movement_effect} from './controller.uc';
 import {create_preference} from '../../radio-prefer/files/steering.uc';
 import {begin_restart_check,check_restart,schedule_recovery} from './recovery.uc';
 
@@ -333,7 +333,7 @@ function sample(radios) {
         s.candidate_channels=r.config.channels;
         s.candidate_widths=r.config.widths;
         s.hardware_widths=r.config.hardware_widths;s.unavailable_widths=r.config.unavailable_widths;
-        if(s.width_limit?.until<=t)delete s.width_limit;
+        refresh_learning(s,r,t);
         s.client_avoid_count=length(filter(client_avoids.entries,e=>e.radio==r.name&&e.until>t));
         s.ht40_constraint=r.band=='2g'&&r.config.width_method=='csa'?'HT40 requires restart for coexistence checks; explicit CSA cannot apply it':null;
     }
@@ -355,7 +355,7 @@ function candidates(r,radios,rules,revalidate) {
         let own=length(filter(radios,x=>length(x.clients)&&overlap(group(int(f),20),x.current)>0));
         if(e&&t-e.at<=cfg.max_age&&!own)busy[f]=e.busy;
     }
-    let snapshot={...scan_result,busy};
+    let snapshot={...scan_result,busy},preparation_cache={};
     function rated(g){
         let key=r.name+':'+g.freq+':'+g.center+':'+g.width;
         let caps=r.band=='2g'?{ht_mcs_set:r.band_caps?.ht_mcs_set}:r.band_caps;
@@ -374,7 +374,7 @@ function candidates(r,radios,rules,revalidate) {
         !survey_covers(rules,r,scan_result.frequencies,dm)?'Incomplete fresh survey':
         !revalidate&&t-(s.last_move ?? -100000)<cfg.cooldown?'Minimum residence after verified move':
         !revalidate&&t-(s.last_attempt ?? -100000)<cfg.retry_delay?'Short retry delay':null;
-    if(s.planning_hold)return [current];
+    if(s.planning_hold&&index(['Minimum residence after verified move','Short retry delay','Bounded preferred-radio return observation','Previous service restored; waiting for fresh client evidence'],s.planning_hold)<0)return [current];
     for(let w in r.config.widths)for(let ch in r.config.channels)for(let g in placements(frequency(ch,r.band),w)){
         if(s.width_limit?.until>t&&w>s.width_limit.actual)continue;
         if(!permitted(g,r.caps,rules,r.config.channels,dm))continue;
@@ -385,7 +385,14 @@ function candidates(r,radios,rules,revalidate) {
         if(placement_rejected(g,s.rejected,r.band,t))continue;
         if(length(filter(g.members,f=>index(scan_result.frequencies,f)<0)))continue;
         if(length(filter(list,x=>same(x,g))))continue;
-        push(list,same(g,current)?current:rated(g));
+        let candidate=same(g,current)?current:rated(g);
+        if(!same(g,current)){
+            candidate.preparation=executor?.preparation(r,g,radios,rules,preparation_cache);
+            let active=executor?.pending();
+            if(revalidate&&active&&same(g,active.target)&&(active.spare_attempted||active.helper))
+                candidate.preparation=active.target.preparation ?? candidate.preparation;
+        }
+        push(list,candidate);
     }
     if(!length(filter(list,g=>same(g,current))))push(list,current);
     return sort(list,(a,b)=>a.cost-b.cost);
@@ -395,19 +402,19 @@ evaluate=function(radios){
     next_eval=now()+cfg.interval;
     if(!scan_result||now()-scan_result.at>cfg.max_age){state.status='Waiting for a fresh survey';save();return;}
     let rules=request(N.NL80211_CMD_GET_REG,0,{}).reg_rules ?? [],models=[];
-    for(let r in radios){let choices=candidates(r,radios,rules),s=state.radios[r.name];push(models,{name:r.name,current:filter(choices,g=>same(g,r.current))[0],candidates:choices,clients:length(r.clients),config:r.config,last_action:max(s.last_attempt ?? 0,s.last_move ?? 0)});}
+    for(let r in radios){let choices=candidates(r,radios,rules),s=state.radios[r.name];push(models,{name:r.name,current:filter(choices,g=>same(g,r.current))[0],candidates:choices,hold:s.planning_hold,disruption:s.disruption,clients:length(r.clients),config:r.config,last_action:max(s.last_attempt ?? 0,s.last_move ?? 0)});}
     let result=choose(models,cfg),decision=decide(result,models,admission,scan_result.at,cfg,intent?.until>now()?intent.signature:null);
     admission=decision.signature?decision:null;
     let changes=[];for(let i,r in radios)if(!same(r.current,result.choices[i]))push(changes,{radio:r.name,from:channel(r.current.freq),to:channel(result.choices[i].freq),width:result.choices[i].width});
     state.proposal={evaluated_at:time(),evaluated_uptime:now(),placements_changed:false,
-        current_cost:result.base.cost,best_cost:result.cost,improvement:result.gain,changes,
+        current_cost:result.base.cost,best_cost:result.cost,improvement:result.gain,movement_cost:result.movement_cost ?? 0,affected_clients:result.affected_clients ?? 0,client_moves:result.client_moves ?? 0,changes,
         current_overlap:result.base.overlap,target_overlap:result.overlap,separate:cfg.separate,
         decision:{action:decision.action,reason:decision.reason,margin:decision.required,observations:decision.count,comparisons:decision.comparisons},
         steps:map(result.path,s=>({radio:models[s.index].name,to:channel(s.target.freq),width:s.target.width,staging:s.staging})),
         alternatives:map(models,m=>({radio:m.name,current:m.current,hold:state.radios[m.name].planning_hold,rejected:json(sprintf('%J',state.radios[m.name].rejected ?? [])),
             channels:state.radios[m.name].candidate_channels,widths:state.radios[m.name].candidate_widths,
-            width_limit:state.radios[m.name].width_limit,
-            candidates:map(m.candidates,g=>({...g,channel:channel(g.freq),shared:sum_overlap(g,models,m.name),current:same(g,m.current)}))})),
+            width_limit:state.radios[m.name].width_limit?.until>now()?state.radios[m.name].width_limit:null,
+            candidates:map(m.candidates,g=>({...g,movement:movement_effect(m,g,cfg),channel:channel(g.freq),shared:sum_overlap(g,models,m.name),current:same(g,m.current)}))})),
         scan_age:now()-scan_result.at,neighbors:length(scan_result.observations)};
     state.status=decision.reason;
     if(decision.action=='hold')intent=null;
@@ -415,7 +422,7 @@ evaluate=function(radios){
     if(cfg.enabled&&!state.halted&&!executor.busy()&&cfg.mode=='automatic'&&decision.action=='move'){
         intent={signature:decision.signature,until:now()+cfg.max_age};
         executor.start(radios[decision.next.index],decision.next.target,radios);
-        history({event:'plan-start',operation:executor.pending().id,radio:models[decision.next.index].name,to:channel(decision.next.target.freq),width:decision.next.target.width,reason:decision.reason});
+        history({event:'plan-start',operation:executor.pending().id,radio:models[decision.next.index].name,to:channel(decision.next.target.freq),width:decision.next.target.width,reason:decision.reason,estimated_gain:result.gain,movement_cost:result.movement_cost,required_gain:decision.required,affected_clients:result.affected_clients,client_moves:result.client_moves,scan_age:now()-scan_result.at});
     }
     save();
 };
@@ -471,22 +478,29 @@ let io={cfg,state,boot,now,precise,save,lease,release,history,history_store,call
         let models=map(radios,r=>{
             let choices=candidates(r,radios,rules,r.name==p.radio);
             return {name:r.name,current:filter(choices,g=>same(g,r.current))[0],candidates:choices,
-                config:r.config,clients:max(length(r.clients),r.name==p.radio?length(p.return_before ?? p.before):0),
+                hold:state.radios[r.name].planning_hold,disruption:state.radios[r.name].disruption,config:r.config,clients:max(length(r.clients),r.name==p.radio?length(p.return_before ?? p.before):0),
                 last_action:r.name==p.radio?(p.previous_action ?? 0):max(state.radios[r.name].last_attempt ?? 0,state.radios[r.name].last_move ?? 0)};
         });
         let plan=choose(models,cfg),decision=decide(plan,models,null,scan_result.at,cfg,null);
         // Re-evaluate the complete layout: a neutral staging move can still be
         // useful, but neither a stale plan nor its own retry gate may decide it.
         let valid=decision.action=='move'&&models[decision.next.index].name==p.radio&&same(decision.next.target,p.target);
+        if(valid)p.admission={estimated_gain:plan.gain,movement_cost:plan.movement_cost,required_gain:decision.required,affected_clients:plan.affected_clients,client_moves:plan.client_moves,scan_age:now()-scan_result.at};
         if(!valid)p.validation_reason='Prepared action reconsidered: '+decision.reason+
             (decision.next?'; current choice '+models[decision.next.index].name+' channel '+channel(decision.next.target.freq):'')+
             '; net benefit '+sprintf('%.1f',plan.gain)+', required '+sprintf('%.1f',decision.required ?? cfg.improvement);
         return valid;
     },
     finished:p=>{
-        let outcome=p.last_event ?? 'cancelled';
+        let outcome=p.last_event ?? 'cancelled',r=filter(discovered,r=>r.name==p.radio)[0];
+        let departed=length(p.departed ?? {}),source_clients=length(p.return_before ?? {});
+        if(r&&!p.external&&!p.repair_attempted&&!p.reconnect&&p.command_started&&p.method=='csa'&&source_clients&&index(['switch-verified','switch-unconfirmed','switch-recovery'],outcome)>=0){
+            let n=length(filter(keys(p.departed ?? {}),mac=>p.return_before?.[mac]));
+            state.radios[p.radio].disruption=learn_disruption(state.radios[p.radio].disruption,source_clients,n,now(),learning_scope(r));
+        }
+        if(r&&state.radios[p.radio].width_limit&&r.current.width>=state.radios[p.radio].width_limit.requested&&outcome=='switch-verified')delete state.radios[p.radio].width_limit;
         history({event:'operation-complete',operation:p.id,radio:p.radio,reason:outcome,
-            disconnect_events:p.disconnects ?? 0,forced_disconnects:p.forced_disconnects ?? 0});
+            disconnect_events:p.disconnects ?? 0,forced_disconnects:p.forced_disconnects ?? 0,observed_clients:length(p.before ?? {}),departed_clients:departed,operation_seconds:now()-(p.started_at ?? p.started),...(p.admission ?? {})});
         state.last_operation={id:p.id,radio:p.radio,outcome,disconnects:p.disconnects ?? 0};
         if(index(['switch-verified','switch-ignored','switch-unconfirmed','external-recovery-verified'],outcome)>=0){
             returns?.add(p,steering?.config.enabled?steering.config.preferred_radio:null);

@@ -6,7 +6,7 @@ const FIELDS={
  clients:['radio','source','start','end','count'],
  periods:['radio','channel','center','width','role','start','end'],
  traffic:['time','end','source','radio','channel','width','role','n','traffic_sum','traffic_peak','clients_peak','busy_sum','busy_n','signal_min'],
- actions:['time','event','operation','kind','affected','retry_seconds','preflight','stage','radio','from','to','channel','width','center','region','clients','clients_missing','clients_unproven','disconnect_events','forced_disconnects','returned','elsewhere','absent','total','declined','response','mode','helper','elapsed','ban_seconds','radar_event','freq','phy','neighbors','missing_count','scanned_frequencies','missing_frequencies','reason'],
+ actions:['time','event','operation','kind','affected','retry_seconds','preflight','stage','radio','from','to','channel','width','center','region','clients','clients_missing','clients_unproven','disconnect_events','forced_disconnects','returned','elsewhere','absent','total','declined','response','mode','helper','elapsed','ban_seconds','radar_event','freq','phy','neighbors','missing_count','scanned_frequencies','missing_frequencies','estimated_gain','movement_cost','required_gain','affected_clients','client_moves','scan_age','observed_clients','departed_clients','operation_seconds','requested_width','reason'],
  radar:['time','center','width','region','phys','weight'],
  surveys:['time','cycle','updated']
 };

@@ -1,5 +1,5 @@
 import {group,same} from '../channel-coordinator/files/policy.uc';
-import {assess,layout,better,transition,choose,decide} from '../channel-coordinator/files/planner.uc';
+import {assess,layout,better,transition,choose,decide,path_effect} from '../channel-coordinator/files/planner.uc';
 import {remember,strength,risk} from '../channel-coordinator/files/radar.uc';
 import {create_survey,scan_cost} from '../channel-coordinator/files/survey.uc';
 import {create_executor} from '../channel-coordinator/files/executor.uc';
@@ -97,6 +97,20 @@ for(let k=0;k<40;k++){
   if(better(l,ref,cfg)&&transition(ms,cs,cfg))ref=l;
  }
  check(!got.truncated&&got.cost==ref.cost&&got.width==ref.width&&got.overlap==ref.overlap,'joint plan matches exhaustive feasible reference '+k);
+}
+// Cost bounds must not prune a better route, including unusual explicit methods.
+for(let k=0;k<40;k++){
+ let ms=[],options={...cfg,separate:k%2==0};
+ for(let i=0;i<3;i++){
+  let cs=[];for(let j=0;j<3;j++)push(cs,g([5180,5500,5580][j],j==0?40:80,(k*13+i*19+j*31)%100));
+  push(ms,{...model('r'+i,cs[i],cs),clients:(k+i)%5,config:{method:k%3?'csa':'idle_reconfigure',width_method:k%3?'idle_reconfigure':'csa'}});
+ }
+ let got=choose(ms,options),ref={...layout(map(ms,z=>z.current),options)};
+ for(let c0 in ms[0].candidates)for(let c1 in ms[1].candidates)for(let c2 in ms[2].candidates){
+  let cs=[c0,c1,c2],l=layout(cs,options),path=transition(ms,cs,options);if(!path)continue;
+  l.cost+=path_effect(ms,path,options).cost;if(better(l,ref,options))ref=l;
+ }
+ check(!got.truncated&&got.cost==ref.cost&&got.width==ref.width&&got.overlap==ref.overlap,'client-aware bounded search matches exhaustive reference '+k);
 }
 let e={time:100,center:5610,width:80,region:2,phy:0,radar_event:0},events=remember([],e);
 events=remember(events,{...e,phy:2});check(length(events)==1&&length(events[0].phys)==2,'shared PHY reports count once');

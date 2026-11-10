@@ -7,16 +7,37 @@ export function reservations(pending) {
     return uniq(filter(names, n => type(n) == 'string' && length(n)));
 };
 
-export function movement_cost(model, target, cfg) {
-    if (same(model.current, target)) return 0;
-    if (!model.config) return 0; // callers without execution facts cannot price a move
-    // Cost has the same units as the configured admission margin, not Mbps.
-    // It is a conservative decision preference, not a predicted outage length.
-    let base = cfg.improvement ?? 3;
-    let occupied = (model.clients ?? 0) > 0;
-    let restart = model.config && move_method(model.config, model.current, target) != 'csa';
-    let primary = same_block(model.current, target);
-    return base * (occupied ? (restart ? 3 : 1) : 0.25) * (primary ? 2 : 1);
+export function movement_effect(model, target, cfg) {
+    if(same(model.current,target)||!model.config)return {cost:0,clients:0,helper_clients:0};
+    let base=cfg.improvement ?? 3,n=max(0,model.clients ?? 0),prep=target.preparation;
+    let restart=move_method(model.config,model.current,target)!='csa'||prep&&prep.radio==model.name;
+    let fraction=max(0,min(1,model.disruption?.fraction ?? 0));
+    let gentle=0.5+0.5*n,hard=1+2*n;
+    let cost=base*(n?(restart?hard:gentle+(hard-gentle)*fraction):0.25);
+    if(same_block(model.current,target))cost*=2;
+    let helpers=prep&&prep.radio!=model.name?max(0,prep.clients ?? 0):0;
+    if(prep&&prep.radio!=model.name)cost+=base*(helpers?1+2*helpers:0.25);
+    return {cost,clients:n,helper_clients:helpers,helper:prep?.radio,method:restart?'restart':'csa',observed_disconnect_fraction:fraction};
+};
+export function movement_cost(model,target,cfg){return movement_effect(model,target,cfg).cost;};
+export function learning_scope(r){
+    // Execution temporarily resolves the method for a particular width. Only
+    // administrator intent and hardware changes should reset the memory.
+    return sprintf('%J',[r.phy,r.band,r.config.hardware_widths,r.config.widths,r.config.requested_method ?? r.config.method,r.config.requested_width_method ?? r.config.width_method,r.dfs_region]);
+};
+export function refresh_learning(s,r,t){
+    let scope=learning_scope(r);
+    for(let key in ['width_limit','disruption']){
+        let m=s[key];if(!m)continue;
+        if(m.scope!=null&&m.scope!=scope||t-(m.at ?? m.until ?? t)>=86400)delete s[key];
+        else m.scope=scope;
+    }
+};
+export function learn_disruption(previous,clients,departed,t,scope){
+    let fresh=previous&&previous.scope==scope&&t-previous.at<86400;
+    let ratio=min(1,max(0,departed)/(1.0*max(1,clients)));
+    return {at:t,scope,samples:min(8,(fresh?previous.samples:0)+1),
+        fraction:fresh?(previous.fraction*3+ratio)/4:ratio};
 };
 
 export function action_valid(action, radio, t, max_age) {

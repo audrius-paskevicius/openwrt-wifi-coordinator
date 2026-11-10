@@ -2,7 +2,7 @@ import {group,same,same_block,overlap,survey_covers,move_method,placements,frequ
 import {assess,spatial_streams} from '../channel-coordinator/files/planner.uc';
 let state={radios:{r:{width_limit:{actual:20,requested:40,until:1000}}}},T=100;
 function now(){return T;}function dfs_mode(){return 'off';}
-let evidence={},estimate_cache={},radar={records:()=>[]},returns=null;
+let evidence={},estimate_cache={},radar={records:()=>[]},returns=null,executor=null;
 let cfg={max_age:900,cooldown:0,retry_delay:0,radar_half_life:21600,protected_clients:[]};
 let scan_result={frequencies:[],observations:[],scanners:{}};
 let r={name:'r',band:'2g',current:group(2412,20),clients:{},caps:{},csa:true,

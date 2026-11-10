@@ -28,6 +28,9 @@ check(survey.bands[1].levels[0]>0,'survey overlap recorded');
 check(survey.bands[1].levels[20]==null,'unscanned spectrum stays unknown');
 check(index(fs.readfile(path),'PRIVATE-SURVEY')<0&&index(fs.readfile(path),'aa:bb:cc')<0,'survey identity filtering');
 check(fs.stat(path).size<=1048576,'survey shares RAM size cap');
+h.event({event:'operation-complete',estimated_gain:10,movement_cost:6,affected_clients:3,observed_clients:4,departed_clients:2,operation_seconds:65,mac:'private'});
+let logged=json(fs.readfile(path)).events[-1];
+check(logged.estimated_gain==10&&logged.movement_cost==6&&logged.affected_clients==3&&logged.observed_clients==4&&logged.departed_clients==2&&logged.operation_seconds==65&&!exists(logged,'mac'),'decision and outcome fields retained without identities');
 h.clear();
 let obs=[{center:2412,width:20,signal:-45,load:null}];
 h.survey(obs,[2412,2437],'sweep-1',[2412,2437]);
@@ -46,4 +49,4 @@ check(length(json(fs.readfile(path)).surveys)==2,'new sweep starts separate hist
 h=open_history('different-boot',true,24);h.flush(true);data=json(fs.readfile(path));
 check(!length(data.samples)&&!length(data.events)&&!length(data.surveys),'reboot reset');
 h=open_history('different-boot',false,24);check(fs.stat(path),'pausing preserves RAM history');
-print('PASS: 19 bounded history, partial-survey, privacy, retention and reset checks\n');
+print('PASS: 20 bounded history, partial-survey, privacy, retention and reset checks\n');

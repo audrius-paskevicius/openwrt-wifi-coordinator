@@ -10,7 +10,7 @@ ram.samples=[{...a.samples[0],end:190,n:2,traffic_sum:10,traffic_peak:6,busy_sum
 a.surveys=[{time:70,bands:[{start:5170,step:20,levels:[10,20],offsets:[0,0]}]},
  {time:80,bands:[{start:5170,step:20,levels:[30,null],offsets:[0,0]}]}];
 ram.surveys=[{time:150,cycle:1,bands:[{start:5170,step:20,levels:[40,50],offsets:[0,2]}]}];
-a.events=[{time:120,event:'test',reason:'=1+1',password:'must not export'}];b.events=a.events;
+a.events=[{time:120,event:'test',reason:'=1+1',password:'must not export',estimated_gain:12.5,movement_cost:9,affected_clients:3,departed_clients:2}];b.events=a.events;
 ram.events=[{time:10,event:'old'},{time:201,event:'future'}];
 a.clients=[{radio:'radio0',source:'boot',start:90,end:110,count:0,mac:'not-exported'}];
 ram.clients=[{...a.clients[0],end:150},{radio:'radio0',source:'boot',start:150,end:190,count:2}];
@@ -29,6 +29,7 @@ check(data.datasets.traffic[0].busy_avg_percent==25,'measured airtime average');
 check(length(data.datasets.surveys)==3,'independent pre-window bin context retained');
 check(length(data.datasets.radar)==1,'older radar context retained');
 check(length(data.datasets.actions)==1&&!exists(data.datasets.actions[0],'password'),'actions filtered, deduplicated and whitelisted');
+check(data.datasets.actions[0].estimated_gain==12.5&&data.datasets.actions[0].movement_cost==9&&data.datasets.actions[0].affected_clients==3&&data.datasets.actions[0].departed_clients==2,'decision and observed outcome fields survive export');
 check(data.datasets.actions[0].time_iso=='1970-01-01T00:02:00Z','UTC timestamp');
 check(iso(0)=='1970-01-01T00:00:00Z','epoch ISO conversion');
 check(csv_cell(-61)=='"-61"','negative numeric signal stays numeric');
@@ -37,6 +38,7 @@ check(csv_cell('a,"b"\nc')=='"a,""b""\nc"','CSV quotes/newlines preserved');
 for(let k in ['periods','clients','traffic','surveys','radar','actions']){
  output='';stream({...opts,format:'csv',dataset:k},i=>sources[i],s=>{output+=s;});
  check(index(output,'record_type,')==0&&index(output,'"summary"')>=0,'CSV header and completion '+k);
+ if(k=='actions')check(index(output,'estimated_gain')>=0&&index(output,'departed_clients')>=0,'CSV action details retain decision and outcome metrics');
  check(index(output,'"metadata"')>=0&&index(output,'"data"')>=0,'CSV metadata/data '+k);
 }
 output='';result=stream(opts,i=>i==1?null:sources[i],s=>{output+=s;});

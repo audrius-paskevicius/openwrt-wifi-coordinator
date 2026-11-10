@@ -1,6 +1,6 @@
 import * as system_fs from 'fs';
 import * as nl from 'nl80211';
-import {width_retry} from './controller.uc';
+import {width_retry,learning_scope} from './controller.uc';
 import {channel,group,same,same_block,overlap,permitted,uses_dfs,dfs_ready,preparation_text,reconfigure_text,same_network,force_signal_ok,private_ipv4,liveness_progress,move_method,quiet_ready,placement_rejected} from './policy.uc';
 export function data_flow(previous,current){
     if(!previous||!current)return false;
@@ -63,21 +63,25 @@ function start(r,target,radios) {
     if(r.unsafe)die('Radio configuration is not supported for channel moves');
     // Watch clients affected by this operation. A natural departure on an
     // untouched band must not roll back an otherwise successful channel move.
-    pending={id:boot+':'+now()+':'+r.name,evidence_at:io.evidence_at?.(),kind:'move-wait',radio:r.name,source:r.current,target,started:now(),before:{...r.clients},fingerprint:r.fingerprint,disconnects:0,method:move_method(r.config,r.current,target)};
+    pending={id:boot+':'+now()+':'+r.name,evidence_at:io.evidence_at?.(),kind:'move-wait',radio:r.name,source:r.current,target,started:now(),before:{...r.clients},fingerprint:r.fingerprint,disconnects:0,started_at:now(),departed:{},method:move_method(r.config,r.current,target)};
     pending.previous_action=max(state.radios[r.name].last_attempt ?? 0,state.radios[r.name].last_move ?? 0);
     pending.return_before={...r.clients};
     state.radios[r.name].last_attempt=now();state.last_action=now();
     state.pending='move';lease(75,'Preparing coordinated channel switch');state.status='Preparing '+pending.method+' on '+r.name;save();
 };
-function start_cac(r,g,radios) {
-    let rules=request(N.NL80211_CMD_GET_REG,0,{}).reg_rules ?? [];
+function preparation_options(r,g,radios,rules,cache) {
     let suitable=[];
     // Clearance is per-frequency. A narrower helper can prepare a wide block
     // in pieces, but every piece must become AVAILABLE on the serving PHY too.
     for(let h in radios){
         if(io.returning&&io.returning(h.name))continue;
+        let cached=cache?.[h.name];
+        if(!cached){
+            cached={mode:dfs_mode(h),text:fs.readfile('/var/run/hostapd-phy'+h.phy+'.conf')};
+            if(cache)cache[h.name]=cached;
+        }
         if(!h.config.managed||h.unsafe||h.band!='5g'||length(h.aps)!=1||
-            cfg.dfs_helper&&h.name!=cfg.dfs_helper||dfs_mode(h)!='prepare')continue;
+            cfg.dfs_helper&&h.name!=cfg.dfs_helper||cached.mode!='prepare')continue;
         let groups=[];
         for(let w in [160,80,40,20]){
             let bit=w==160?32:w==80?8:w==40?4:2;
@@ -89,16 +93,26 @@ function start_cac(r,g,radios) {
             }
         }
         for(let part in groups)if(permitted(part,h.caps,rules,h.config.channels,'prepare')&&
-            preparation_text(fs.readfile('/var/run/hostapd-phy'+h.phy+'.conf'),part))push(suitable,{...h,cac_part:part});
+            preparation_text(cached.text,part))push(suitable,{...h,cac_part:part});
     }
     let choices=filter(suitable,h=>!length(h.clients));
     choices=sort(choices,(a,b)=>(a.name==r.name?1:0)-(b.name==r.name?1:0)||b.cac_part.width-a.cac_part.width);
-    let h=choices[0];
-    if(!h){
-        let busy=sort(filter(suitable,h=>h.config.occupied=='handoff'&&!length(filter(keys(h.clients),m=>index(cfg.protected_clients,lc(m))>=0))),(a,b)=>
+    let busy=sort(filter(suitable,h=>h.config.occupied=='handoff'&&!length(filter(keys(h.clients),m=>index(cfg.protected_clients,lc(m))>=0))),(a,b)=>
             length(filter(keys(a.clients),m=>index(cfg.protected_clients,lc(m))>=0))-
             length(filter(keys(b.clients),m=>index(cfg.protected_clients,lc(m))>=0))||length(a.clients)-length(b.clients)||a.mbps-b.mbps||
             (a.name==r.name?-1:0)-(b.name==r.name?-1:0))[0];
+    return {empty:choices[0],busy};
+}
+function preparation(r,g,radios,rules,cache){
+    if(!uses_dfs(g,r.caps)||dfs_ready(g,r.caps)||(cache?.[r.name]?.mode ?? dfs_mode(r))!='prepare')return null;
+    let options=preparation_options(r,g,radios,rules,cache),h=options.empty ?? options.busy;
+    return h?{radio:h.name,clients:length(h.clients)}:null;
+}
+function start_cac(r,g,radios) {
+    let rules=request(N.NL80211_CMD_GET_REG,0,{}).reg_rules ?? [];
+    let options=preparation_options(r,g,radios,rules),h=options.empty;
+    if(!h){
+        let busy=options.busy;
         if(busy&&!pending.spare_attempted){
             let sent=handoff(busy,radios,r.name);
             if(sent||cfg.escalation=='decisive'&&pending.handoff_target){
@@ -594,24 +608,24 @@ function operation(radios) {
         if(length(progress.failed))pending.last_problem=t;
         let stable=t-(pending.last_problem ?? pending.started)>=30;
         let channel_ok=r&&same(r.current,pending.target);
-        let constrained=r&&r.band=='2g'&&pending.target.width==40&&r.current.width==20&&
-            index(pending.target.members,r.current.freq)>=0&&!pending.external;
+        let constrained=r&&r.current.width<pending.target.width&&
+            !length(filter(r.current.members,f=>index(pending.target.members,f)<0))&&!pending.external;
         if(constrained&&t-pending.started<30){
-            state.status='Waiting for HT40 setup to settle before checking the resulting width';save();return;
+            state.status='Waiting for channel setup to settle before checking the resulting width';save();return;
         }
         if(constrained&&!pending.coexistence){
-            // Hostapd may retain 20 MHz after its coexistence scan. Accept only
-            // after client verification; do not keep trying the same HT40 block.
+            // Hostapd or the driver may retain a narrower width. Accept only
+            // after client verification; remember refusals across retry expiry.
             let requested=pending.target,s=state.radios[r.name];
             s.rejected=s.rejected ?? [];
-            push(s.rejected,{target:requested,until:t+(cfg.max_age ?? 900),reason:'20 MHz retained during HT40 setup: coexistence or driver constraint'});
+            push(s.rejected,{target:requested,until:t+(cfg.max_age ?? 900),reason:r.current.width+' MHz retained during '+requested.width+' MHz setup: coexistence or driver constraint'});
             // Trying a different primary immediately does not remove a width
             // constraint. Let fresh evidence accumulate before another attempt.
-            s.width_limit={actual:r.current.width,requested:requested.width,...width_retry(s.width_limit,t,cfg.max_age ?? 900),reason:'HT40 setup retained 20 MHz; repeated attempts back off'};
+            s.width_limit={actual:r.current.width,requested:requested.width,...width_retry(s.width_limit,t,cfg.max_age ?? 900),scope:learning_scope(r),reason:requested.width+' MHz setup retained '+r.current.width+' MHz; repeated attempts back off'};
             while(length(s.rejected)>16)shift(s.rejected);
-            history({event:'width-constrained',radio:r.name,channel:channel(r.current.freq),width:r.current.width,requested_width:40});
+            history({event:'width-constrained',radio:r.name,channel:channel(r.current.freq),width:r.current.width,requested_width:requested.width});
             pending.target=r.current;pending.coexistence=true;channel_ok=true;
-            state.status='HT40 setup retained 20 MHz; checking clients';
+            state.status='Channel setup retained '+r.current.width+' MHz; checking clients';
         }
         if(r&&!channel_ok&&!same(r.current,pending.source)&&!pending.external){
             clear_bans();delete pending.rescue;
@@ -774,6 +788,7 @@ function abort(e,force) {
 function event(e,radios){
     if(e.cmd==N.NL80211_CMD_DEL_STATION&&pending?.before?.[e.msg?.mac]){
         pending.disconnects++;
+        pending.departed=pending.departed ?? {};pending.departed[e.msg.mac]=true;
         // Count the whole operation, but delayed departures from the completed
         // handoff must not restart verification of clients already elsewhere.
         if(pending.kind=='verify'&&pending.switch_clients?.[e.msg?.mac])pending.last_problem=now();
@@ -790,7 +805,7 @@ function event(e,radios){
     let r=filter(radios,r=>r.phy==msg.wiphy&&index(r.current.members,msg.wiphy_freq)>=0)[0];
     if(!r)return;
     if(pending&&pending.radio!=r.name){abort('Radar invalidated operation reservation',true);}
-    if(!pending)pending={id:boot+':'+now()+':radar:'+r.name,radio:r.name,source:r.current,target:r.current,before:{...r.authorized},fingerprint:r.fingerprint,disconnects:0};
+    if(!pending)pending={id:boot+':'+now()+':radar:'+r.name,radio:r.name,source:r.current,target:r.current,before:{...r.authorized},fingerprint:r.fingerprint,disconnects:0,started_at:now(),departed:{}};
     clear_bans();
     if(fs.stat(JOURNAL))try{restore_preparation();}catch(err){history({event:'helper-recovery-deferred',reason:''+err});}
     pending.kind='reconcile';pending.started=now();pending.external=true;pending.switch_clients={};
@@ -798,5 +813,5 @@ function event(e,radios){
     history({event:'radar-evacuation',radio:r.name,channel:channel(msg.wiphy_freq)});lease(90,state.status);save();
 }
 function tick(radios){operation(radios);if(pending)delete pending.observation_failed_since;}
-return {start,tick,abort,event,reassess,busy:()=>pending!=null,pending:()=>pending};
+return {start,tick,abort,event,reassess,preparation,busy:()=>pending!=null,pending:()=>pending};
 };

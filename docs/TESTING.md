@@ -1,12 +1,49 @@
 # Validation
 
-Source release: **0.7.0-r5**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r6**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 52 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current LuCI fixture expects 55 setting descriptions.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r6 client-aware movement balance (2026-11-10)
+
+The same movement rule now applies to every radio, with affected-client counts,
+observed CSA departures, helper preparation and staging included. Temporary holds
+retain comparison alternatives without making them executable. Width-refusal
+attempts survive pause expiry and also cover narrower 5 GHz outcomes. Decision
+and observed outcome fields are retained in history and JSON/CSV action exports.
+
+The full isolated OpenWrt suite passed, including 41 controller checks, 148
+planner/radar/survey cases, 30 service-model cases, 1,127 executor cases and 1,023
+restart-recovery checks. Regressions exercise client-count weighting, learned
+CSA cost and ageing, helper selection, repeated staging exposure, held alternatives,
+retry expiry, configuration changes, distinct departures and 160-to-80 MHz fallback.
+The 20 history and 33 export checks include the new fields and identity filtering.
+The 668 storage checks retained all 7,203 samples and 2,401 surveys across 200 hours.
+Portable source/UI checks and the actual LuCI browser fixture passed, including
+55 setting descriptions, visible alternatives during holds, candidate and route
+costs, and outcome metrics displayed alongside the event reason.
+
+Forty additional client-aware comparisons matched an exhaustive feasible-layout
+reference with separation both enabled and disabled, including unusual explicit
+channel/width methods. An optimistic cost bound skips uncompetitive branches
+before route search. A read-only replay of one saved router comparison took about
+0.03 seconds with the new planner and 4.91 seconds with the old one; they made
+different decisions under their different movement policies. This single snapshot
+is not a general performance benchmark.
+
+The signed APK/index verified, and all 43 extracted payload files matched source
+or generated content. Installation preserved all six checked configurations. The
+installed CGI passed 15 authorization/download checks. Temporary signing copies
+were removed. Source and package payloads were checked against private router
+credentials without publishing those values.
+
+These tests establish policy and serialization behaviour, not throughput benefit
+or the optimum movement frequency in a changing RF environment. The new exported
+figures support evaluating actual moves over time.
 
 ## 0.7.0-r5 Comparison tab and history presentation (2026-11-10)
 

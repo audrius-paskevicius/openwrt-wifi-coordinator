@@ -26,8 +26,8 @@ The six tabs are **Channels**, **Clients**, **Comparison**, **History**, **Stora
 - Defaults to live driver-derived channel lists for every radio; optional explicit lists restrict selection.
 - Ranks joint layouts by usable bandwidth and advertised radio spatial capacity, accounting for the primary channel and radar memory. Width alone does not outrank estimated service; the objective is independent of today's client mix.
 - Uses one decision owner with per-radio reservations, allowing unrelated scans and preference requests during an operation.
-- Prices disruption before changing channels; repeated noisy surveys alone cannot manufacture confidence.
-- Separately observes preferred-radio return after a move and records the complete operation.
+- Prices disruption across all radios using affected-client counts, observed CSA departures, helper use and staging. Repeated noisy surveys alone cannot manufacture confidence.
+- Separately observes preferred-radio return after a move and records decision costs and observed outcomes in history and JSON/CSV exports.
 - Uses live channel-switch announcements where supported. Otherwise it tries a compatible client handoff, then briefly restarts only the changing radio if clients remain.
 - Checks reconnection and service after a change, with rollback and temporary exclusions after failures.
 - Uses eligible DFS spectrum opportunistically, preparing it on an empty compatible helper while another radio serves clients when possible. Recent radar detections add a planning penalty with a one-hour default half-life, separate from mandatory kernel clearance and exclusion periods.

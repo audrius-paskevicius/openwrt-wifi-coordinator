@@ -80,6 +80,7 @@ export function open_history(boot,enabled,hours) {
         for(let k in ['event','kind','affected','retry_seconds','preflight','stage','radio','from','to','channel','width','center','region','clients','clients_missing','clients_unproven','disconnect_events','helper','elapsed','ban_seconds','radar_event','freq','phy','neighbors','missing_count','scanned_frequencies','missing_frequencies'])
             if(e[k]!=null)clean[k]=e[k];
         for(let k in ['operation','returned','elsewhere','absent','total','declined','forced_disconnects','response','mode'])if(e[k]!=null)clean[k]=e[k];
+        for(let k in ['estimated_gain','movement_cost','required_gain','affected_clients','client_moves','scan_age','observed_clients','departed_clients','operation_seconds','requested_width'])if(e[k]!=null)clean[k]=e[k];
         if(e.reason)clean.reason=substr(replace(''+e.reason,/[0-9a-f]{2}(:[0-9a-f]{2}){5}/gi,'[client]'),0,240);
         push(h.events,clean);flush(true);
     }

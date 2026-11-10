@@ -144,6 +144,10 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  assert(comparison.textContent.includes('Paced survey in progress')&&comparison.textContent.includes('Radio placements have changed'),'current progress and changed placement must be explicit');
  state.proposal={...state.proposal,evaluated_uptime:150,evaluated_at:1700000060,placements_changed:false,alternatives:[{radio:'radio0',channels:[149],widths:[80],candidates:[{channel:149,width:80,current:true,cost:2,occupancy:2,capacity:78,shared:0}]}]};
  await comparisonPoll();assert(comparison.querySelector('tbody').textContent.includes('149 / 80 MHz'),'completed evaluation replaces previous rows');
+ state.proposal={...state.proposal,movement_cost:12,affected_clients:3,client_moves:5,alternatives:[{...state.proposal.alternatives[0],hold:'Minimum residence after verified move',candidates:[{...state.proposal.alternatives[0].candidates[0],movement:{cost:6}},{channel:36,width:80,cost:4,occupancy:4,capacity:70,shared:0,movement:{cost:9}}]}]};
+ await comparisonPoll();assert(comparison.textContent.includes('Movement cost: 12.0 points; 3 currently associated')&&comparison.textContent.includes('5 estimated client moves'),'complete route exposure displayed');
+ assert(comparison.querySelectorAll('tbody tr').length===2&&comparison.textContent.includes('Minimum residence'),'hold keeps visible alternatives');
+ assert(comparison.querySelector('thead').textContent.includes('Move cost')&&comparison.querySelector('tbody').textContent.includes('6.0'),'direct candidate movement cost displayed');
  const retainedTable=comparison.querySelector('table');await comparisonPoll();assert(comparison.querySelector('table')===retainedTable,'unchanged results keep table DOM during refresh');
  failState=true;await comparisonPoll();assert(comparison.querySelector('table')===retainedTable&&!comparison.querySelector('.alert-message').hidden,'failed read retains results and warns');
  failState=false;await comparisonPoll();assert(comparison.querySelector('.alert-message').hidden,'successful refresh clears warning');
@@ -154,7 +158,7 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  assert(failedHistory.querySelector('.alert-message.warning').textContent.includes('History is incomplete'),'failed reads must stay visible even without any radio records');
  assert(failedHistory.textContent.indexOf('History is incomplete')<failedHistory.textContent.indexOf('History is collecting'),'read failure must precede the empty-history message');
  const recent=Math.floor(Date.now()/1000);
- const historyData={periods:[{radio:'radio0',channel:36,width:80,start:recent-60,end:recent}],samples:[],events:[],surveys:[],ram_bytes:100,archive_bytes:0,archive_files:0};
+ const historyData={periods:[{radio:'radio0',channel:36,width:80,start:recent-60,end:recent}],samples:[],events:[{time:recent,event:'operation-complete',reason:'switch-verified',estimated_gain:12,movement_cost:6,affected_clients:3,observed_clients:4,departed_clients:2,operation_seconds:65}],surveys:[],ram_bytes:100,archive_bytes:0,archive_files:0};
  graphs.channelChart=graphs.clientChart=graphs.trafficChart=()=>({destroy(){}});
  graphs.clientFinStyle=()=>'';
  graphs.colour=()=>'#005dff';graphs.patternStyle=()=>'';graphs.patternName=()=>'diagonal lines';graphs.radarGradient=()=> '#fff';
@@ -162,6 +166,7 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  const historyPane=await page('history').renderPage([null,historyData]);
  historyPane.querySelectorAll('link').forEach(n=>n.remove());document.getElementById('pages').appendChild(historyPane);
  assert(!historyPane.querySelector('.wc-history-storage')&&!historyPane.querySelector('.wc-export')&&!historyPane.querySelector('.cbi-map'),'History contains graphs and actions only');
+ assert(historyPane.textContent.includes('switch-verified')&&historyPane.textContent.includes('net benefit 12.0')&&historyPane.textContent.includes('2 clients observed leaving'),'history shows decision and outcome counts alongside reason');
  assert(page('history').handleSaveApply===null,'History has no save controls');
  const show=historyPane.querySelector('select');show.value='24';show.dispatchEvent(new Event('change'));
  const storagePane=await page('storage').renderPage([null,historyData]);

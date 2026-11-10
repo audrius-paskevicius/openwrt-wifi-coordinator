@@ -46,6 +46,7 @@ ex.event({cmd:nl.const.NL80211_CMD_DEL_STATION,msg:{mac:'client'}},[radio]);
 T+=15;ex.tick([radio]);ex.pending().switch_clients={};
 T+=181;ex.event({cmd:nl.const.NL80211_CMD_DEL_STATION,msg:{mac:'client'}},[radio]);
 check(ex.pending().disconnects==2,'handoff and delayed departure events remain in total accounting');
+check(length(ex.pending().departed)==1,'repeated departure events count one affected client');
 check(ex.pending().last_problem==null,'delayed departure of evacuated client does not reset stability');
 ex.tick([radio]);check(!ex.busy()&&events[-1].event=='switch-verified','healthy service is not rolled back by a late handoff notification');
 setup();ex.start(radio,group(5580,80),[radio]);T+=15;ex.tick([radio]);
@@ -129,7 +130,10 @@ opt.request=()=>({reg_rules:[{reg_rule_flags:0,freq_range_start:5150000,freq_ran
 // The executor captures request at creation; widen its existing synthetic rule through a fresh instance.
 ex=create_executor(opt);ex.start(radio,group(5500,160),[radio]);T+=15;ex.tick([radio]);
 check(repairs==1&&radio.current.width==160&&index(content,'vht_oper_chwidth=2')>=0,'160 restart reaches requested width with actual hostapd configuration');
+radio.current=group(5500,80);
+T+=5;ex.tick([radio]);check(ex.pending().target.width==160,'5 GHz width fallback waits for setup to settle');
 T+=46;ex.tick([radio]);check(!ex.busy()&&events[-1].event=='switch-verified','160 restart completes verification');
+check(st.radios.r.width_limit.requested==160&&st.radios.r.width_limit.actual==80,'5 GHz narrowing learns a bounded width limit');
 opt=setup();radio.band='2g';radio.current=group(2412,20);radio.clients={};radio.authorized={};radio.aps=[{}];radio.caps={};
 for(let ch=1;ch<=13;ch++)radio.caps[2407+5*ch]={max_tx_power:2000};
 radio.config.channels=[1,5,9,13];content='channel=1\nht_capab=[LDPC]\nnoscan=0\n';
@@ -265,7 +269,13 @@ content+='interface=test0\nieee80211h=1\n';
 radio.config.managed=true;radio.radar_widths=8;
 for(let f in group(5580,80).members)radio.caps[f]={max_tx_power:2000,radar:true,dfs_state:0};
 peer={...radio,name:'peer',phy:2,ifname:'peer0',current:group(5745,80),clients:{other:true},authorized:{other:true},aps:[{config:net,status:{status:'ENABLED'}}]};
-pair=[radio,peer];ex.start(radio,group(5580,80),pair);T+=15;ex.tick(pair);
+pair=[radio,peer];
+let helper=ex.preparation(radio,group(5580,80),pair,opt.request().reg_rules,{});
+check(helper.radio=='r'&&helper.clients==1,'planner prices the occupied helper selected by execution');
+peer.clients={};helper=ex.preparation(radio,group(5580,80),pair,opt.request().reg_rules,{});
+check(helper.radio=='peer'&&helper.clients==0,'empty helper is preferred without inventing affected clients');
+peer.clients={other:true};
+ex.start(radio,group(5580,80),pair);T+=15;ex.tick(pair);
 check(ex.pending().kind=='spare-handoff'&&ex.pending().handoff_target=='peer','occupied DFS helper reaches compatible handoff');
 check(length(filter(calls,c=>c.method=='bss_transition_request'))==1&&!journal&&!repairs,'helper handoff starts without prematurely reconfiguring occupied AP');
 // Rejected requests keep the observation baseline instead of latching failure.

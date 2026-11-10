@@ -2,7 +2,7 @@
 // not Mbps. Execution never adds another hidden benefit threshold.
 import {same,group,overlap,pressure} from './policy.uc';
 import {risk} from './radar.uc';
-import {movement_cost} from './controller.uc';
+import {movement_cost,movement_effect} from './controller.uc';
 // Advertised bidirectional spatial capacity, never a client's momentary rate.
 export function spatial_streams(caps) {
     let v=caps?.vht_mcs_set,ht=caps?.ht_mcs_set;
@@ -85,13 +85,25 @@ function route(start,goal,cfg,order) {
     }
     return visit(start,[]);
 }
+export function path_effect(models,path,cfg){
+    let current=map(models,m=>m.current),cost=0,client_moves=0,affected={};
+    for(let step in path){
+        let m=models[step.index],effect=movement_effect({...m,current:current[step.index]},step.target,cfg);
+        cost+=effect.cost;client_moves+=effect.clients+effect.helper_clients;
+        affected[m.name]=max(affected[m.name] ?? 0,effect.clients);
+        if(effect.helper&&effect.helper!=m.name)affected[effect.helper]=max(affected[effect.helper] ?? 0,effect.helper_clients);
+        current[step.index]=step.target;
+    }
+    let affected_clients=0;for(let n in values(affected))affected_clients+=n;
+    return {cost,client_moves,affected_clients};
+};
 export function transition(models,goal,cfg) {
     // Replanning must not let the first independent radio monopolize execution.
     // Oldest-served eligible moves go first; overlap dependencies still apply.
     let order=[];for(let i,m in models)push(order,i);
     order=sort(order,(a,b)=>(models[a].last_action ?? 0)-(models[b].last_action ?? 0)||a-b);
     let start=map(models,m=>m.current),direct=route(start,goal,cfg,order);if(direct)return direct;
-    let best=null;
+    let best=null,best_cost=null;
     // One neutral staging move is enough to break ordinary two-radio swaps.
     // Bound the search, do not claim a path exists if more staging is required.
     for(let i in order)for(let g in models[i].candidates){
@@ -99,7 +111,10 @@ export function transition(models,goal,cfg) {
         let via=[...start];via[i]=g;
         if(cfg.separate&&layout(via,cfg).overlap>layout(start,cfg).overlap+0.000001)continue;
         let path=route(via,goal,cfg,order);
-        if(path&&(!best||length(path)+1<length(best)))best=[{index:i,target:g,staging:true},...path];
+        if(path){
+            let steps=[{index:i,target:g,staging:true},...path],cost=path_effect(models,steps,cfg).cost;
+            if(!best||cost<best_cost||cost==best_cost&&length(steps)<length(best)){best=steps;best_cost=cost;}
+        }
     }
     return best;
 };
@@ -108,29 +123,52 @@ export function choose(models,cfg) {
     // A cleaner primary must repay the cost of reaching it, including a restart.
     models=map(models,m=>{
         let best={};
-        for(let raw in m.candidates){let g={...raw,move_cost:movement_cost(m,raw,cfg)},key=g.center+':'+g.width,old=best[key];
+        for(let raw in (m.hold?[m.current]:m.candidates)){let g={...raw,move_cost:movement_cost(m,raw,cfg)},key=g.center+':'+g.width,old=best[key];
             if(!old||g.cost+g.move_cost<old.cost+old.move_cost-0.000001||max(g.cost+g.move_cost-old.cost-old.move_cost,old.cost+old.move_cost-g.cost-g.move_cost)<=0.000001&&same(g,m.current))best[key]=g;
         }
         let candidates=values(best);
         if(!length(filter(candidates,g=>same(g,m.current))))push(candidates,{...m.current,move_cost:0});
+        for(let g in candidates){
+            let n=max(0,m.clients ?? 0);
+            g.floor_cost=same(g,m.current)||!m.config?0:(cfg.improvement ?? 3)*(n?0.5+0.5*n:0.25);
+        }
+        candidates=sort(candidates,(a,b)=>a.cost+a.move_cost-b.cost-b.move_cost);
         return {...m,candidates};
     });
-    let current=map(models,m=>m.current),base=layout(current,cfg),best={...base,choices:current,path:[]},visited=0,truncated=false;
-    function visit(i,choices){
+    let current=map(models,m=>m.current),base=layout(current,cfg),best={...base,choices:current,path:[],movement_cost:0,affected_clients:0,client_moves:0},visited=0,truncated=false;
+    let remaining=[];remaining[length(models)]=0;
+    for(let j=length(models)-1;j>=0;j--)remaining[j]=remaining[j+1]+min(...map(models[j].candidates,g=>g.cost+g.floor_cost));
+    function visit(i,choices,lower){
         if(++visited>100000){truncated=true;return;}
         if(i==length(models)){
             let candidate=layout(choices,cfg);
+            let direct_cost=0,floor=0;
+            for(let g in choices){
+                direct_cost+=g.move_cost ?? 0;
+                floor+=g.floor_cost;
+            }
+            // Even the gentlest single move per changed radio must be paid.
+            // Reject uncompetitive layouts before searching staging routes.
+            candidate.cost+=floor-direct_cost;
             if(!better(candidate,best,cfg))return;
             let path=transition(models,choices,cfg);if(!path)return;
+            let effect=path_effect(models,path,cfg);
+            candidate.cost+=effect.cost-floor;
+            candidate.movement_cost=effect.cost;candidate.affected_clients=effect.affected_clients;candidate.client_moves=effect.client_moves;
+            if(!better(candidate,best,cfg))return;
             best={...candidate,choices:[...choices],path};return;
         }
         for(let g in models[i].candidates){
-            let next=[...choices,g];
-            if(cfg.separate&&layout(next,cfg).overlap>best.overlap+0.000001)continue;
-            visit(i+1,next);if(truncated)return;
+            let next=[...choices,g],partial=layout(next,cfg),cost=lower+g.cost+g.floor_cost;
+            if(cfg.separate&&partial.overlap>best.overlap+0.000001)continue;
+            // Remaining radios cannot reduce accumulated overlap or improve on
+            // their own cheapest optimistic score. Preserve separation priority.
+            let optimistic=cost+remaining[i+1]+(cfg.separate?0:cfg.overlap_penalty*partial.overlap);
+            if((!cfg.separate||partial.overlap>=best.overlap-0.000001)&&optimistic>best.cost+0.000001)continue;
+            visit(i+1,next,cost);if(truncated)return;
         }
     }
-    visit(0,[]);
+    visit(0,[],0);
     return {...best,base,gain:base.cost-best.cost,visited,truncated};
 };
 function comparison_evidence(models,previous,stamp,cfg) {
