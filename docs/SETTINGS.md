@@ -76,7 +76,7 @@ Every remaining control has a distinct operational purpose. Controls are grouped
 | --- | --- |
 | `enabled` | Stops channel surveys/planning; distinct from observation, which still scans and proposes. Client steering has its own switch. |
 | `mode` | Observe versus automatic planner-initiated channel changes. Observe still allows interrupted-operation recovery and kernel radar evacuation. Does not control preferred-radio steering. |
-| `interval` | Administrator's scan-overhead budget: minimum wait after completed surveys/operations, including close comparisons. Startup begins after 15 seconds. |
+| `interval` | Administrator's scan-overhead budget: normal wait after completed surveys/operations, including close comparisons. Default: 120 seconds; scan duration is additional. Startup begins after 15 seconds. |
 | `improvement` | Labelled Movement caution: minimum net service-index gain after movement cost, including widening. Also sets the movement-cost unit, which scales with affected clients, recent CSA departures, helpers and staging. Every step repays this margin against current evidence. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
 | `min_dwell` | Avoids repeated moves after successful verification. Independent of survey frequency. |
 | `persist` | Whether verified wireless placements are checkpointed, at most every six hours. Separate from graph history and radar memory. |

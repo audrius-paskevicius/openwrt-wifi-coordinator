@@ -47,7 +47,7 @@ for(let key in ['enabled','separate_radios','allow_reconnect','persist','history
 function number(k,d,lo,hi) { try{return setting_integer(raw[k] ?? d,lo,hi);}catch(e){die(`Invalid ${k}: ${e}\n`);} }
 let board=trim(fs.readfile('/tmp/sysinfo/board_name') ?? '');
 let wrt=index(['linksys,wrt3200acm','linksys,wrt32x'],board)>=0;
-let cfg={enabled:raw.enabled=='1',mode:raw.mode ?? 'observe',interval:number('interval',60,30,86400),
+let cfg={enabled:raw.enabled=='1',mode:raw.mode ?? 'observe',interval:number('interval',120,30,86400),
     cooldown:number('min_dwell',180,30,86400),retry_delay:30,
     improvement:number('improvement',3,1,200),
     overlap_penalty:number('overlap_penalty',25,0,500),max_mbps:+(raw.max_mbps ?? '0.05'),

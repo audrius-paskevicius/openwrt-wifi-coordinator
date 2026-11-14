@@ -8,6 +8,14 @@ Run the portable source/documentation checks with `python3 scripts/check-project
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
 
+## Default survey pause: 120 seconds (2026-11-14, after r22)
+
+Changed the shipped configuration, runtime fallback and Settings default from
+60 to 120 seconds. Explicit settings on other existing installations remain
+unchanged. The pause is additional to scan duration. This change does not fix
+the separately identified scheduling exception when scanning overlaps an
+operation. Portable source/UI checks and native compilation passed.
+
 ## Settings tabs and download-only Export (2026-11-14, after r22)
 
 Graph display is now a Settings tab using the existing shared display UCI keys.
