@@ -27,14 +27,17 @@ const radios=[{'.name':'radio0',band:'5g'},{'.name':'radio1',band:'2g'},{'.name'
 const uci={sections:()=>radios,get:()=>true};
 const state={updated:100,radios:{radio0:{requested_method:'auto',method:'csa',requested_width_method:'auto',width_method:'idle_reconfigure',method_reason:'Driver advertises CSA',width_reason:'Tested width changes require restart'},radio1:{requested_method:'csa',method:'csa',csa_recovery_left:120,rejected:[{until:220,target:{freq:2472,width:20},reason:'Client connectivity did not verify'}]}}};
 const source=fs.readFileSync(path.join(root,'channel-coordinator/files/wifi-settings.js'),'utf8');
-const page=new Function('view','form','uci','rpc','fs','poll','help','E','_','L','timefmt',source)(
+const storage=new Function('baseclass','form','uci','poll','timefmt','E','_',fs.readFileSync(path.join(root,'channel-coordinator/files/wifi-coordinator.storage.js'),'utf8'))({extend:x=>x},form,uci,{add(){}},require('./time.cjs'),E,x=>x);
+const page=new Function('view','form','uci','rpc','fs','poll','help','E','_','L','timefmt','storage',source)(
  {extend:x=>x},form,uci,{declare:()=>()=>Promise.resolve({})},{read:()=>Promise.resolve(JSON.stringify(state))},
- {add:fn=>polls.push(fn)},{compact:()=>{},sectionStatus:(s,n)=>{s.statusNode=n;}},E,x=>x,{resource:x=>x,url:x=>x},require('./time.cjs'));
+ {add:fn=>polls.push(fn)},{compact:()=>{},sectionStatus:(s,n)=>{s.statusNode=n;}},E,x=>x,{resource:x=>x,url:x=>x},require('./time.cjs'),storage);
 function option(name,section='main'){const o=options.find(x=>x.option===name&&x.section===section);assert(o,'Missing '+section+'.'+name);return o;}
 module.exports=page.renderPage([null,null,null,state]).then(async()=>{
- const display=sections.find(s=>s.config==='wifi_coordinator_display');assert(display,'shared router graph settings have a separate UCI map');
- assert.deepEqual(display.children.map(o=>o.option),['decimation','triangles','squares','crosses','popups']);
- for(const o of display.children){assert.equal(o.type,'flag');assert.equal(o.default,'1');assert.equal(o.rmempty,false);assert(o.description.length>60);}
+ for(const key of ['history_enabled','history_hours','history_save_minutes','clear_history','_history_storage'])assert.equal(option(key).tab,'storage');
+ const display=options.filter(o=>o.tab==='display');
+ assert.deepEqual(display.map(o=>o.ucioption),['decimation','triangles','squares','crosses','popups']);
+ for(const o of display){assert.equal(o.uciconfig,'wifi_coordinator_display');assert.equal(o.ucisection,'main');assert.equal(o.type,'flag');assert.equal(o.default,'1');assert.equal(o.rmempty,false);assert(o.description.length>60);}
+ assert(sections.find(s=>s.config==='channel_coordinator').tabs.display,'Graph display belongs to the Settings tabs');
  for(const name of ['retry_delay','scan_wait','scan_batch','cac_timeout','csa_count','ban_seconds','wide_threshold'])assert(!options.some(x=>x.option===name));
  for(const radio of radios){
   const name=radio['.name'];

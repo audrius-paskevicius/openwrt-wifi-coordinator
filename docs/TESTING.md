@@ -4,9 +4,30 @@ Source release: **0.7.0-r22**. Automated runtime tests use OpenWrt 25.12.6 on a 
 
 ## Reproducing current checks
 
-Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite covers viewport requests, response-cache isolation/retry, graph display controls and existing chart semantics. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
+Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite covers viewport requests, response-cache isolation/retry, graph display controls and existing chart semantics. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 58 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## Settings tabs and download-only Export (2026-11-14, after r22)
+
+Graph display is now a Settings tab using the existing shared display UCI keys.
+History recording, retention, flash-save interval, Clear recorded history and
+storage diagnostics are under Settings / History recording & storage. Export
+contains only period/dataset selectors and CSV/JSON downloads; it has no settings
+form, clearing control or Save/Apply/Reset footer. The existing storage URL remains
+valid for bookmarks. No controller or recording behavior changed.
+
+Portable source and UI checks passed. The fixture using actual LuCI methods
+passed with 58 descriptions, including display/storage namespace bindings,
+retention/custom save intervals, status refresh, and independent export periods
+and POST fields. Live LuCI displayed both Settings tabs and the download-only
+Export page. Authenticated one-hour CSV and JSON downloads both returned HTTP
+200; the JSON parsed successfully. Saving and applying a temporary popup toggle changed only
+`wifi_coordinator_display`; it was restored afterward, with no pending changes.
+All four configuration files matched their original hashes and coordinator PID
+9087 remained running throughout. Clear recorded history was left unchecked;
+no live history was deleted. The UI files were installed directly over r22
+without a service restart; no new release APK was published for this UI change.
 
 ## 0.7.0-r22 Reliable planning results and live observations (2026-11-14)
 

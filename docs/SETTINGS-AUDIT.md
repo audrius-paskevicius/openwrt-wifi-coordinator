@@ -22,7 +22,7 @@ retired. The new UI does not resurrect them or create replacement aliases in UCI
 | Move clients | Preferred radio, strength, handoff window, protection, both signal thresholds, preference settling, cooldown/attempt cap | `steering.uc`, `handoff.uc` and `executor.uc` share relevant policy and budgets. Consolidate under Client steering. Settling is preference-specific; cooldown and cap still affect handoffs when preference is disabled. |
 | Select a hardware method | Channel and width methods | `policy.uc` resolves Auto from capabilities, known hardware behaviour and recent failures. Explicit overrides remain useful and can intentionally block unsupported moves. Retain under each radio's Driver overrides. |
 | Verify and recover service | Unprobeable-client observation, clear-stop action | `executor.uc` and recovery logic distinguish association from service evidence. Retain the deployment-dependent observation window; show acknowledgement only when a global/per-radio recovery problem is reported. Automatic recovery remains active. |
-| Preserve state and observations | Placement persistence, history enable/retention/clear | Placement checkpoints, radar memory and chart history serve distinct purposes. Keep placement persistence in Operation and history controls in Storage & export. Do not merge their meanings. |
+| Preserve state and observations | Placement persistence, history enable/retention/clear | Placement checkpoints, radar memory and chart history serve distinct purposes. Keep placement persistence in Operation and history controls in Settings under History recording & storage. Do not merge their meanings. |
 
 ## Couplings reviewed, not silently changed
 

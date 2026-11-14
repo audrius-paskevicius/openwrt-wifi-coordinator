@@ -1,18 +1,19 @@
 'use strict';
 const fs=require('fs'),path=require('path'),assert=require('assert');
-const source=fs.readFileSync(path.join(__dirname,'../channel-coordinator/files/wifi-storage.js'),'utf8');
+const source=fs.readFileSync(path.join(__dirname,'../channel-coordinator/files/wifi-coordinator.storage.js'),'utf8');
 function E(tag,attrs,children){return {tag,attrs,children,replaceChildren(...nodes){this.children=nodes;},appendChild(node){this.children.push(node);},remove(){}};}
 async function render(config,runtime={}){
  const options=[];
- class FormMap {
-  section(){return {option(type,name,title,description){const o={option:name,title,description,choices:[],value(value,label){this.choices.push([value,label]);}};options.push(o);return o;}};}
-  render(){return Promise.resolve(E('form',{},[]));}
- }
- const page=new Function('view','disclaimer','form','uci','fs','poll','help','timefmt','E','_','L',source)(
-  {extend:o=>o},{},{Map:FormMap},{get:(c,s,k)=>config[k]}, {},{add(){}},{compact(){}},{stamp:t=>String(t)},E,s=>s,{resource:s=>s});
- const node=await page.renderPage([null,runtime]);return {options,node};
+ const section={taboption(tab,type,name,title,description){const o={option:name,title,description,choices:[],value(value,label){this.choices.push([value,label]);}};options.push(o);return o;}};
+ const helper=new Function('baseclass','form','uci','fs','poll','timefmt','E','_',source)(
+  {extend:o=>o},{},{get:(c,s,k)=>config[k]}, {},{add(){}},{stamp:t=>String(t)},E,s=>s);
+ helper.addOptions(section,'storage',runtime);
+ const node=options.find(o=>o.option==='_history_storage').renderWidget();return {options,node};
 }
 (async()=>{
+ const exportSource=fs.readFileSync(path.join(__dirname,'../channel-coordinator/files/wifi-storage.js'),'utf8');
+ assert(!exportSource.includes('clear_history'));assert(!exportSource.includes('form.Map'));
+ for(const key of ['handleSaveApply','handleSave','handleReset'])assert(exportSource.includes(key+':null'));
  const defaults=await render({});let option=defaults.options.find(o=>o.option==='history_save_minutes');
  assert.equal(option.cfgvalue(),'360');assert.equal(option.default,'360');assert.equal(option.rmempty,false);
  assert.equal(option.datatype,'and(integer,range(15,360))');

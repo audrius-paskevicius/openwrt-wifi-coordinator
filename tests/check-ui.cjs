@@ -8,6 +8,7 @@ const files = [
   'channel-coordinator/files/wifi-comparison.js',
   'channel-coordinator/files/wifi-history.js',
   'channel-coordinator/files/wifi-storage.js',
+  'channel-coordinator/files/wifi-coordinator.storage.js',
   'channel-coordinator/files/wifi-disclaimer.js',
   'channel-coordinator/files/wifi-coordinator.graphs.js',
   'channel-coordinator/files/wifi-coordinator.history.js',

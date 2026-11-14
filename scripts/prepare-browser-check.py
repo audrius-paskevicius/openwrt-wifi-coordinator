@@ -33,6 +33,7 @@ methods = {
 sources = {name: (root / file).read_text(encoding='utf-8') for name, file in [
     ('time', 'channel-coordinator/files/wifi-coordinator.time.js'),
     ('help', 'channel-coordinator/files/wifi-coordinator.help.js'),
+    ('storageSettings', 'channel-coordinator/files/wifi-coordinator.storage.js'),
     ('settings', 'channel-coordinator/files/wifi-settings.js'),
     ('channels', 'channel-coordinator/files/wifi-channels.js'),
     ('comparison', 'channel-coordinator/files/wifi-comparison.js'),
@@ -105,20 +106,22 @@ const poll={add:fn=>polls.push(fn)};
 const view={extend:x=>x};
 const graphs={};
 const timefmt=new Function('baseclass',payload.sources.time)({extend:x=>x});
-function page(name){return new Function('view','form','uci','rpc','fs','poll','help','E','_','L','graphs','timefmt',payload.sources[name])(view,form,uci,rpc,fs,poll,help,E,_,L,graphs,timefmt);}
+const storage=new Function('baseclass','form','uci','fs','poll','timefmt','E','_',payload.sources.storageSettings)({extend:x=>x},form,uci,fs,poll,timefmt,E,_);
+function page(name){return new Function('view','form','uci','rpc','fs','poll','help','E','_','L','graphs','timefmt','storage',payload.sources[name])(view,form,uci,rpc,fs,poll,help,E,_,L,graphs,timefmt,storage);}
 function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));assert(tooltipDiv.style.opacity==='1','hover must open native tooltip');assert(tooltipDiv.textContent.includes(node.dataset.tooltip),'hover must expose full explanation');assert(tooltipDiv.getBoundingClientRect().right<=innerWidth+1,'tooltip must fit viewport');}
 (async()=>{
- let comparisonPoll;
+ let comparisonPoll,storagePoll;
  for(const name of ['settings','channels','clients','history','storage','comparison']){
   const pane=await page(name).renderPage(name==='settings'?[null,null,null,state]:name==='comparison'?[null,{state:state}]:['history','storage'].includes(name)?[null,{}]:[null,null,state,{}]);
-  pane.dataset.fixturePage=name;if(name==='comparison')comparisonPoll=polls[polls.length-1];
+  pane.dataset.fixturePage=name;if(name==='settings')storagePoll=polls[polls.length-1];if(name==='comparison')comparisonPoll=polls[polls.length-1];
   // Fixture uses locally embedded style, never navigates to the router.
   pane.querySelectorAll('link').forEach(n=>n.remove());
   document.getElementById('pages').appendChild(pane);
  }
  const downloads=[];HTMLFormElement.prototype.submit=function(){downloads.push({action:this.getAttribute('action'),method:this.method,target:this.target,fields:Object.fromEntries(new FormData(this))});};
  const exportSection=document.querySelector('.wc-export');
- assert(exportSection.previousElementSibling.classList.contains('cbi-map'),'export follows retention');
+ assert(!document.querySelector('[data-fixture-page=storage] .cbi-map'),'Export has no settings form');
+ assert(document.querySelector('[data-fixture-page=settings] .wc-history-storage'),'storage status belongs to Settings');
  assert(Math.max(...Array.from(document.querySelector('[data-fixture-page=history] select').options,o=>Number(o.value)))===120,'legacy 200-hour setting cannot extend Show beyond 120');
  assert(Math.max(...Array.from(document.querySelector('#wc-export-period').options,o=>Number(o.value)||0))===120,'legacy export selector capped at 120');
  document.querySelector('#wc-export-period').value='6';exportSection.querySelector('[data-export-format=json]').click();
@@ -141,6 +144,15 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
   const o=fields.find(o=>o.map===configMap&&o.option===key),stored=key==='preference_enabled'?'enabled':key;
   assert(nativeLoad.call(o,'main')==='radio_prefer.main.'+stored,'native preference load binding '+key);
   nativeWrite.call(o,'main','synthetic-value');assert(JSON.stringify(writes.pop())===JSON.stringify(['radio_prefer','main',stored,'synthetic-value']),'native preference write binding '+key);
+ }
+ for(const key of ['decimation','triangles','squares','crosses','popups']){
+  const o=fields.find(o=>o.option==='display_'+key);
+  assert(nativeLoad.call(o,'main')==='wifi_coordinator_display.main.'+key,'native display load binding '+key);
+  nativeWrite.call(o,'main','0');assert(JSON.stringify(writes.pop())===JSON.stringify(['wifi_coordinator_display','main',key,'0']),'native display write binding '+key);
+ }
+ for(const key of ['history_enabled','history_hours','history_save_minutes','clear_history']){
+  const o=fields.find(o=>o.option===key);
+  nativeWrite.call(o,'main','synthetic-value');assert(JSON.stringify(writes.pop())===JSON.stringify(['channel_coordinator','main',key,'synthetic-value']),'native storage write binding '+key);
  }
  const channelEnable=fields.find(o=>o.map===configMap&&o.option==='enabled');
  assert(nativeLoad.call(channelEnable,'main')==='channel_coordinator.main.enabled','channel enable remains independent');
@@ -228,8 +240,8 @@ function tooltip(node){node.scrollIntoView({block:'center'});node.dispatchEvent(
  const show=historyPane.querySelector('select');show.value='24';show.dispatchEvent(new Event('change'));
  const storagePane=await page('storage').renderPage([null,historyData]);
  storagePane.querySelectorAll('link').forEach(n=>n.remove());document.getElementById('pages').appendChild(storagePane);
- const storage=storagePane.querySelector('.wc-history-storage');assert(!storage.open,'storage diagnostics start collapsed');
- storage.open=true;await polls[polls.length-1]();assert(storage.open,'expanded storage diagnostics survive refresh');
+ const storage=document.querySelector('.wc-history-storage');assert(!storage.open,'storage diagnostics start collapsed');
+ storage.open=true;await storagePoll();assert(storage.open,'expanded storage diagnostics survive refresh');
  assert(storagePane.querySelector('#wc-export-period').value==='all','export defaults to all, independent of History');
  storagePane.querySelector('#wc-export-period').value='12';
  storagePane.querySelector('.wc-export button').click();assert(downloads[downloads.length-1].fields.hours==='12','export posts its own window independently');

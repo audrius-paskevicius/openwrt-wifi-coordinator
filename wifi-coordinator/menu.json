@@ -26,7 +26,7 @@
       "type": "view",
       "path": "wifi-storage"
     },
-    "title": "Storage & export"
+    "title": "Export"
   },
   "admin/network/wifi_coordinator/clients": {
     "order": 20,

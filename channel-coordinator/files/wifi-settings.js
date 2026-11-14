@@ -6,11 +6,12 @@
 'require fs';
 'require poll';
 'require wifi-coordinator.help as help';
+'require wifi-coordinator.storage as storage';
 
 function radioName(r){return r['.name']+' ('+(r.band=='2g'?'2.4':'5')+' GHz)';}
 function readState(){return fs.read('/tmp/channel-coordinator-state.json').then(JSON.parse).catch(function(){return {};});}
 return view.extend({
- load:function(){return Promise.all([uci.load('channel_coordinator'),uci.load('radio_prefer'),uci.load('wireless'),readState(),uci.load('wifi_coordinator_display')]);},
+ load:function(){return Promise.all([uci.load('channel_coordinator'),uci.load('radio_prefer'),uci.load('wireless'),readState(),uci.load('wifi_coordinator_display'),storage.read()]);},
  render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));},
  renderPage:function(data){
   var state=data[3]||{},radios=uci.sections('wireless','wifi-device'),methodStatus={};
@@ -34,14 +35,17 @@ return view.extend({
     node.replaceChildren.apply(node,rows);
    });
   }
-  var m=new form.Map('channel_coordinator',_('Wi-Fi Coordinator: settings'),_('Operation changes restart coordination. Graph display settings below are shared by all browsers and do not restart coordination.'));
+  var m=new form.Map('channel_coordinator',_('Wi-Fi Coordinator: settings'),_('Operation changes restart coordination. Graph display settings are shared by all browsers and do not restart coordination.'));
   m.chain('radio_prefer');
+  m.chain('wifi_coordinator_display');
   var s=m.section(form.NamedSection,'main','coordinator');s.anonymous=true;
   s.tab('general',_('Operation'),_('Channel planning and preferred-radio steering are independent. Observe mode does not stop enabled client steering.'));
   s.tab('radios',_('Radios'),_('Choose which radios may change channel and which channels and widths they may use.'));
   s.tab('clients',_('Client steering'),_('Control how clients move between radios. Permission to restart an occupied radio is set separately.'));
   s.tab('scan',_('Survey & radar'),_('Balance spectrum measurements with service to connected clients.'));
   s.tab('advanced',_('Advanced'),_('Adjust channel-change caution and connection checks.'));
+  s.tab('display',_('Graph display'),_('Saved on this router for every browser. History uses new settings on its next refresh. These controls affect graph presentation; recording, retention, exports and channel decisions use their existing settings.'));
+  s.tab('storage',_('History recording & storage'),_('Control recording, retention and flash saves, or clear recorded history.'));
   if(typeof location!='undefined'&&location.hash=='#clients')s.selected_tab='clients';
   function val(tab,name,title,def,type,desc){var o=s.taboption(tab,form.Value,name,_(title),_(desc||''));o.default=String(def);o.datatype=type;o.rmempty=false;o.retain=true;if(type!='range(0.01,1000)')o.datatype='and(integer,'+type+')';return o;}
   function flag(tab,name,title,def,desc){var o=s.taboption(tab,form.Flag,name,_(title),_(desc||''));o.default=def;o.rmempty=false;return o;}
@@ -126,23 +130,21 @@ return view.extend({
    clients:['preferred_radio','handoff_escalation','_steering_summary','protected_clients','allow_reconnect','handoff_wait','settle_time','handoff_target_min','handoff_source_min','cooldown','max_attempts'],
    scan:['scan_policy','interval','scan_duty','scan_gap','scan_type','scanner','max_age','dfs_mode','dfs_helper'],
    advanced:['separate_radios','overlap_penalty','improvement','min_dwell','radar_half_life','max_mbps','quiet_seconds','verify_unprobed']};
-  var tabOrder=['general','radios','clients','scan','advanced'];
+  var tabOrder=['general','radios','clients','scan','advanced','display'];
   s.children.sort(function(a,b){
    if(a.tab!=b.tab)return tabOrder.indexOf(a.tab)-tabOrder.indexOf(b.tab);
    var names=order[a.tab];return names?names.indexOf(a.option)-names.indexOf(b.option):0;
   });
   refresh(state);
   poll.add(function(){return readState().then(refresh);},5);
-  help.compact(m);
-  var display=new form.Map('wifi_coordinator_display',_('Graph display'),_('Saved on this router for every browser. History uses new settings on its next refresh. These controls do not change recording, retention, exports or channel decisions.'));
-  var ds=display.section(form.NamedSection,'main','display');ds.anonymous=true;
   [['decimation','Adapt graph detail to screen resolution','Request only the selected time window and reduce graph data on the router to match the plotting width. Preserve traffic extrema, client-count steps, channel changes and unknown gaps. Heatmap columns show time-weighted estimates with their range. Turn off to draw available stored detail; this does not recover measurements absent from stored summaries.'],
    ['triangles','Show action markers (triangles)','Show recorded actions such as channel changes and client departures. Hiding markers does not remove actions from the log or exports. Crowded markers are grouped when screen adaptation is enabled.'],
    ['squares','Show missing-observation markers (squares)','Mark intervals where observations are missing and service continuity is unknown. Hiding these squares leaves the underlying gaps blank.'],
    ['crosses','Show unavailability markers (crosses)','Mark intervals when hostapd confirmed that no access point was enabled. Hiding these crosses does not fill the gap or remove its records.'],
-   ['popups','Show graph popups','Show graph values, intervals, aggregate ranges and marker details on hover or tap. Also enables graph-heading and legend hints. Settings explanations remain available.']].forEach(function(row){var option=ds.option(form.Flag,row[0],_(row[1]),_(row[2]));option.default='1';option.rmempty=false;});
-  help.compact(display);
-  return Promise.all([m.render(),display.render()]).then(function(nodes){var node=nodes[0];updateGuidance();node.addEventListener('change',updateGuidance);node.addEventListener('input',updateGuidance);return E('div',{'class':'wifi-coordinator'},[
-   E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),node,nodes[1]]);});
+   ['popups','Show graph popups','Show graph values, intervals, aggregate ranges and marker details on hover or tap. Also enables graph-heading and legend hints. Settings explanations remain available.']].forEach(function(row){var option=s.taboption('display',form.Flag,'display_'+row[0],_(row[1]),_(row[2]));option.uciconfig='wifi_coordinator_display';option.ucisection='main';option.ucioption=row[0];option.default='1';option.rmempty=false;});
+  storage.addOptions(s,'storage',data[5]||{});
+  help.compact(m);
+  return m.render().then(function(node){updateGuidance();node.addEventListener('change',updateGuidance);node.addEventListener('input',updateGuidance);return E('div',{'class':'wifi-coordinator'},[
+   E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),node]);});
  }
 });
