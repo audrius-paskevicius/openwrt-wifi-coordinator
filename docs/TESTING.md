@@ -1,12 +1,28 @@
 # Validation
 
-Source release: **0.7.0-r23**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r24**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite covers viewport requests, response-cache isolation/retry, graph display controls and existing chart semantics. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 58 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r24 Scan-mode hover explanation (2026-11-14)
+
+Expanded only the hover explanation for Which radios may scan. It defines all
+three alternative modes, explains that quiet means sustained low client traffic,
+locates the shared thresholds under Advanced, and identifies the pacing controls
+as applying only to Paced while serving. Labels, choices, visibility, defaults,
+configuration values and algorithm behavior are unchanged from r23.
+
+Portable source/UI checks and the native LuCI browser fixture passed. The live
+hover displayed the complete explanation within the viewport. All 55 extracted
+package files matched r23 apart from the intended Settings explanation and
+version substitutions. Signature and release checksums passed. Installation
+upgraded only this package; all 52 installed program files matched the APK,
+and all four saved configuration hashes were unchanged. Scanning resumed with
+no safety stop or recovery pending. A rollback backup was retained off-router.
 
 ## 0.7.0-r23 Settings organization and survey default (2026-11-14)
 
