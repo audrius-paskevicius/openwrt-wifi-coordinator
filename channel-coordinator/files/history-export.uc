@@ -32,7 +32,7 @@ function scan_quality(rows){
   return out;
  });
 }
-function clean(k,x){
+export function clean(k,x,dates){
  let out={};
  for(let f in FIELDS[k])if(x[f]!=null)out[f]=x[f];
  if(k=='actions'){
@@ -41,14 +41,14 @@ function clean(k,x){
   if(x.frequencies!=null)out.frequencies=scan_frequencies(x.frequencies);
   if(x.scan_quality!=null)out.scan_quality=scan_quality(x.scan_quality);
  }
- for(let f in ['time','start','end','updated'])if(out[f]!=null)out[f+'_iso']=iso(out[f]);
+ if(dates!==false)for(let f in ['time','start','end','updated'])if(out[f]!=null)out[f+'_iso']=iso(out[f]);
  if(k=='surveys')out.bands=map(x.bands ?? [],b=>({start:b.start,step:b.step,levels:b.levels,offsets:b.offsets ?? []}));
  if(k=='traffic'){
   out.traffic_avg_mbps=x.n>0?x.traffic_sum/x.n:null;
   out.busy_avg_percent=x.busy_n>0?x.busy_sum/x.busy_n:null;
  }
  return out;
-}
+};
 export function csv_cell(x){
  if(x==null)return '';
  let s=type(x)=='object'||type(x)=='array'?sprintf('%J',x):''+x;
@@ -107,6 +107,21 @@ export function stream(options,read_source,write){
   }
   if(k=='radar'){
    for(let x in options.radar?.events ?? [])if(x.time<=now)output(x);
+  }else if(options.canonical){
+   let context={},emitted={};
+   for(let si=0;si<length(options.sources);si++){
+    let h=read_source(si,k);if(!h){warn('Cannot read source '+options.sources[si]);continue;}
+    for(let x in h[LIST[k]] ?? []){
+     let at=x.updated ?? x.end ?? x.time;if(at<retained||(x.start ?? x.time)>now)continue;
+     if(k=='surveys')for(let b in x.bands ?? [])for(let bi=0;bi<length(b.levels ?? []);bi++){
+      if(b.levels[bi]==null)continue;let t=x.time+(b.offsets?.[bi] ?? 0),bin=''+b.start+':'+b.step+':'+bi;
+      if(t<=start&&(!context[bin]||t>=context[bin].time))context[bin]={time:t,row:x};
+     }
+     if(at>=start){output(x);if(k=='surveys')emitted[x._id]=true;}
+    }
+    flush();
+   }
+   for(let c in values(context))if(!emitted[c.row._id]){output(c.row);emitted[c.row._id]=true;}
   }else{
    let winners={},context={},needed={};
    function source(i){

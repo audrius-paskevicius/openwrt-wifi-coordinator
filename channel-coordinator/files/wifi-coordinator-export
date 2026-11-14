@@ -4,6 +4,8 @@ import * as fs from 'fs';
 import * as ubus from 'ubus';
 import * as uci from 'uci';
 import { urldecode, DECODE_PLUS } from 'lucihttp';
+import {snapshot,manifest,read_block} from '/usr/share/channel-coordinator/history-store.uc';
+import {empty} from '/usr/share/channel-coordinator/history-codec.uc';
 import { stream, DATASETS } from '/usr/share/channel-coordinator/history-export.uc';
 
 function fail(status,message){
@@ -30,32 +32,25 @@ function allowed(scope,object,method){return bus?.call('session','access',{ubus_
 let dir='/etc/wifi-coordinator/',ram='/tmp/wifi-coordinator-history.json',state='/tmp/channel-coordinator-state.json';
 if(!allowed('file',dir,'list')||!allowed('file',ram,'read')||!allowed('file',state,'read')||
  !allowed('uci','channel_coordinator','read'))fail('403 Forbidden','This session cannot export coordinator history.');
-let warnings=[],names=fs.lsdir(dir);
-if(!names){if(fs.stat(dir))push(warnings,'Cannot list history archive');names=[];}
-names=sort(filter(names,n=>match(n,/^batch-[0-9]+\.json$/)));
-for(let n in names)if(!allowed('file',dir+n,'read'))fail('403 Forbidden','This session cannot read an archive batch.');
-let cursor=uci.cursor(),hours=max(1,min(120,int(cursor.get('channel_coordinator','main','history_hours') ?? 24))),now=time();
-// Skip closed batches that cannot overlap the supported retention window.
-names=filter(names,n=>int(match(n,/^batch-([0-9]+)\.json$/)[1])>=now-hours*3600);
-function read(path){
- // A bounded read also protects against a file growing after stat().
- let s=fs.lstat(path);if(!s||s.type!='file'||s.size>2097152)return null;
- let f=fs.open(path,'r');if(!f)return null;
- let data=f.read(2097153);f.close();if(data==null||length(data)>2097152)return null;
- try{return json(data);}catch(e){return null;}
-}
-let snapshot=read(ram),controller=read(state);
-if(!snapshot){if(fs.stat(ram))push(warnings,'Cannot read RAM history');snapshot={periods:[],samples:[],events:[],surveys:[]};}
-if(!controller){push(warnings,'Cannot read radar memory and declared bands');controller={};}
-let sources=[...names,'RAM'],selected=int(args.hours)||hours;
-let options={format:args.format,dataset:args.dataset,now,start:now-min(selected,hours)*3600,retained:now-hours*3600,
- hours,sources,warnings,version:'@WIFI_COORDINATOR_VERSION@',bands:controller.declared_bands,
- radar:controller.radar,dropped:snapshot.dropped_records};
-// Drop unrelated live state, which may identify clients or contain recovery data.
-controller=null;
-let filename='wifi-history-'+now+(args.format=='csv'?'-'+args.dataset:'')+'.'+args.format;
-print('Content-Type: '+(args.format=='json'?'application/json':'text/csv')+'; charset=utf-8\r\nContent-Disposition: attachment; filename="'+filename+'"\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\r\n');
-if(!fs.stdout.flush())exit(1);
-stream(options,i=>i==length(names)?snapshot:read(dir+names[i]),chunk=>{
- if(fs.stdout.write(chunk)!=length(chunk)||!fs.stdout.flush())die('Download closed');
-});
+if(!allowed('file',dir+'history-index.json','read')||!allowed('file',dir+'block-*.json','read')||!allowed('file',dir+'tail-*.json','read'))fail('403 Forbidden','This session cannot read the history index.');
+let snap=null;
+try{
+ let index=manifest();if(!index)fail('503 Service Unavailable','History migration has not completed.');
+ snap=snapshot();
+ let cursor=uci.cursor(),hours=max(1,min(120,int(cursor.get('channel_coordinator','main','history_hours') ?? 24))),now=time(),selected=int(args.hours)||hours;
+ let controller={};try{controller=json(fs.readfile(state));}catch(e){}
+ let blocks=filter(snap.manifest.blocks,d=>d.high>=now-hours*3600&&d.low<=now),sources=[...map(blocks,d=>d.name),'active'];
+ let options={format:args.format,dataset:args.dataset,canonical:true,now,start:now-min(selected,hours)*3600,retained:now-hours*3600,
+  hours,sources,warnings:[],version:'@WIFI_COORDINATOR_VERSION@',bands:controller.declared_bands,radar:controller.radar,dropped:snap.status.dropped_records};
+ controller=null;
+ let filename='wifi-history-'+now+(args.format=='csv'?'-'+args.dataset:'')+'.'+args.format;
+ print('Content-Type: '+(args.format=='json'?'application/json':'text/csv')+'; charset=utf-8\r\nContent-Disposition: attachment; filename="'+filename+'"\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\r\n');
+ if(!fs.stdout.flush())die('Download closed');
+ const lists={traffic:'samples',actions:'events'};
+ stream(options,(i,k)=>{
+  if(i==length(blocks))return snap.active;
+  let d=blocks[i];if(d.dataset!=(lists[k] ?? k)||k!='surveys'&&d.high<options.start)return empty();
+  try{return read_block(d);}catch(e){return null;}
+ },chunk=>{if(fs.stdout.write(chunk)!=length(chunk)||!fs.stdout.flush())die('Download closed');});
+ snap.release();snap=null;
+}catch(e){if(snap)snap.release();die('Export failed: '+e);}

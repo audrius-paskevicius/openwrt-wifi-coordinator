@@ -1,12 +1,122 @@
 # Validation
 
-Source release: **0.7.0-r17**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r21**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
-Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite includes 54 history/cache assertions and 30 interruption/recovery cases. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
+Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite covers viewport requests, response-cache isolation/retry, graph display controls and existing chart semantics. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## r21 history text correction (2026-11-14)
+
+Corrected corrupted range separators and middle dots in history tooltips,
+summary labels and action pagination using JavaScript Unicode escapes.
+The project-wide encoding scan and checks of all 12 deployed UI modules found
+no remaining damaged text. Portable source/UI checks passed; live LuCI returned
+the expected frequency-range tooltip and rendered all three charts without errors.
+The two corrected UI files were applied without restarting the coordinator.
+This source correction follows the original r21 package build.
+
+## 0.7.0-r20 / r21 Indexed history and incremental graph loading (2026-11-14)
+
+Native tests cover manifest commit interruptions, idempotent recovery, immutable
+blocks, lossless survey-column encoding, one-time legacy migration, integrity
+failures and reader leases during retention cleanup. The full retention simulation
+preserved 4,323 traffic summaries and 1,441 surveys/actions with no dropped records.
+Graph tests cover reusable tiles, bounded progressive loading, browser inventories,
+recent-tile invalidation and indexed action pagination. Portable checks cover
+incremental transfer, cache immutability, gap/reboot boundaries and chart reuse.
+
+An isolated copy of the router's retained history produced equivalent old/new
+exports for every dataset (placements, client counts, traffic, surveys, radar and
+actions). This comparison fixes the snapshot and time window; counts can differ
+between later runs as the retention boundary advances. Physical power interruption
+has not been tested: fault injection exercises the commit/recovery boundaries.
+
+Live r21 installation and transactional repack passed native package verification.
+All four operational/display UCI files remained byte-identical. The display-only
+reload check used procd's instance PID and preserved that process; temporary flags
+were restored. History recording remained current without an archive error.
+
+The final live migration comparison matched 301 placements, 2,913 traffic
+summaries, 357 client intervals, 9,840 events and 3,001 survey frames. Canonical
+block payloads occupied 5,171,917 bytes versus 5,787,149 bytes of legacy source
+files plus RAM (filesystem overhead is additional). Verified legacy files were
+removed from the router after retaining local pre-upgrade backups.
+
+The 126-hour recording simulation passed 23,765 assertions. Targeted native checks
+passed 31 storage/recovery/codec/repack assertions, seven tile/pagination checks,
+23 recording/privacy checks, 20 client-continuity checks, 34 save-interval checks,
+69 reduction/gap checks and 42 export checks. The final codec refinement reran the
+targeted checks and full-data equivalence comparison, not the long simulation.
+
+Live five-day refresh requests were about 1.5 seconds with one changed recent
+tile (about 130 kB including action/marker metadata). A warm complete transfer to
+a fresh browser inventory took about 2.7 seconds and 2.46 MB. Empty-cache requests
+returned progressive portions in roughly 2-3.5 seconds; preparing all five days
+still takes tens of seconds. A full live JSON export completed without warnings
+in about 17 seconds. Timings are observations on this router, not guarantees.
+
+## 0.7.0-r19 Shared graph display controls (2026-11-14)
+
+Adds router-wide controls for screen-aware graph reduction, triangles, squares,
+crosses and graph popups. Display UCI is separate from operational UCI so its
+changes do not trigger the coordinator. A bounded, authenticated graph endpoint
+filters the requested time window before transfer, while exports keep their
+existing precision. Actions use independent pagination. Survey display no longer
+extends stale observations through unknown gaps. Radio-selection code is unchanged.
+
+Portable source/UI checks passed. Native tests passed 69 viewport-reduction,
+gap, marker, pagination and privacy assertions, plus 42 streaming-export checks.
+The signed package passed native verification and upgraded r18 to r19. Wireless
+and both operational configuration files stayed byte-identical; packaged policy,
+planner, executor, survey, controller, radar, planning-job and main modules matched
+the installed r18 versions. The temporary signing key was removed after building.
+
+Live LuCI rendered all five flags and all three history charts. Authenticated
+requests returned HTTP 200 without read errors; GET and an unauthenticated token
+were rejected. Changing all flags to off was reflected in a fresh request, and
+defaults were restored afterward. The first global configuration reload restarted
+the coordinator; subsequent display-only off/on changes preserved its PID.
+History updates continued without a reported archive error. No reboot or RF
+throughput test was performed for this release.
+
+With this router's retained data, the 120-hour, 1000-pixel reduced response was
+about 1.82 MB from 5.65 MB of source history and took about 23 seconds to prepare.
+The live six-hour request took about 1.8 seconds; a cached response took about
+0.27 seconds. These are observed timings, not guarantees. The long-window first
+request remains relatively slow despite reduced transfer and rendering work.
+
+## 0.7.0-r18 Selectable history save interval (2026-11-14)
+
+Storage & export offers 15-minute, 30-minute, one-hour, three-hour and six-hour
+history saves, preserving the six-hour default. Help distinguishes retention,
+recording frequency and flash-write frequency, including the limits of a save
+schedule when recording stalls or a write fails. The effective interval is capped
+at retention. Channel selection, steering, verified-placement persistence and
+radar-memory schedules are unchanged. Shutdown priority is corrected to `09`,
+with explicit removal of the obsolete one-digit shutdown entry on installation.
+
+Portable source/UI checks passed, including the new storage-setting rendering
+checks. The isolated OpenWrt interval test passed 34 assertions covering every
+preset, a custom interval, boundary records, interval changes across service
+restart, retention, failed writes and retry recovery, and shutdown saving.
+These tests use temporary files and simulated time; they do not reboot the router.
+The previously observed missing scheduled archives remain a separate unresolved
+incident; selectable frequency is not claimed to repair that failure.
+
+The existing history, client-history, streaming export and long-run archive tests
+passed 23, 20, 42 and 552 checks respectively. The archive simulation preserved
+all 4,323 samples and 1,441 surveys across its 120-hour retained window. The signed
+APK verified and installed without dependency changes. The channel-coordinator,
+Radio Preference and wireless configuration files remained byte-identical. Live
+history resumed with a 21,600-second interval, no archive error and no safety stop.
+The shutdown link was `K09channel-coordinator`, with no obsolete `K9` entry.
+Actual LuCI rendering in Chrome verified all five choices, the preserved selection,
+active schedule and full help text without saving a different interval. The browser
+disclaimer acknowledgement was left unchanged. No router reboot was performed;
+the complete algorithm test suite and RF performance tests were not rerun.
 
 ## 0.7.0-r17 History header and readable durations (2026-11-10)
 

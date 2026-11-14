@@ -2,6 +2,9 @@
 [ -z "${IPKG_INSTROOT:-}" ] || exit 0
 cat /usr/share/channel-coordinator/DISCLAIMER.txt
 /etc/init.d/radio-prefer disable
+# Older packages used STOP=9, sorting shutdown after K90umount.
+# rc.common disable only removes two-digit entries, so migrate this one explicitly.
+rm -f /etc/rc.d/K9channel-coordinator
 /etc/init.d/channel-coordinator enable
 /usr/bin/ucode /usr/share/channel-coordinator/defaults.uc --apply
 /usr/bin/ucode /usr/share/channel-coordinator/country.uc --apply

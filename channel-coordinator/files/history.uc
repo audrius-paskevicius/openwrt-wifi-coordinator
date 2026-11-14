@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import {pressure} from './policy.uc';
-import {RAM_LIMIT,INTERVAL,archive_info,clear_archive,expire_archive,prune,bounded,checkpoint} from './history-storage.uc';
+import {RAM_LIMIT,save_interval,prune,bounded} from './history-storage.uc';
+import {restore,assign_ids,checkpoint,clear_store,manifest} from './history-store.uc';
 const PATH='/tmp/wifi-coordinator-history.json',LIMIT=RAM_LIMIT;
 function scan_frequencies(rows){return slice(filter(type(rows)=='array'?rows:[],f=>type(f)=='int'&&f>=2300&&f<5925),0,128);}
 function scan_quality(rows){
@@ -11,17 +12,17 @@ function scan_quality(rows){
   return out;
  });
 }
-export function open_history(boot,enabled,hours) {
+export function open_history(boot,enabled,hours,save_minutes) {
     hours=max(1,min(120,hours));
-    let h={boot,started:time(),periods:[],samples:[],clients:[],events:[],surveys:[]},last_record=0,last_flush=0;
-    try { if((fs.stat(PATH)?.size ?? LIMIT+1)<=LIMIT){let old=json(fs.readfile(PATH));
-        if(old.boot==boot&&type(old.periods)=='array'&&type(old.samples)=='array'&&type(old.events)=='array'&&type(old.surveys)=='array')
-            h=old;
-    } }catch(e){}
-    if(type(h.clients)!='array')h.clients=[];
-    let archive=archive_info();
-    let saved=archive.saved ?? 0;
-    archive=null; // Older history is loaded only during a checkpoint, not held by the daemon.
+    let interval=save_interval(save_minutes,hours);
+    let h,last_record=0,last_flush=0,last_pressure=0;
+    try{h=restore(boot,hours,time());}
+    catch(e){
+        // A damaged history archive must not prevent channel coordination.
+        // Preserve new observations in a distinct session until storage recovers.
+        h={boot,session:boot+'-history-recovery-'+time(),epoch:null,started:time(),next_seq:0,periods:[],samples:[],clients:[],events:[],surveys:[],archive_error:'History recovery failed: '+e};
+    }
+    let saved=h.archive_saved ?? 0;
     let last_attempt=max(h.archive_attempt ?? 0,saved,h.started);
     if(last_attempt>time())last_attempt=time();
     function flush(force,shutdown) {
@@ -34,16 +35,21 @@ export function open_history(boot,enabled,hours) {
         h.events=filter(h.events,e=>(e.end ?? e.time)>=cutoff);
         h.surveys=filter(h.surveys,s=>(s.updated ?? s.time)>=cutoff);
         h.updated=t;h.retention_hours=hours;h.limit_bytes=LIMIT;h.enabled=enabled;
-        if(shutdown||t-last_attempt>=INTERVAL){
+        assign_ids(h);
+        let pressure=length(sprintf('%J',h))>LIMIT*3/4&&t-last_pressure>=60;
+        if(shutdown||t-last_attempt>=interval||pressure){
+            if(pressure)last_pressure=t;
             last_attempt=t;h.archive_attempt=t;
-            expire_archive(t,hours);
-            let changed=h.archive_dirty||length(filter(h.clients,s=>s.end>saved))||length(filter(h.samples,s=>s.end>saved))||length(filter(h.events,e=>e.time>saved))||length(filter(h.surveys,s=>(s.updated ?? s.time)>saved))||length(filter(h.periods,p=>p.end>saved));
+
+            let expired=false;try{expired=length(filter(manifest()?.blocks ?? [],d=>d.high<cutoff))>0;}catch(e){}
+            let changed=expired||h.archive_dirty||length(filter(h.clients,s=>s.end>saved))||length(filter(h.samples,s=>s.end>saved))||length(filter(h.events,e=>e.time>saved))||length(filter(h.surveys,s=>(s.updated ?? s.time)>saved))||length(filter(h.periods,p=>p.end>saved));
             if(changed){
-                if(checkpoint(h,t,hours)){saved=t;h.archive_dirty=false;h.archive_error=null;prune(h,t-3600);}
-                else {ok=false;h.archive_error='Archive write failed or less than 4 MiB would remain free. Recent history kept in RAM; next scheduled attempt in six hours.';}
+                try{
+                    if(checkpoint(h,t,hours,shutdown)){saved=t;h.archive_dirty=false;h.archive_error=null;}
+                }catch(e){ok=false;h.archive_error='Archive save failed: '+e+'. Recent history remains in RAM subject to its size limit; scheduled retry in '+int(interval/60)+' minutes.';}
             }
         }
-        h.archive_saved=saved;h.archive_next=last_attempt+INTERVAL;
+        h.archive_saved=saved;h.archive_next=last_attempt+interval;h.archive_interval=interval;
         let data=bounded(h,LIMIT);
         if(!fs.writefile(PATH+'.new',data)||!fs.rename(PATH+'.new',PATH))ok=false;
         last_flush=t;
@@ -83,12 +89,12 @@ export function open_history(boot,enabled,hours) {
             }
             let period=null;
             for(let i=length(h.periods)-1;i>=0;i--)if(h.periods[i].radio==r.radio){period=h.periods[i];break;}
-            if(!period||t-period.end>15||last_down&&last_down.end>period.end||period.channel!=r.channel||period.width!=r.width||period.center!=r.center||period.role!=r.role){
+            if(!period||period._session&&period._session!=(h.session ?? boot)||t-period.end>15||last_down&&last_down.end>period.end||period.channel!=r.channel||period.width!=r.width||period.center!=r.center||period.role!=r.role){
                 period={radio:r.radio,channel:r.channel,center:r.center,width:r.width,role:r.role,start:t,end:t};push(h.periods,period);
             }else period.end=t;
             let sample=null;
             for(let i=length(h.samples)-1;i>=0&&h.samples[i].time>=bucket;i--){
-                let s=h.samples[i];if(s.radio==r.radio&&s.channel==r.channel&&s.width==r.width&&s.role==r.role){sample=s;break;}
+                let s=h.samples[i];if(s.source==boot&&s.radio==r.radio&&s.channel==r.channel&&s.width==r.width&&s.role==r.role){sample=s;break;}
             }
             if(!sample){
                 sample={time:bucket,end:t,source:boot,radio:r.radio,channel:r.channel,width:r.width,role:r.role,n:0,traffic_sum:0,traffic_peak:0,clients_peak:0,busy_sum:0,busy_n:0,signal_min:null};push(h.samples,sample);
@@ -138,6 +144,6 @@ export function open_history(boot,enabled,hours) {
         }
         frame.bands=bands;frame.updated=t;flush(true);
     }
-    function clear() { h={boot,started:time(),periods:[],samples:[],clients:[],events:[],surveys:[]};last_record=0;last_flush=0;saved=0;last_attempt=time();fs.unlink(PATH);clear_archive();flush(true); }
+    function clear() { let m=clear_store(boot,time(),hours);h={boot,epoch:m.epoch,next_seq:0,started:time(),periods:[],samples:[],clients:[],events:[],surveys:[]};last_record=0;last_flush=0;saved=m.saved;last_attempt=time();fs.unlink(PATH);flush(true); }
     return {record,event,flush,clear,survey,shutdown:()=>flush(true,true)};
 };

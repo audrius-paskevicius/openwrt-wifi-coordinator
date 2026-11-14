@@ -32,8 +32,9 @@ The tabs are **Channels**, **Clients**, **Comparison**, **History**, **Settings*
 - Uses live channel-switch announcements where supported. Otherwise it tries a compatible client handoff, then briefly restarts only the changing radio if clients remain.
 - Checks reconnection and service after a change, with rollback and temporary exclusions after failures.
 - Uses eligible DFS spectrum opportunistically, preparing it on an empty compatible helper while another radio serves clients when possible. Recent radar detections add a planning penalty with a one-hour default half-life, separate from mandatory kernel clearance and exclusion periods.
-- Records channel placement, client counts, spectrum surveys, traffic summaries, and actions for up to 120 hours (24 hours by default). Recent history stays in RAM; older history moves to flash in six-hour batches. Orderly shutdown saves pending records.
-- Draws history locally with bundled Chart.js; no CDN is required.
+- Records channel placement, client counts, spectrum surveys, traffic summaries, and actions for up to 120 hours (24 hours by default). Recent history stays in RAM; older history moves to flash at a selectable interval from 15 minutes to six hours (six hours by default). Orderly shutdown saves pending records.
+- Stores completed history once in indexed, checksummed blocks, with a transactional active checkpoint and lossless survey compaction. Graph tiles are reusable RAM caches; refreshes transfer changed tiles and update existing Chart.js charts. No CDN is required.
+- Adapts history transfers and all graph layers to the selected time window and screen width. Shared router settings control this reduction, action/missing-observation/unavailability markers, and graph popups. Stored history and exports keep their existing detail.
 - Keeps observation and steering responsive while a read-only worker calculates placements. History distinguishes unknown gaps, confirmed AP unavailability and recorded actions; calculation timings and missed samples are included in Actions exports.
 - Streams authenticated JSON and CSV [history downloads](docs/EXPORT.md) without creating export files or writing flash.
 - Shows short help beside every setting, with full explanations on hover, focus or click/tap.

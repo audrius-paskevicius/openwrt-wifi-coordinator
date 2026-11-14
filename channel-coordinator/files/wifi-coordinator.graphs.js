@@ -69,6 +69,11 @@ function baseOptions(start,end){return {
   title:{display:false}},
  y:{type:'linear',grid:{color:'#e5e5e5'},border:{color:'#999'},ticks:{color:'#444'},afterFit:function(s){s.width=80;}}}
 };}
+function displayOptions(options,view){
+ if(view&&view.display&&view.display.popups===false){options.plugins.tooltip.enabled=false;options.events=[];options.elements.point.hitRadius=0;}
+ return options;
+}
+function aggregateLabel(raw){var a=raw&&raw.aggregate;return a?'Screen summary: '+a.count+' records, '+dated(a.start)+' \u2013 '+dated(a.end)+(a.min!=null?'; observed range '+a.min+'\u2013'+a.max:'; '+a.placements+' placements'):null;}
 function line(label,data,color,extra){return Object.assign({label:label,data:data,borderColor:color,backgroundColor:color,fill:false,pointRadius:0,pointHoverRadius:3,borderWidth:2.5,tension:0,spanGaps:false},extra||{});}
 function channelData(periods,names,start,end,axis){
  axis=axis||defaultAxis;
@@ -135,7 +140,7 @@ function surveyData(surveys,start,end,axis){
   });});
  });
  return Object.keys(bins).map(function(key){var bin=bins[key];bin.points.sort(function(a,b){return a.observed-b.observed;});var points=bin.points.map(function(p,i){return Object.assign({},p,{x:[Math.max(start,p.observed),Math.min(end,bin.points[i+1]?bin.points[i+1].observed:end)]});}).filter(function(p){return p.x[1]>p.x[0];});return {
-  type:'bar',indexAxis:'y',label:'Spectrum survey '+bin.low+'–'+bin.high+' MHz',wcSurvey:true,
+  type:'bar',indexAxis:'y',label:'Spectrum survey '+bin.low+'\u2013'+bin.high+' MHz',wcSurvey:true,
   data:points,parsing:true,grouped:false,order:10,borderWidth:0,borderSkipped:false,inflateAmount:0,
   backgroundColor:function(c){return 'rgba(30,30,30,'+(0.02+0.60*Math.sqrt((c.raw?c.raw.level:0)/100))+')';},
   barThickness:function(c){var y=c.chart.scales.y;return Math.abs(y.getPixelForValue(axis.position(bin.high))-y.getPixelForValue(axis.position(bin.low)));}
@@ -143,9 +148,10 @@ function surveyData(surveys,start,end,axis){
 }
 function radarColour(level){return 'rgba(140,90,0,'+(0.90*Math.max(0,Math.min(1,level)))+')';}
 function radarGradient(){return 'linear-gradient(to right,'+radarColour(1)+','+radarColour(0)+'), #fff';}
-function radarData(records,start,end,halfLife,axis){
+function radarData(records,start,end,halfLife,axis,view){
  axis=axis||defaultAxis;
  var bins={},half=Math.max(60,halfLife||3600),step=Math.max(60,(end-start)/160,half/12);
+ if(view)step=view.display&&view.display.decimation?Math.max(1,(end-start)/Math.max(1,view.pixel_width)):Math.max(1,half/12);
  (records||[]).forEach(function(e){if(!(e.width>0)||!Number.isFinite(e.center)||e.time>end)return;
   for(var f=e.center-e.width/2;f<e.center+e.width/2;f+=20){
    axis.spans(f,Math.min(f+20,e.center+e.width/2)).forEach(function(span){
@@ -207,14 +213,30 @@ function evidenceData(rows,names,start,end,events,axis){
    else if(['placement-observed','radio-reconnect','radar-evacuation','client-departure'].includes(e.event)||e.event=='operation-complete'&&e.disconnect_events>0)
     mark('action',e.time,e.time,(e.reason||e.event)+(e.disconnect_events?' ('+e.disconnect_events+' station departures)':''));
   });
-  Object.keys(marks).forEach(function(kind){if(marks[kind].length)sets.push(line(r+' · '+labels[kind],marks[kind],kind=='unavailable'?'#b83b35':kind=='unknown'?'#777':colour(r,0),
+  Object.keys(marks).forEach(function(kind){if(marks[kind].length)sets.push(line(r+' \u00b7 '+labels[kind],marks[kind],kind=='unavailable'?'#b83b35':kind=='unknown'?'#777':colour(r,0),
    {wcEvidence:true,showLine:false,pointStyle:kind=='unavailable'?'crossRot':kind=='unknown'?'rect':'triangle',pointRadius:4,pointHoverRadius:6,pointBorderWidth:2,order:-1}));});
  });return sets;
 }
-function evidenceTitle(raw){return dated(raw.evidence.start)+(raw.evidence.end!=raw.evidence.start?' – '+dated(raw.evidence.end):'');}
+function evidenceTitle(raw){return dated(raw.evidence.start)+(raw.evidence.end!=raw.evidence.start?' \u2013 '+dated(raw.evidence.end):'');}
 function evidenceLabel(raw){return raw.evidence.radio+': '+raw.evidence.detail;}
-function channelChart(canvas,periods,names,start,end,surveys,radar,bands,events){
- var options=baseOptions(start,end),axis=spectrumAxis(bands),ticks=axis.ticks;
+function readyEvidence(rows,axis){
+ var sets=new Map();(rows||[]).forEach(function(e){var key=e.radio+':'+e.kind;if(!sets.has(key))sets.set(key,{radio:e.radio,kind:e.kind,points:[]});var y=axis?axis.position(e.anchor):e.anchor;if(y==null)return;
+  sets.get(key).points.push({x:(e.start+e.end)/2,y:y,evidence:Object.assign({},e,{detail:e.detail+(e.count>1?' ('+e.count+' records)':'')})});});
+ return Array.from(sets.values()).map(function(s){return line(s.radio+' \u00b7 '+s.kind,s.points,s.kind=='unavailable'?'#b83b35':s.kind=='unknown'?'#777':colour(s.radio,0),{wcEvidence:true,showLine:false,pointStyle:s.kind=='unavailable'?'crossRot':s.kind=='unknown'?'rect':'triangle',pointRadius:4,pointHoverRadius:6,pointBorderWidth:2,order:-1});});
+}
+function surveyCells(cells,axis){
+ var bins=new Map();(cells||[]).forEach(function(c){axis.spans(c[0],c[1]).forEach(function(span){var key=span.low+':'+span.high;if(!bins.has(key))bins.set(key,{span:span,points:[]});
+  bins.get(key).points.push({x:[c[2],c[3]],y:(span.yLow+span.yHigh)/2,observed:c[4],level:c[5],minimum:c[6],maximum:c[7],observations:c[8],low:span.low,high:span.high});});});
+ return Array.from(bins.values()).map(function(b){return {type:'bar',indexAxis:'y',label:'Spectrum survey',wcSurvey:true,data:b.points,parsing:true,grouped:false,order:10,borderWidth:0,borderSkipped:false,inflateAmount:0,
+  backgroundColor:c=>'rgba(30,30,30,'+(0.02+0.60*Math.sqrt((c.raw?c.raw.level:0)/100))+')',
+  barThickness:c=>Math.abs(c.chart.scales.y.getPixelForValue(b.span.yHigh)-c.chart.scales.y.getPixelForValue(b.span.yLow))};});
+}
+function updateChart(canvas,config,existing){
+ if(!existing)return new chartlib.Chart(canvas,config);
+ existing.data=config.data;existing.options=config.options;existing.resize();existing.update('none');return existing;
+}
+function channelChart(canvas,periods,names,start,end,surveys,radar,bands,events,view,existing){
+ var options=displayOptions(baseOptions(start,end),view),axis=spectrumAxis(bands),ticks=axis.ticks;
  options.scales.y.min=-6;options.scales.y.max=Math.max(1,axis.max)+6;
  options.scales.y.afterBuildTicks=function(s){s.ticks=ticks.map(function(t){return {value:t.value};});};
  options.scales.y.ticks={autoSkip:false,color:'#444',font:{size:11},callback:function(v){return (ticks.find(function(t){return t.value==v;})||{}).label||'';}};
@@ -228,26 +250,27 @@ function channelChart(canvas,periods,names,start,end,surveys,radar,bands,events)
   return !period||!items.slice(0,index).some(other=>!other.dataset.wcHalo&&!other.dataset.wcFill&&other.raw.period===period);
  };
  options.plugins.tooltip.callbacks={
-  title:function(items){var raw=items[0]&&items[0].raw,p=raw&&raw.period;return raw?.evidence?evidenceTitle(raw):p?dated(p.start)+' – '+dated(p.end):raw?(raw.radar?'Last radar detection: ':'Survey measured at ')+dated(raw.observed):'';},
-  label:function(c){var p=c.raw.period;return c.raw.evidence?evidenceLabel(c.raw):p?[p.radio+': primary channel '+p.channel+' / '+p.width+' MHz','Centre '+c.raw.center+' MHz · '+(p.role||'serving')]:c.raw.radar?[c.raw.low+'–'+c.raw.high+' MHz','Radar avoidance strength: '+Math.round(c.raw.level*100)+'% (not a probability)']:[c.raw.low+'–'+c.raw.high+' MHz','Congestion estimate: '+c.raw.level+' / 100'];}
+  title:function(items){var raw=items[0]&&items[0].raw,p=raw&&raw.period;return raw?.evidence?evidenceTitle(raw):p?dated(p.start)+' \u2013 '+dated(p.end):raw?(raw.radar?'Last radar detection: ':'Survey measured at ')+dated(raw.observed):'';},
+  label:function(c){var p=c.raw.period;return c.raw.evidence?evidenceLabel(c.raw):p?[p.radio+': primary channel '+p.channel+' / '+p.width+' MHz','Centre '+c.raw.center+' MHz \u00b7 '+(p.role||'serving'),aggregateLabel(p)].filter(Boolean):c.raw.radar?[c.raw.low+'\u2013'+c.raw.high+' MHz','Radar avoidance strength: '+Math.round(c.raw.level*100)+'% (not a probability)']:[c.raw.low+'\u2013'+c.raw.high+' MHz','Congestion estimate: '+Number(c.raw.level).toFixed(1)+' / 100',c.raw.observations>1?'Time-weighted display column; range '+c.raw.minimum+'\u2013'+c.raw.maximum+' from '+c.raw.observations+' observations':null].filter(Boolean);}
  };
- return new chartlib.Chart(canvas,{type:'line',data:{datasets:channelData(periods,names,start,end,axis).concat(surveyData(surveys||[],start,end,axis),radarData(radar&&radar.events,start,end,radar&&radar.half_life,axis),evidenceData(periods,names,start,end,events,axis))},options:options});
+ return updateChart(canvas,{type:'line',data:{datasets:channelData(periods,names,start,end,axis).concat(view&&view.survey_cells?surveyCells(view.survey_cells,axis):surveyData(surveys||[],start,end,axis),radarData(radar&&radar.events,start,end,radar&&radar.half_life,axis,view),view&&view.channel_evidence?readyEvidence(view.channel_evidence,axis):evidenceData(periods,names,start,end,events,axis))},options:options},existing);
 }
-function trafficChart(canvas,samples,names,start,end){
- var options=baseOptions(start,end);options.scales.y.min=0;options.scales.y.suggestedMax=0.1;
+function trafficChart(canvas,samples,names,start,end,view,existing){
+ var options=displayOptions(baseOptions(start,end),view);options.scales.y.min=0;options.scales.y.suggestedMax=0.1;
  options.scales.y.ticks.maxTicksLimit=5;options.scales.y.title={display:true,text:'Traffic (Mbit/s)',color:'#444'};
- options.plugins.tooltip.callbacks={title:function(items){return items.length?dated(items[0].raw.x)+' – '+dated(items[0].raw.end):'';},
-  label:function(c){return c.dataset.label+': '+c.raw.y.toFixed(3)+' Mbit/s average; '+c.raw.peak.toFixed(3)+' peak (5-minute summary)';}};
- return new chartlib.Chart(canvas,{type:'line',data:{datasets:trafficData(samples,names)},options:options});
+ options.plugins.tooltip.callbacks={title:function(items){return items.length?dated(items[0].raw.x)+' \u2013 '+dated(items[0].raw.end):'';},
+  label:function(c){return [c.dataset.label+': '+c.raw.y.toFixed(3)+' Mbit/s average; '+c.raw.peak.toFixed(3)+' peak (5-minute summary)',aggregateLabel(c.raw)].filter(Boolean);}};
+ return updateChart(canvas,{type:'line',data:{datasets:view&&view.traffic_points?names.map((r,i)=>{var points=view.traffic_points[r]||[];return line(r,points,colour(r,i),{radio:r,pointRadius:points.filter(p=>p.y!=null).length==1?2:0});}):trafficData(samples,names)},options:options},existing);
 }
-function clientChart(canvas,intervals,names,start,end,events){
- var options=baseOptions(start,end);options.scales.y.min=0;options.scales.y.suggestedMax=1;
+function clientChart(canvas,intervals,names,start,end,events,view,existing){
+ var options=displayOptions(baseOptions(start,end),view);options.scales.y.min=0;options.scales.y.suggestedMax=1;
  options.scales.y.ticks.maxTicksLimit=5;options.scales.y.ticks.precision=0;
  options.scales.y.title={display:true,text:'Clients',color:'#444'};
- options.plugins.tooltip.callbacks={title:function(items){var raw=items[0]&&items[0].raw,p=raw&&raw.interval;return raw?.evidence?evidenceTitle(raw):p?dated(p.start)+' – '+dated(p.end):'';},
-  label:function(c){return c.raw.evidence?evidenceLabel(c.raw):c.dataset.label+': '+c.raw.y+' client'+(c.raw.y==1?'':'s');}};
+ options.plugins.tooltip.callbacks={title:function(items){var raw=items[0]&&items[0].raw,p=raw&&raw.interval;return raw?.evidence?evidenceTitle(raw):p?dated(p.start)+' \u2013 '+dated(p.end):'';},
+  label:function(c){return c.raw.evidence?evidenceLabel(c.raw):[c.dataset.label+': '+c.raw.y+' client'+(c.raw.y==1?'':'s'),aggregateLabel(c.raw)].filter(Boolean);}};
  options.layout={padding:{top:10}};
- return new chartlib.Chart(canvas,{type:'line',data:{datasets:clientData(intervals,names,start,end).concat(evidenceData(intervals,names,start,end,events))},options:options,plugins:[clientFinPlugin]});
+ var data=view&&view.client_points?names.map((r,i)=>line(r,view.client_points[r]||[],colour(r,i),{radio:r,stepped:'after',pointRadius:c=>c.raw&&c.raw.interval&&c.raw.interval.start==c.raw.interval.end?2:0})):clientData(intervals,names,start,end);
+ return updateChart(canvas,{type:'line',data:{datasets:data.concat(view&&view.client_evidence?readyEvidence(view.client_evidence):evidenceData(intervals,names,start,end,events))},options:options,plugins:[clientFinPlugin]},existing);
 }
 function finSlant(r,i){return [-8,0,8][radioIndex(r,i)%3];}
 function clientFinStyle(r,i){
@@ -261,7 +284,7 @@ function clientFinMarks(chart){
   if(!chart.isDatasetVisible(i))return;
   for(var j=0;j+1<d.data.length;j++){
    var p=d.data[j],q=d.data[j+1];
-   if(!p.interval||p.interval!==q.interval||p.y==null||p.y!==q.y)continue;
+   if(!p.interval||!q.interval||p.interval.source!==q.interval.source||p.interval.end<q.interval.start||p.y==null||p.y!==q.y)continue;
    var a=Math.max(area.left,chart.scales.x.getPixelForValue(p.x)),b=Math.min(area.right,chart.scales.x.getPixelForValue(q.x)),y=chart.scales.y.getPixelForValue(p.y);
    if(b-a<2||y<area.top||y>area.bottom)continue;
    var phase=area.left+spacing*(i+0.5)/Math.max(1,total),first=phase+Math.ceil((a-phase)/spacing)*spacing;

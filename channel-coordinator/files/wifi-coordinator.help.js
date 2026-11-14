@@ -42,6 +42,12 @@ var summaries={
  max_attempts:'Attempts toward the same radio before a longer pause.',
  history_enabled:'Record new history; turning off pauses recording.',
  history_hours:'Maximum history age to retain and display.',
+ history_save_minutes:'Shorter intervals reduce unsaved history but write to flash more often.',
+ decimation:'Match transferred and drawn history to the graph width.',
+ triangles:'Show triangles for recorded actions.',
+ squares:'Show squares for missing observations; gaps stay blank.',
+ crosses:'Show crosses for confirmed access-point unavailability.',
+ popups:'Show graph details on hover or tap.',
  clear_history:'Delete recorded history when applying settings.'
 };
 function explain(shortText,longText,title){

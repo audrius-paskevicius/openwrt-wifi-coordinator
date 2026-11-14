@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import {open_history,set_now} from './history-test-module.uc';
-import {read_archive,merge_history,prune,bounded} from './history-storage-test.uc';
+import {merge_history,prune,bounded} from './history-storage-test.uc';
+import {history as read_archive} from './history-assertions.uc';
 let checks=0;function check(v,msg){if(!v)die(msg);checks++;}
 let t=1000000,path='/tmp/wifi-history-test.json';
 function read(){return json(fs.readfile(path));}
@@ -15,14 +16,14 @@ check(length(read().clients)==2&&read().clients[1].end==t+15,'same-boot restart 
 check(h.shutdown(),'client history checkpoint succeeds');
 set_now(t+20);h.record([row(2)]);h.flush(true);
 let merged=merge_history(read_archive(),read());
-check(length(merged.clients)==2&&merged.clients[1].end==t+20,'RAM/archive extension deduplicated');
+check(length(merged.clients)==3&&merged.clients[2].end==t+20,'shutdown closes committed intervals; resumed recording gets a new identity');
 set_now(t+40);h.record([row(2)]);h.flush(true);
-check(length(read().clients)==3&&read().clients[1].end==t+20,'missing observations leave a gap');
+check(length(read().clients)==2&&read().clients[0].end==t+20,'missing observations leave a gap');
 set_now(t+45);h=open_history('counts',false,24);h.record([row(4)]);h.flush(true);
-check(length(read().clients)==3,'disabled recording adds no counts');
+check(length(read().clients)==2,'disabled recording adds no counts');
 set_now(t+50);h=open_history('reboot',true,24);h.record([row(1)]);h.flush(true);
 check(length(read().clients)==1&&read().clients[0].source=='reboot','new boot resets RAM');
-check(length(read_archive().clients)==2,'reboot retains archived counts');
+check(length(read_archive().clients)==3,'reboot retains archived counts and new unsaved count');
 let old=read();delete old.clients;fs.writefile(path,sprintf('%J',old));
 set_now(t+55);h=open_history('reboot',true,24);h.record([row(3)]);h.flush(true);
 check(length(read().clients)==1&&length(read().samples)>0,'older RAM gains counts without losing existing summaries');

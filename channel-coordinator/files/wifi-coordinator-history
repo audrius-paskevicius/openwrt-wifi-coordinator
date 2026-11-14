@@ -1,0 +1,61 @@
+#!/usr/bin/ucode
+'use strict';
+import * as fs from 'fs';
+import * as ubus from 'ubus';
+import * as uci from 'uci';
+import {urldecode,DECODE_PLUS} from 'lucihttp';
+import {snapshot,manifest} from '/usr/share/channel-coordinator/history-store.uc';
+import {graph_tiles,action_page,marker_events,reader} from '/usr/share/channel-coordinator/history-reader.uc';
+import {history_view,evidence} from '/usr/share/channel-coordinator/history-view.uc';
+function fail(status,message){print('Status: '+status+'\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n\r\n'+sprintf('%J',{error:message}));exit(0);}
+if(getenv('REQUEST_METHOD')!='POST')fail('405 Method Not Allowed','POST required');
+if(split(getenv('CONTENT_TYPE') ?? '',';')[0]!='application/x-www-form-urlencoded')fail('415 Unsupported Media Type','Invalid encoding');
+let size=getenv('CONTENT_LENGTH') ?? '';
+if(!match(size,/^[0-9]+$/)||int(size)<1||int(size)>16384)fail('400 Bad Request','Invalid request size');
+let raw=fs.stdin.read(int(size)),args={};if(length(raw)!=int(size))fail('400 Bad Request','Incomplete request');
+for(let pair in split(raw,'&')){
+ let p=split(pair,'=');if(length(p)!=2)fail('400 Bad Request','Invalid form');
+ let k=urldecode(p[0],DECODE_PLUS),v=urldecode(p[1],DECODE_PLUS);
+ if(index(['sessionid','hours','width','kind','offset','end','have'],k)<0||exists(args,k))fail('400 Bad Request','Invalid field');args[k]=v;
+}
+if(!match(args.sessionid ?? '',/^[a-f0-9]{32}$/)||args.sessionid=='00000000000000000000000000000000')fail('403 Forbidden','Log in to LuCI');
+function integer(k,low,high,def){let s=args[k] ?? ''+def;if(!match(s,/^[0-9]{1,12}$/)||int(s)<low||int(s)>high)fail('400 Bad Request','Invalid '+k);return int(s);}
+let now=time(),hours=integer('hours',1,120,6),width=integer('width',160,2048,800),offset=integer('offset',0,1000000,0),end=integer('end',0,now,now),kind=args.kind ?? 'graphs';
+if(index(['graphs','actions'],kind)<0)fail('400 Bad Request','Invalid kind');
+let bus=ubus.connect();
+function allowed(scope,object,method){return bus?.call('session','access',{ubus_rpc_session:args.sessionid,scope,object,function:method})?.access==true;}
+let dir='/etc/wifi-coordinator/',ram='/tmp/wifi-coordinator-history.json',state='/tmp/channel-coordinator-state.json';
+if(!allowed('file',dir,'list')||!allowed('file',ram,'read')||!allowed('file',state,'read')||!allowed('uci','channel_coordinator','read')||!allowed('uci','wifi_coordinator_display','read'))fail('403 Forbidden','This session cannot read Wi-Fi history');
+let c=uci.cursor(),retention=max(1,min(120,int(c.get('channel_coordinator','main','history_hours') ?? 24))),start=max(now-retention*3600,end-min(hours,retention)*3600),max_age=max(60,min(7200,int(c.get('channel_coordinator','main','max_age') ?? 900)));
+if(end<=start)fail('400 Bad Request','Requested history has expired');
+let display={};for(let k in ['decimation','triangles','squares','crosses','popups'])display[k]=c.get('wifi_coordinator_display','main',k)!='0';
+let have=args.have?split(args.have,','):[];
+if(length(have)>256||length(filter(have,x=>!match(x,/^[a-f0-9]{32}$/))))fail('400 Bad Request','Invalid tile inventory');
+if(!allowed('file',dir+'history-index.json','read')||!allowed('file',dir+'block-*.json','read')||!allowed('file',dir+'tail-*.json','read'))fail('403 Forbidden','This session cannot read the history index');
+let snap=null;
+try{
+ let index=manifest();if(!index)fail('503 Service Unavailable','History migration has not completed');
+ snap=snapshot();
+ let result;
+ if(kind=='actions')result=action_page(snap,start,end,offset);
+ else {
+  let controller={};try{controller=json(fs.readfile(state));}catch(e){}
+  if(display.decimation){
+   result=graph_tiles(snap,{start,end,width,max_age,have,incremental:true});result.protocol=3;
+   let read=reader(snap),periods=read.data(now-retention*3600,now,'periods').periods,clients=read.data(now-retention*3600,now,'clients').clients,events=marker_events(snap,start,end);
+   let flags={action:display.triangles,unknown:display.squares,unavailable:display.crosses};
+   result.channel_evidence=evidence(periods,events,start,end,width,true,flags,true);
+   result.client_evidence=evidence(clients,events,start,end,width,true,flags,false);
+   let page=action_page(snap,start,end,0);result.actions=page.actions;result.action_total=page.action_total;
+  }else{
+   let read=reader(snap),h=read.data(start-max_age,end);
+   result=history_view({start,end,width,max_age,canonical:true,display,sources:['indexed']},()=>h);
+  }
+  result.radar=controller.radar ?? {};result.declared_bands=controller.declared_bands ?? [];
+  for(let k in ['enabled','retention_hours','archive_error','archive_next','archive_interval','dropped_records','updated'])result[k]=snap.status[k];
+  result.archive_saved=snap.manifest.saved;result.archive_revision=snap.manifest.revision;
+ }
+ result.start=start;result.end=end;result.pixel_width=width;result.display=display;result.read_errors=[];
+ snap.release();snap=null;
+ print('Content-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\r\n'+sprintf('%J',result));
+}catch(e){if(snap)snap.release();fail('503 Service Unavailable','History could not be prepared: '+e);}

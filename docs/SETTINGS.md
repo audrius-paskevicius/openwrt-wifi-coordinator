@@ -63,10 +63,10 @@ These are fresh-install defaults, not a migration that overwrites existing choic
 | Admission | 3 service-index points, raised by evidence uncertainty when needed |
 | Client handoff | 90-second budget; decisive escalation; brief reconnect fallback enabled |
 | DFS | Preparation enabled; automatic helper; **3600-second radar-memory half-life** |
-| History | Recording enabled; retain up to 24 hours; six-hour flash offloads |
+| History | Recording enabled; retain up to 24 hours; selectable flash offloads, six hours by default |
 | Verified placements | Persistence enabled; checkpoint at most every six hours |
 
-The one-hour radar half-life, six-hour compatibility exclusions and six-hour flash intervals are separate mechanisms. Missing configuration does not mean fresh defaults: for example, missing `enabled` stops the daemon; missing `mode`, `scan_type` and `dfs_mode` fall back to Observe, passive scans and DFS off.
+The one-hour radar half-life, six-hour compatibility exclusions and flash-save intervals are separate mechanisms. Missing configuration does not mean fresh defaults: for example, missing `enabled` stops the daemon; missing `mode`, `scan_type` and `dfs_mode` fall back to Observe, passive scans and DFS off.
 
 ## Channel coordination: retained controls
 
@@ -129,14 +129,34 @@ All shared strength, timing, protection, signal and retry controls are on Settin
 
 ## History
 
+**Settings → Graph display** contains five shared router settings, stored in the
+separate `wifi_coordinator_display` UCI configuration. All default to enabled.
+They apply to every browser on its next History refresh and survive reboot.
+Changing only these display settings does not trigger a coordinator restart.
+
+| Key | Display behaviour |
+| --- | --- |
+| `decimation` | Adapt transfers and plotting to the visible time range and plotting width. Preserve extrema, integer client counts, channel activity and unknown gaps. Congestion uses time-weighted intervals with observed ranges. Disable for all available stored detail. |
+| `triangles` | Show recorded-action markers. |
+| `squares` | Show missing-observation markers; hidden markers leave gaps blank. |
+| `crosses` | Show confirmed access-point unavailability markers. |
+| `popups` | Enable graph hover/tap details and graph-heading/legend hints. Settings explanations remain available. |
+
+These controls never alter history recording, retention, export detail or radio
+decisions. Recent actions are paged in groups of 100 without aggregation. With
+adaptation enabled, crowded markers report a count and interval; mixed channel
+placements and reduced value ranges are identified in popups. Full-detail mode
+cannot recover measurements already absent from stored five-minute summaries.
+
 | Key | Why keep it / precise scope |
 | --- | --- |
 | `history_enabled` | Pauses new recording without deleting existing history. |
 | `history_hours` | Maximum retention and both graph/export selection ranges (up to 120 hours), subject to the documented RAM/free-flash safeguards. |
+| `history_save_minutes` | Scheduled RAM-to-flash history save interval: 15–360 minutes, default 360. UI presets: 15 minutes, 30 minutes, 1 hour, 3 hours, 6 hours. Capped at the retention window. Does not change recording cadence, channel decisions, verified-placement checkpoints or radar-memory saves. |
 | `clear_history` | Explicit one-shot deletion, reset after use. Independent of pausing recording; does not erase radar memory. |
 
-Upgrades reduce saved retention above 120 hours to 120; smaller settings are preserved. The recorder also enforces the cap when reading an older configuration. History skips batches older than 120 hours before reading; a shorter saved retention filters what it displays. Exports skip batches older than the saved retention. Physical deletion remains part of scheduled six-hour maintenance while the controller runs, or orderly shutdown. Reload an already open History or Storage page after applying a new retention value so its selectors use the saved limit.
+Upgrades reduce saved retention above 120 hours to 120; smaller settings are preserved. The recorder also enforces the cap when reading an older configuration. History and exports use indexed block time extents to select retained data. Physical deletion remains part of maintenance at the selected save interval while the controller runs, or orderly shutdown. Reload an already open History or Storage page after applying a new retention value so its selectors use the saved limit.
 
 These settings are on **Storage & export**. History's Show and exports' Period selectors are independent local viewing/download choices, each limited by saved retention. They do not change recording or stored retention.
 
-History recording, retaining working wireless placements, and radar-memory persistence serve different purposes; merging their controls would obscure what survives reboot. Storage mechanics remain fixed: six-hour batched offloads, recent RAM cache, and an orderly shutdown checkpoint. No user-facing flash-write frequency knob is needed.
+History recording, retaining working wireless placements, and radar-memory persistence serve different purposes; merging their controls would obscure what survives reboot. History save frequency is selectable. Shorter intervals reduce the observations exposed to sudden power loss but increase flash writes and wear: 30 minutes permits up to 48 scheduled saves per day, versus 4 at six hours, with an additional save attempted on orderly shutdown. An unchanged buffer does not create another data block. Buffer pressure can trigger an earlier save. Existing installations without the setting keep the six-hour default. The selected interval is not a guarantee: failed writes, a full RAM buffer or stalled recording can produce larger gaps. The active interval, last successful save, next due time and write errors appear in History storage. Retention remains independent.

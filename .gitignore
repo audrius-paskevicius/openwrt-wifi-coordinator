@@ -21,3 +21,6 @@ signing-private/
 backups/
 .env
 .env.*
+
+wifi-coordinator/history-store-test.uc
+wifi-coordinator/history-reader-test.uc

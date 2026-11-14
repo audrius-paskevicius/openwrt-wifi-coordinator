@@ -15,6 +15,7 @@ trap 'rm -rf "$ROOT"' EXIT HUP INT TERM
 mkdir -p "$ROOT/etc/config" "$ROOT/etc/init.d" "$ROOT/usr/share/channel-coordinator" "$ROOT/usr/share/radio-prefer"
 mkdir -p "$ROOT/www/luci-static/resources/view" "$ROOT/usr/share/luci/menu.d" "$ROOT/usr/share/rpcd/acl.d" "$ROOT/lib/upgrade/keep.d"
 cp "$CC/files/channel-coordinator.config" "$ROOT/etc/config/channel_coordinator"
+cp "$CC/files/wifi-coordinator-display.config" "$ROOT/etc/config/wifi_coordinator_display"
 cp "$RP/files/radio-prefer.config" "$ROOT/etc/config/radio_prefer"
 cp "$CC/files/channel-coordinator.init" "$ROOT/etc/init.d/channel-coordinator"
 cp "$RP/files/radio-prefer.init" "$ROOT/etc/init.d/radio-prefer"
@@ -28,7 +29,10 @@ sed -i 's|../../radio-prefer/files/steering.uc|../radio-prefer/steering.uc|' "$R
 cp "$RP/files/steering.uc" "$ROOT/usr/share/radio-prefer/"
 sed -i 's|../../channel-coordinator/files/handoff.uc|../channel-coordinator/handoff.uc|' "$ROOT/usr/share/radio-prefer/steering.uc"
 cp "$CC/files/history-export.uc" "$ROOT/usr/share/channel-coordinator/"
+cp "$CC/files/history-codec.uc" "$CC/files/history-store.uc" "$CC/files/history-reader.uc" "$ROOT/usr/share/channel-coordinator/"
+cp "$CC/files/history-view.uc" "$ROOT/usr/share/channel-coordinator/"
 mkdir -p "$ROOT/www/cgi-bin"
+cp "$CC/files/wifi-coordinator-history" "$ROOT/www/cgi-bin/"
 sed "s/@WIFI_COORDINATOR_VERSION@/$VERSION/g" "$CC/files/wifi-coordinator-export" > "$ROOT/www/cgi-bin/wifi-coordinator-export"
 cp "$CC/files/wifi-settings.js" "$CC/files/wifi-channels.js" "$CC/files/wifi-comparison.js" "$CC/files/wifi-history.js" "$CC/files/wifi-storage.js" "$CC/files/wifi-disclaimer.js" "$RP/files/wifi-clients.js" "$ROOT/www/luci-static/resources/view/"
 for view in "$ROOT/www/luci-static/resources/view/"*.js; do
@@ -38,6 +42,7 @@ mkdir -p "$ROOT/www/luci-static/resources/wifi-coordinator"
 cp "$CC/files/wifi-coordinator.chart.js" "$ROOT/www/luci-static/resources/wifi-coordinator/chart.js"
 cp "$CC/files/wifi-coordinator.graphs.js" "$ROOT/www/luci-static/resources/wifi-coordinator/graphs.js"
 cp "$CC/files/wifi-coordinator.time.js" "$ROOT/www/luci-static/resources/wifi-coordinator/time.js"
+cp "$CC/files/wifi-coordinator.history.js" "$ROOT/www/luci-static/resources/wifi-coordinator/history.js"
 cp "$CC/files/wifi-coordinator.help.js" "$ROOT/www/luci-static/resources/wifi-coordinator/help.js"
 cp "$BASE/../DISCLAIMER.txt" "$ROOT/usr/share/channel-coordinator/DISCLAIMER.txt"
 ucode -e 'import * as fs from "fs"; let source=fs.readfile(ARGV[0]),text=fs.readfile(ARGV[1]); if(!source||!text)die("Missing disclaimer source"); print(replace(replace(source,"@WIFI_COORDINATOR_DISCLAIMER_JSON@",sprintf("%J",text)),"@WIFI_COORDINATOR_VERSION@",ARGV[2]));' "$CC/files/wifi-coordinator.disclaimer.js" "$BASE/../DISCLAIMER.txt" "$VERSION" > "$ROOT/www/luci-static/resources/wifi-coordinator/disclaimer.js"
@@ -48,6 +53,7 @@ cp "$CC/files/acl.json" "$ROOT/usr/share/rpcd/acl.d/luci-app-channel-coordinator
 cp "$RP/files/acl.json" "$ROOT/usr/share/rpcd/acl.d/luci-app-radio-prefer.json"
 cat > "$ROOT/lib/upgrade/keep.d/wifi-coordinator" <<'EOF'
 /etc/config/channel_coordinator
+/etc/config/wifi_coordinator_display
 /etc/config/radio_prefer
 /etc/radio-prefer/
 /etc/wifi-coordinator/
@@ -61,6 +67,7 @@ cat > "$ROOT/lib/upgrade/keep.d/wifi-coordinator" <<'EOF'
 /usr/share/channel-coordinator/
 /usr/share/radio-prefer/
 /www/cgi-bin/wifi-coordinator-export
+/www/cgi-bin/wifi-coordinator-history
 /www/luci-static/resources/view/wifi-channels.js
 /www/luci-static/resources/view/wifi-settings.js
 /www/luci-static/resources/view/wifi-comparison.js
@@ -81,10 +88,11 @@ find "$ROOT" -type d -exec chmod 755 {} \;
 find "$ROOT" -type f -exec chmod 644 {} \;
 chmod 755 "$ROOT/etc/init.d/channel-coordinator" "$ROOT/etc/init.d/radio-prefer"
 chmod 755 "$ROOT/www/cgi-bin/wifi-coordinator-export"
+chmod 755 "$ROOT/www/cgi-bin/wifi-coordinator-history"
 "$APK_TOOL" mkpkg --files "$ROOT" --sign-key "$SIGN_KEY" \
  --info name:luci-app-wifi-coordinator --info version:"$VERSION" --info arch:noarch \
  --info license:MIT --info description:'AI-generated Wi-Fi channel planning and steering; use at your own risk' \
- --info 'depends:luci-base iw usteer ucode ucode-mod-fs ucode-mod-ubus ucode-mod-uci ucode-mod-uloop ucode-mod-nl80211 !luci-app-radio-prefer !luci-app-channel-coordinator' \
+ --info 'depends:luci-base iw usteer ucode ucode-mod-fs ucode-mod-ubus ucode-mod-uci ucode-mod-uloop ucode-mod-nl80211 ucode-mod-digest !luci-app-radio-prefer !luci-app-channel-coordinator' \
  --script "post-install:$BASE/post-install" --script "pre-upgrade:$BASE/pre-upgrade" \
  --script "post-upgrade:$BASE/post-install" --script "pre-deinstall:$BASE/pre-deinstall" \
  --output "$OUT/luci-app-wifi-coordinator-$VERSION.apk"

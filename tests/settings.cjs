@@ -17,9 +17,9 @@ class Section {
  taboption(tab,...args){const o=this.option(...args);o.tab=tab;this.tabs[tab].children.push(o);return o;}
 }
 class Map {
- constructor(){this.children=[];}
+ constructor(config){this.children=[];this.config=config;}
  chain(name){this.chained=name;}
- section(type,name){const s=new Section(name);this.children.push(s);return s;}
+ section(type,name){const s=new Section(name);s.config=this.config;this.children.push(s);return s;}
  render(){return Promise.resolve(E('form',{},[]));}
 }
 const form={Map,NamedSection:Section,Value:'text',ListValue:'select',Flag:'flag',DynamicList:'list',SectionValue:'section',DummyValue:'dummy'};
@@ -32,6 +32,9 @@ const page=new Function('view','form','uci','rpc','fs','poll','help','E','_','L'
  {add:fn=>polls.push(fn)},{compact:()=>{},sectionStatus:(s,n)=>{s.statusNode=n;}},E,x=>x,{resource:x=>x,url:x=>x},require('./time.cjs'));
 function option(name,section='main'){const o=options.find(x=>x.option===name&&x.section===section);assert(o,'Missing '+section+'.'+name);return o;}
 module.exports=page.renderPage([null,null,null,state]).then(async()=>{
+ const display=sections.find(s=>s.config==='wifi_coordinator_display');assert(display,'shared router graph settings have a separate UCI map');
+ assert.deepEqual(display.children.map(o=>o.option),['decimation','triangles','squares','crosses','popups']);
+ for(const o of display.children){assert.equal(o.type,'flag');assert.equal(o.default,'1');assert.equal(o.rmempty,false);assert(o.description.length>60);}
  for(const name of ['retry_delay','scan_wait','scan_batch','cac_timeout','csa_count','ban_seconds','wide_threshold'])assert(!options.some(x=>x.option===name));
  for(const radio of radios){
   const name=radio['.name'];
