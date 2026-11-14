@@ -1,12 +1,30 @@
 # Validation
 
-Source release: **0.7.0-r22**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r23**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite covers viewport requests, response-cache isolation/retry, graph display controls and existing chart semantics. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 58 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r23 Settings organization and survey default (2026-11-14)
+
+Packages the Settings tabs, download-only Export page and 120-second survey
+pause default previously applied directly after r22. Existing configured values
+are preserved during upgrade. The scan/operation scheduling exception described
+below remains unresolved; this release changes the default, not that scheduler.
+
+Portable source/UI checks, native main compilation and shell syntax checks passed.
+The signed APK verified against the router's installed public key. All 53 checked
+source-derived package files matched the checkout, accounting for documented
+version/import substitutions; all four release-asset checksums passed. The
+transaction upgraded only Wi-Fi Coordinator from r22 to r23. All 52 installed
+non-configuration files matched the extracted APK, all four saved configuration
+hashes were unchanged, and the saved survey interval remained 120 seconds.
+Coordinator PID 13151 resumed scanning; history timestamps advanced without an
+archive error or safety stop. A pre-upgrade backup was retained off-router. No
+new RF policy or performance claims are made for this packaging update.
 
 ## Default survey pause: 120 seconds (2026-11-14, after r22)
 
