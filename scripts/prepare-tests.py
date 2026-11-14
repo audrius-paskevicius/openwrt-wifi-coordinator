@@ -14,6 +14,9 @@ def read(path):
 def write(name, content):
     (tests / name).write_text(content.replace("\r\n", "\n"), encoding="utf-8")
 
+write("planning-job-test.uc", read(production / "planning-job.uc").replace(
+    "/tmp/wifi-coordinator-plan.", "/tmp/wifi-coordinator-plan-test."))
+
 
 history = read(production / "history.uc")
 history = history.replace("/tmp/wifi-coordinator-history.json", "/tmp/wifi-history-test.json")
@@ -48,6 +51,12 @@ reader = reader.replace("/tmp/wifi-history-tiles", "/tmp/wifi-history-test-tiles
 write("history-reader-test.uc", reader)
 
 main = read(production / "main.uc")
+start = main.index("function inventory()")
+end = main.index("function allclients(", start)
+guard_start = main.index("function planning_result(")
+guard_end = main.index("function accept_comparison(", guard_start)
+write("test-observation-inventory.uc", read(root / "tests/observation-header.uc") + "\n" +
+      main[start:end] + main[guard_start:guard_end] + "\n" + read(root / "tests/observation-cases.uc"))
 start = main.index("function survey_action(")
 end = main.index("function history(", start)
 write("test-owner-errors.uc", read(root / "tests/owner-errors-header.uc") + "\n" +

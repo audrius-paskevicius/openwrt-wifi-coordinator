@@ -15,7 +15,7 @@ function scan_quality(rows){
 export function open_history(boot,enabled,hours,save_minutes) {
     hours=max(1,min(120,hours));
     let interval=save_interval(save_minutes,hours);
-    let h,last_record=0,last_flush=0,last_pressure=0;
+    let h,last_record=0,last_flush=0,last_pressure=0,unknown={};
     try{h=restore(boot,hours,time());}
     catch(e){
         // A damaged history archive must not prevent channel coordination.
@@ -62,6 +62,7 @@ export function open_history(boot,enabled,hours,save_minutes) {
         last_record=t;h.archive_dirty=true;
         let bucket=int(t/300)*300;
         for(let r in rows){
+            if(r.availability=='unknown'){unknown[r.radio]=true;continue;}
             // Positive hostapd evidence only. Missing/failed reads stay unknown.
             if(r.availability=='unavailable'){
                 let interval=null;
@@ -82,16 +83,17 @@ export function open_history(boot,enabled,hours,save_minutes) {
             if(type(r.clients)=='int'&&r.clients>=0){
                 let count=null;
                 for(let i=length(h.clients)-1;i>=0;i--)if(h.clients[i].radio==r.radio){count=h.clients[i];break;}
-                let continuous=count&&count.source==boot&&t>=count.end&&t-count.end<=15&&(!last_down||last_down.end<=count.end);
+                let continuous=!unknown[r.radio]&&count&&count.source==boot&&t>=count.end&&t-count.end<=15&&(!last_down||last_down.end<=count.end);
                 if(continuous)count.end=t;
                 if(!continuous||count.count!=r.clients)
                     push(h.clients,{radio:r.radio,source:boot,start:t,end:t,count:r.clients});
             }
             let period=null;
             for(let i=length(h.periods)-1;i>=0;i--)if(h.periods[i].radio==r.radio){period=h.periods[i];break;}
-            if(!period||period._session&&period._session!=(h.session ?? boot)||t-period.end>15||last_down&&last_down.end>period.end||period.channel!=r.channel||period.width!=r.width||period.center!=r.center||period.role!=r.role){
+            if(unknown[r.radio]||!period||period._session&&period._session!=(h.session ?? boot)||t-period.end>15||last_down&&last_down.end>period.end||period.channel!=r.channel||period.width!=r.width||period.center!=r.center||period.role!=r.role){
                 period={radio:r.radio,channel:r.channel,center:r.center,width:r.width,role:r.role,start:t,end:t};push(h.periods,period);
             }else period.end=t;
+            delete unknown[r.radio];
             let sample=null;
             for(let i=length(h.samples)-1;i>=0&&h.samples[i].time>=bucket;i--){
                 let s=h.samples[i];if(s.source==boot&&s.radio==r.radio&&s.channel==r.channel&&s.width==r.width&&s.role==r.role){sample=s;break;}

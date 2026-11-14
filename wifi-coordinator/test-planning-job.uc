@@ -1,6 +1,6 @@
 import * as uloop from 'uloop';
 import * as fs from 'fs';
-import {create_job} from '../channel-coordinator/files/planning-job.uc';
+import {create_job} from './planning-job-test.uc';
 import {choose} from '../channel-coordinator/files/planner.uc';
 import {group} from '../channel-coordinator/files/policy.uc';
 let checks=0;function check(v,s){if(!v)die('FAIL: '+s+'\n');checks++;}

@@ -35,9 +35,24 @@ Changing byte counters and DFS elapsed-time counters do not continually discard
 work; traffic/airtime scores describe the captured observations. No second
 decision owner, reduced candidate spectrum or weaker movement threshold is added.
 
-Workers communicate through an anonymous pipe. Captured configuration and
-authentication-bearing helper text remain private process memory; they are not
-written into history or exports. Planning timing records contain durations only.
+Workers publish results through a private per-job directory in `/tmp`, with a
+4 MiB result limit. The inherited output file is flushed and closed before an
+atomic rename makes it readable; only a small completion notice uses the pipe.
+This avoids partial-message loss in older uloop libraries. There is no flash
+write or filesystem sync. The owner validates the result identity and envelope,
+then removes it after acceptance, rejection or cancellation. Opening the output
+before fork prevents a cancelled child from recreating deleted job files. Dead
+owner directories are reclaimed using PID and process-start identity. Captured
+authentication-bearing helper text remains private process memory; neither it
+nor the worker result is written into history or exports. Timing records contain
+durations only.
+
+Live placements require a known primary frequency, supported width and consistent
+centre/member frequencies from the interface and PHY snapshot. An incomplete
+transition reading pauses comparison and final action validation; it cannot
+become a fabricated placement, zero-client count or traffic sample. Sampled incomplete readings
+break history continuity even when shorter than the usual sampling-gap tolerance.
+Fresh valid readings restore observation without changing channel-scoring policy.
 
 The authenticated history endpoint checks access to the history index, block/checkpoint namespaces, recent RAM data, controller status and settings before reading. Its bounded POST request includes the desired range, width and optional tile inventory. It never accepts filesystem paths.
 

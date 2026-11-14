@@ -1,12 +1,54 @@
 # Validation
 
-Source release: **0.7.0-r21**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r22**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite covers viewport requests, response-cache isolation/retry, graph display controls and existing chart semantics. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 52 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r22 Reliable planning results and live observations (2026-11-14)
+
+The worker calculation and channel-scoring policy are unchanged. Large results
+now use a bounded private RAM file with atomic publication, avoiding partial pipe
+message loss reproduced on ucode 2026.01.16~85922056-r2. The controller keeps
+processing events while the worker runs; this path performs no flash save or sync.
+Incomplete live channel geometry is treated as unknown before planning, counters
+or history can consume it. The Channels page marks the temporary unknown state.
+
+Native worker lifecycle checks passed, along with 169 large-result, integrity,
+cleanup and restart assertions. Eighty transfers of a 568,892-byte nested result
+completed without loss in 14.57 seconds, including test serialization/comparison.
+This timing is a stress-fixture observation, not a production decision latency.
+Tests reject oversized, truncated and wrong-job results, preserve live owners,
+reclaim dead-owner files and handle a worker exiting without publication.
+The calculation-equivalence test retains the same synchronous/background result.
+
+The actual inventory/acceptance paths passed 72 geometry and missing-observation
+checks. Recording passed 24 client-continuity checks, including short unknown
+intervals without invented zero counts, traffic or confirmed outages. Related
+native checks passed: 15 snapshot-validity, 144 policy, 41 controller, 148 planner/
+radar/survey, 30 service-score, 1,130 executor, 1,023 recovery, 18 width-limit,
+six comparison-snapshot, 21 scanner-quality, 23 history, 42 export, 69 graph-view,
+four owner-error and five reconnect-recovery assertions. Portable source/UI
+checks, entry-point compilation and shell syntax checks also passed.
+
+The signed APK verified against the project's public key. Its extracted files
+matched source with the documented build-time import substitution; installed
+policy, planner, controller, executor, survey and radar files remained unchanged.
+Upgrade changed only this package, and all four operational/display UCI files
+remained byte-identical. A pre-upgrade backup of 406 files was verified locally.
+
+During 431 seconds of live observation after installation, five comparisons
+completed with no failed or discarded results, taking 2.41-3.63 seconds. Four
+complete sweeps covered all 41 frequencies without omissions. Channel placements
+remained 124/160, 161/80 and 13/20 MHz. The first occupied-radio sweep took 156
+seconds (146 seconds immediately before upgrade); later sweeps took 24-27 seconds
+when the scanner was available. Scan pacing and duty policy were unchanged.
+All three history charts rendered without a UI error; recording was current,
+with no archive error or newly invalid placement. This short observation plus
+the isolated tests does not establish long-term reliability or RF performance.
 
 ## r21 history text correction (2026-11-14)
 

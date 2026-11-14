@@ -5,6 +5,7 @@ import * as ubus from 'ubus';
 import * as uci from 'uci';
 import * as uloop from 'uloop';
 import {create_job} from './planning-job.uc';
+import {observed_placement} from './observation.uc';
 import {open_history} from './history.uc';
 import {channel, group, same, same_block, overlap, permitted, delta_busy, dfs_ready, uses_dfs, traffic_sample,declared_bands,dfs_policy,placement_rejected} from './policy.uc';
 import {survey_covers,move_method,configured_channels,configured_widths,frequency,switch_methods,setting_integer,hardware_widths,placements,live_width} from './policy.uc';
@@ -266,9 +267,14 @@ function inventory() {
         }
         let live=null;
         for(let i in interfaces ?? []) if(i.ifname==aps[0].ifname) live=i;
-        if(!live) continue;
-        let width=live_width(live.channel_width);
-        if(!width||live.wiphy_freq>=5925) {unsafe=true;width=width ?? 160;}
+        let p=phyinfo[live?.wiphy],g=observed_placement(live,p?.caps);
+        if(!g){
+            push(unavailable_rows,{radio:name,availability:'unknown'});
+            state.radios[name] ??= {};
+            state.radios[name].observation_unknown=true;
+            delete traffic[name];delete rates[name];delete quiet_since[name];
+            continue;
+        }
         let clients={},authorized={},signals={},client_data={},bytes=0,client_capacity=0;
         for(let ap in aps) {
             let c=call('hostapd.'+ap.ifname,'get_clients');
@@ -288,9 +294,7 @@ function inventory() {
         let identities=join(' ',sort(keys(clients)));
         let reading=traffic_sample(prev,rates[name],quiet_since[name],t,bytes,identities,cfg.max_mbps);
         rates[name]=reading.rate;quiet_since[name]=reading.quiet;traffic[name]=reading.sample;
-        let band=live.wiphy_freq<3000?'2g':'5g', g=group(live.wiphy_freq,width,live.center_freq1) ?? {freq:live.wiphy_freq,center:live.center_freq1,width,members:[live.wiphy_freq],sec:0};
-        g.center=live.center_freq1 ?? g.center;
-        let p=phyinfo[live.wiphy] ?? {caps:{},csa:false},config=rcfg(name,band,p.caps,p.csa,p.bands?.[band]);
+        let band=live.wiphy_freq<3000?'2g':'5g',config=rcfg(name,band,p.caps,p.csa,p.bands?.[band]);
         let reg=request(N.NL80211_CMD_GET_REG,0,{wiphy:live.wiphy});
         if(length(filter(interfaces,i=>i.wiphy==live.wiphy))!=length(aps))unsafe=true;
         push(out,{name,band,aps,ifname:aps[0].ifname,phy:live.wiphy,caps:p.caps,csa:p.csa,
@@ -339,6 +343,7 @@ function sample(radios) {
             if(b!=null) evidence[key]={busy:b,at:t};
         }
         let s=state.radios[r.name] ?? {}; state.radios[r.name]=s;
+        delete s.observation_unknown;
         if(s.channel!=null&&(s.channel!=channel(r.current.freq)||s.width!=r.current.width||s.center!=r.current.center))
             history({event:'placement-observed',radio:r.name,from:s.channel,to:channel(r.current.freq),width:r.current.width});
         s.channel=channel(r.current.freq); s.width=r.current.width;s.center=r.current.center;
@@ -462,6 +467,9 @@ function calculation(radios,p) {
     };
 }
 function planning_result(kind,radios,p) {
+    if(length(filter(unavailable_rows,r=>r.availability=='unknown'))){
+        planning.cancel('Live radio observation incomplete');return null;
+    }
     let key=planning_key(radios,p),answer=planning.take(kind,key);
     if(answer?.error)die(answer.error);
     if(answer){

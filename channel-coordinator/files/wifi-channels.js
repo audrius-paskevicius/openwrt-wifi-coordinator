@@ -29,8 +29,8 @@ return view.extend({
   function refresh(st){
    var header=E('thead',{},E('tr',{},['Radio','Channel / width','Clients','Traffic','Minimum residence','Radar check'].map(function(x){return E('th',{'scope':'col'},_(x));}))),rows=[];
    Object.keys(st.radios||{}).forEach(function(name){var r=st.radios[name];rows.push(E('tr',{},[
-    name,(r.channel||'?')+' / '+(r.width||'?')+' MHz',String(r.clients||0),Number(r.mbps||0).toFixed(3)+' Mbps',
-    timefmt.seconds(r.cooldown_left||0)+' s',r.dfs?(r.dfs_ready?'Cleared DFS channel':'DFS clearance required'):'Not a DFS channel'
+    name,r.observation_unknown?'Observation temporarily incomplete':(r.channel||'?')+' / '+(r.width||'?')+' MHz',r.observation_unknown?'Unknown':String(r.clients||0),r.observation_unknown?'Unknown':Number(r.mbps||0).toFixed(3)+' Mbps',
+    timefmt.seconds(r.cooldown_left||0)+' s',r.observation_unknown?'Unknown':r.dfs?(r.dfs_ready?'Cleared DFS channel':'DFS clearance required'):'Not a DFS channel'
    ].map(function(v){return E('td',{},v);})));});
    var p=st.proposal, dfs=st.dfs;
    var items=[E('div',{'class':'wc-table-wrap'},E('table',{'class':'table wc-table'},[header,E('tbody',{},rows)]))],cards=[];
