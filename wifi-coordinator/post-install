@@ -11,4 +11,9 @@ rm -f /etc/rc.d/K9channel-coordinator
 /etc/init.d/channel-coordinator start
 /etc/init.d/rpcd reload
 rm -f /tmp/luci-indexcache /tmp/luci-indexcache.*.json
+# Older versions prepared disposable graph tiles on the router.
+if [ -d /tmp/wifi-history-tiles ] && [ ! -L /tmp/wifi-history-tiles ]; then
+ rm -f /tmp/wifi-history-tiles/*.json /tmp/wifi-history-tiles/*.new
+ rmdir /tmp/wifi-history-tiles 2>/dev/null || true
+fi
 exit 0

@@ -136,7 +136,7 @@ Changing only these display settings does not trigger a coordinator restart.
 
 | Key | Display behaviour |
 | --- | --- |
-| `decimation` | Adapt transfers and plotting to the visible time range and plotting width. Preserve extrema, integer client counts, channel activity and unknown gaps. Congestion uses time-weighted intervals with observed ranges. Disable for all available stored detail. |
+| `decimation` | Adapt plotting to screen width in a browser worker. Preserve extrema, integer client counts, channel activity and unknown gaps. Congestion uses time-weighted intervals with observed ranges. Disable for all available stored detail; this mode also runs in the browser. |
 | `triangles` | Show recorded-action markers. |
 | `squares` | Show missing-observation markers; hidden markers leave gaps blank. |
 | `crosses` | Show confirmed access-point unavailability markers. |

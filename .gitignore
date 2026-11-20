@@ -24,5 +24,6 @@ backups/
 
 wifi-coordinator/history-store-test.uc
 wifi-coordinator/history-reader-test.uc
+wifi-coordinator/history-transfer-test.uc
 wifi-coordinator/planning-job-test.uc
 wifi-coordinator/test-observation-inventory.uc

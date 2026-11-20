@@ -40,6 +40,7 @@
 .wifi-coordinator .wc-summary p { margin: 0 0 6px; }
 .wifi-coordinator .wc-summary ul { margin: 4px 0 0; padding-left: 20px; }
 .wifi-coordinator .wc-caption { display: block; margin: 8px 0 18px; color: #596570; }
+.wifi-coordinator .wc-caption[hidden] { display: none; }
 .wifi-coordinator .wc-comparison-context { color: #596570; margin-bottom: 8px; }
 .wifi-coordinator .wc-comparison-notes { display: grid; gap: 12px; margin: 12px 0; }
 .wifi-coordinator .wc-comparison-note { border-left: 3px solid #b7bfc5; padding: 4px 12px; }

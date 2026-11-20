@@ -266,6 +266,15 @@ function clientChart(canvas,intervals,names,start,end,events,view,existing){
  var options=displayOptions(baseOptions(start,end),view);options.scales.y.min=0;options.scales.y.suggestedMax=1;
  options.scales.y.ticks.maxTicksLimit=5;options.scales.y.ticks.precision=0;
  options.scales.y.title={display:true,text:'Clients',color:'#444'};
+ options.plugins.tooltip.filter=function(item,index,items){
+  var p=item.raw.interval;
+  // Both endpoints can be equally near the pointer. Prepared history arrives
+  // as JSON, so compare interval values rather than object identity.
+  return !p||!items.slice(0,index).some(function(other){
+   var q=other.raw.interval;
+   return other.datasetIndex===item.datasetIndex&&q&&other.raw.y===item.raw.y&&q.start===p.start&&q.end===p.end&&q.source===p.source;
+  });
+ };
  options.plugins.tooltip.callbacks={title:function(items){var raw=items[0]&&items[0].raw,p=raw&&raw.interval;return raw?.evidence?evidenceTitle(raw):p?dated(p.start)+' \u2013 '+dated(p.end):'';},
   label:function(c){return c.raw.evidence?evidenceLabel(c.raw):[c.dataset.label+': '+c.raw.y+' client'+(c.raw.y==1?'':'s'),aggregateLabel(c.raw)].filter(Boolean);}};
  options.layout={padding:{top:10}};

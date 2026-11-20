@@ -17,7 +17,7 @@ Coordinated channel selection and client steering for OpenWrt, developed and liv
 
 The package combines channel planning, Radio Preference, and a LuCI interface under **Network → Wi-Fi Coordinator**. It uses `usteer` for measurements while keeping competing steering decisions passive. It preserves your Wi-Fi names, passwords, and LAN/WAN topology; automatic operation changes radio channels and widths.
 
-The tabs are **Channels**, **Clients**, **Comparison**, **History**, **Settings**, **Storage & export**, and the full disclaimer. Channels and Clients show live operation without save controls. Comparison explains the last completed placement assessment. Settings brings channel and steering configuration together, preserving their existing storage and policies. History displays observations; Storage & export controls retention and downloads, with an independent export-period selector.
+The tabs are **Channels**, **Clients**, **Comparison**, **History**, **Settings**, **Export**, and the full disclaimer. Channels and Clients show live operation without save controls. Comparison explains the last completed placement assessment. Settings brings channel and steering configuration together, including history recording and graph display. History displays observations; Export provides downloads with an independent period selector.
 
 ## What it does
 
@@ -33,8 +33,8 @@ The tabs are **Channels**, **Clients**, **Comparison**, **History**, **Settings*
 - Checks reconnection and service after a change, with rollback and temporary exclusions after failures.
 - Uses eligible DFS spectrum opportunistically, preparing it on an empty compatible helper while another radio serves clients when possible. Recent radar detections add a planning penalty with a one-hour default half-life, separate from mandatory kernel clearance and exclusion periods.
 - Records channel placement, client counts, spectrum surveys, traffic summaries, and actions for up to 120 hours (24 hours by default). Recent history stays in RAM; older history moves to flash at a selectable interval from 15 minutes to six hours (six hours by default). Orderly shutdown saves pending records.
-- Stores completed history once in indexed, checksummed blocks, with a transactional active checkpoint and lossless survey compaction. Graph tiles are reusable RAM caches; refreshes transfer changed tiles and update existing Chart.js charts. No CDN is required.
-- Adapts history transfers and all graph layers to the selected time window and screen width. Shared router settings control this reduction, action/missing-observation/unavailability markers, and graph popups. Stored history and exports keep their existing detail.
+- Stores completed history once in indexed, checksummed blocks, with a transactional active checkpoint and lossless survey compaction. Browsers cache those blocks and prepare graph data in a worker; the router does no graph preparation or background precomputation. Existing Chart.js charts are retained. No CDN is required.
+- Loads the requested history and adapts all graph layers to screen width in the browser. Shared router settings control this reduction, action/missing-observation/unavailability markers, and graph popups. Stored history and exports keep their existing detail.
 - Keeps observation and steering responsive while a read-only worker calculates placements. History distinguishes unknown gaps, confirmed AP unavailability and recorded actions; calculation timings and missed samples are included in Actions exports.
 - Streams authenticated JSON and CSV [history downloads](docs/EXPORT.md) without creating export files or writing flash.
 - Shows short help beside every setting, with full explanations on hover, focus or click/tap.
@@ -86,6 +86,7 @@ The builder writes the APK and signed `packages.adb` index to `wifi-coordinator/
 # On a development machine with Python 3 and Node.js:
 python3 scripts/check-project.py
 node tests/check-ui.cjs
+node scripts/generate-history-core.cjs --check
 python3 scripts/prepare-tests.py
 
 # On OpenWrt with ucode, fs, nl80211, ubus, uci, and uloop modules:

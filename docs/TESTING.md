@@ -8,6 +8,65 @@ Run the portable source/documentation checks with `python3 scripts/check-project
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
 
+## 0.7.0-r26 Browser history preparation (2026-11-20)
+
+Graph requests now transfer a fixed active snapshot and immutable encoded blocks.
+A browser worker performs decoding, reduction and evidence preparation. All nine
+selectable spans were checked at 360 and 1100 pixels, with adaptation on and off.
+The 36 worker outputs matched reference ucode output for channel intervals,
+traffic/client points, survey cells, summaries, radar events and evidence markers,
+allowing only numeric JSON serialization precision differences. The reference
+fixture includes zero counts, gaps, reboot boundaries, unavailability, actions,
+traffic peaks and unmeasured survey bins.
+
+The worker tests cover block reuse across spans and widths, epoch invalidation,
+permission failures, cancelled requests, progress totals and expired-block retry.
+OpenWrt checks cover encoded-byte preservation, indexed selection, invalid epochs
+and identifiers, and same-length checksum corruption. The existing 69 viewport
+semantics checks also passed. Rendering continues to use the existing graph module.
+
+Live checks exercised every selectable span and rapid selection changes. With
+the measured archive, a fresh five-day worker load took 5.0 seconds including
+transfer and preparation; a repeat took 1.5 seconds. A cached 48-hour load took
+1.1 seconds, and resizing five days took 0.7 seconds. These desktop measurements
+exclude chart drawing and are not phone-performance guarantees. The full five-day
+metadata and seven block batches consumed about 2.9 router CPU seconds, measured
+with the installed CGI; HTTP transport overhead is not included in that CPU figure.
+No graph preparation runs on the router. A hidden-tab resize completed in 0.53
+seconds: MessageChannel yielding avoids background timer throttling. The progress
+caption was verified hidden after completion. Invalid sessions, path-like block
+identifiers, wrong epochs and oversized identifier lists returned 403/400/409/400.
+The signed APK preserves the coordinator, preference and display configurations;
+normal autonomous radio operations continue during verification.
+
+To reproduce cross-language parity, create a synthetic input with
+`HISTORY_TEST_IMPORT=1 node -e "process.stdout.write(JSON.stringify(require('./tests/history-worker.cjs').fixture()))" > /tmp/history-fixture.json`.
+On OpenWrt run `ucode tests/history-parity.uc /tmp/history-fixture.json /tmp/history-reference.json`;
+then run `node tests/history-parity.cjs /tmp/history-reference.json` on the development
+machine with a copy of that output. This creates test output only; it does not
+read or alter live history. Regenerate the browser core after changing its ucode
+sources with `node scripts/generate-history-core.cjs`.
+
+## Client-history tooltip fix (2026-11-20, after r25)
+
+Client-count tooltips show each interval once when both endpoints are equally
+close to the pointer. Comparison uses the dataset, count, interval bounds and
+source, so it also works after JSON serialization. Other radios, distinct
+intervals and evidence markers remain visible.
+
+The portable UI suite and actual Chart.js browser fixture passed, including
+duplicate endpoints before and after JSON serialization. The graph module was
+applied directly to the router and its served SHA-256 matched the tested source.
+No package upgrade or coordinator restart was needed.
+
+Follow-up live verification found that direct file updates left LuCI's asset
+URL version unchanged. Refreshed the package-database modification timestamp
+used by LuCI for that version; database contents were verified unchanged.
+A normal browser reload fetched both updated modules under the new URL version.
+The live History page showed no graph-detail caption, and activating both
+endpoints of a recorded client interval produced one tooltip row. The graph
+detail explanation remains in the Settings hover help.
+
 ## 0.7.0-r25 Shorter scan-mode hover (2026-11-14)
 
 Shortens the same explanation. Controls, configuration and runtime code remain

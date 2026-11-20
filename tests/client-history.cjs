@@ -13,6 +13,21 @@ assert.equal(graph.clientData([{...rows[0],count:null}],['radio0'],0,100)[0].dat
 const chart=graph.clientChart(null,rows,['radio0'],0,50);
 assert.equal(chart.options.scales.y.ticks.precision,0);
 assert.equal(chart.options.scales.y.min,0);
+function tooltipItems(config){return config.data.datasets.flatMap((dataset,datasetIndex)=>dataset.data.filter(raw=>raw.y!=null).map(raw=>({dataset,datasetIndex,raw})));}
+const endpoints=tooltipItems(graph.clientChart(null,[rows[0]],['radio0'],0,10));
+assert.equal(endpoints.filter(chart.options.plugins.tooltip.filter).length,1,'raw interval endpoints appear once');
+const serialized=JSON.parse(JSON.stringify(endpoints));
+assert.equal(serialized.filter(chart.options.plugins.tooltip.filter).length,1,'JSON endpoints do not share object identity');
+const otherRadio={...serialized[0],datasetIndex:1};
+const nextInterval={...serialized[0],raw:{...serialized[0].raw,interval:{...rows[0],start:10,end:20}}};
+const otherBoot={...serialized[0],raw:{...serialized[0].raw,interval:{...rows[0],source:'two'}}};
+const differentCount={...serialized[0],raw:{...serialized[0].raw,y:2}};
+const evidence={datasetIndex:2,raw:{y:0,evidence:{kind:'unknown'}}};
+assert.equal([...serialized,otherRadio,nextInterval,otherBoot,differentCount,evidence].filter(chart.options.plugins.tooltip.filter).length,6,'keep other radios, intervals, reboot boundaries, counts and evidence');
+const prepared=graph.clientChart(null,[],['radio0'],0,10,[],{client_points:{radio0:serialized.map(x=>x.raw)},client_evidence:[]});
+assert.equal(tooltipItems(prepared).filter(prepared.options.plugins.tooltip.filter).length,1,'prepared history uses the same deduplication');
+const instant=graph.clientChart(null,[{...rows[0],start:5,end:5}],['radio0'],0,10);
+assert.equal(tooltipItems(instant).filter(instant.options.plugins.tooltip.filter).length,1,'zero-length intervals appear once');
 const source=fs.readFileSync(path.join(root,'channel-coordinator/files/wifi-history.js'),'utf8');
 assert(source.indexOf("heading(_('Where each radio spent its time')")<source.indexOf("heading(_('Clients on each radio over time')"));
 assert(source.indexOf("heading(_('Clients on each radio over time')")<source.indexOf("heading(_('Observed traffic over time')"));

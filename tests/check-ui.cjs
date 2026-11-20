@@ -12,6 +12,8 @@ const files = [
   'channel-coordinator/files/wifi-disclaimer.js',
   'channel-coordinator/files/wifi-coordinator.graphs.js',
   'channel-coordinator/files/wifi-coordinator.history.js',
+  'channel-coordinator/files/wifi-coordinator.history-core.js',
+  'channel-coordinator/files/wifi-coordinator.history-worker.js',
   'channel-coordinator/files/wifi-coordinator.time.js',
   'channel-coordinator/files/wifi-coordinator.help.js',
   'channel-coordinator/files/wifi-coordinator.chart.js',
@@ -20,7 +22,9 @@ const files = [
 for (const file of files) new Function(fs.readFileSync(path.join(root, file), 'utf8'));
 console.log(`PASS: ${files.length} LuCI/graph JavaScript syntax checks`);
 require('./history-request.cjs');
-require('./history-tiles.cjs');
+require('child_process').execFileSync(process.execPath,[path.join(root,'scripts/generate-history-core.cjs'),'--check']);
+require('./history-worker.cjs');
+require('./history-worker-client.cjs');
 require('./graph-display.cjs');
 require('./help.cjs');
 require('./settings.cjs');

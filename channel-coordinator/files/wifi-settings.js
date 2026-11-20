@@ -132,7 +132,7 @@ return view.extend({
    advanced:['separate_radios','overlap_penalty','improvement','min_dwell','radar_half_life','max_mbps','quiet_seconds','verify_unprobed']};
   refresh(state);
   poll.add(function(){return readState().then(refresh);},5);
-  [['decimation','Adapt graph detail to screen resolution','Request only the selected time window and reduce graph data on the router to match the plotting width. Preserve traffic extrema, client-count steps, channel changes and unknown gaps. Heatmap columns show time-weighted estimates with their range. Turn off to draw available stored detail; this does not recover measurements absent from stored summaries.'],
+  [['decimation','Adapt graph detail to screen resolution','Load stored history for the selected time window and adapt graph detail in your browser to match the plotting width. Preserve traffic extrema, client-count steps, channel changes and unknown gaps. Heatmap columns show time-weighted estimates with their range. Turn off to draw available stored detail; this does not recover measurements absent from stored summaries.'],
    ['triangles','Show action markers (triangles)','Show recorded actions such as channel changes and client departures. Hiding markers does not remove actions from the log or exports. Crowded markers are grouped when screen adaptation is enabled.'],
    ['squares','Show missing-observation markers (squares)','Mark intervals where observations are missing and service continuity is unknown. Hiding these squares leaves the underlying gaps blank.'],
    ['crosses','Show unavailability markers (crosses)','Mark intervals when hostapd confirmed that no access point was enabled. Hiding these crosses does not fill the gap or remove its records.'],

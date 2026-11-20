@@ -91,7 +91,8 @@ return view.extend({
  load:async function(){await uci.load('channel_coordinator');var hours=Math.min(6,Number(uci.get('channel_coordinator','main','history_hours'))||24);return [null,await historyapi.read({hours:hours,width:graphWidth(document.getElementById('view'))}).catch(e=>emptyHistory(e,hours))];},
  render:function(data){return disclaimer.gate(this.renderPage.bind(this,data));},
  renderPage:function(data){
-  var instances=[],frame=null,generation=0,resizeTimer=null,preparationTimer=null,requestedWidth=0,lastRendered=null,activeRequest=null,queuedRefresh=false;
+  var instances=[],frame=null,generation=0,resizeTimer=null,requestedWidth=0,lastRendered=null,activeRequest=null,queuedRefresh=false;
+  var progress=E('p',{'class':'wc-caption','aria-live':'polite','hidden':true});
   var history=data[1],retain=Math.max(1,Math.min(120,Number(uci.get('channel_coordinator','main','history_hours'))||24)),hours=Math.min(6,retain),display=E('div'),selector=E('select',{'class':'cbi-input-select'});
   function setRetention(value){retain=Math.max(1,Math.min(120,Number(value)||24));hours=Math.min(hours,retain);
    var choices=retentionChoices.filter(function(h){return h<=retain;});if(choices.indexOf(retain)<0)choices.push(retain);
@@ -111,13 +112,12 @@ return view.extend({
    var surveys=(h.surveys||[]).slice().sort(function(a,b){return a.time-b.time;});
    var radioNames=h.radio_names||Array.from(new Set(periods.map(function(p){return p.radio;}).concat(samples.map(function(s){return s.radio;}),clients.map(function(s){return s.radio;})))).sort();
    var warnings=(h.read_errors||[]).map(function(e){return E('p',{'class':'alert-message warning'},'History is incomplete. '+e);});
-   if(h.preparing)warnings.unshift(E('p',{'class':'wc-caption','aria-live':'polite'},'Preparing older history: '+h.preparing+' sections remaining. Unloaded areas are temporarily blank.'));
    if(h.refresh_warning)warnings.unshift(E('p',{'class':'alert-message warning'},h.refresh_warning));
    if(!radioNames.length){
     instances.forEach(c=>c.destroy());instances=[];
     var recording=h.enabled==null?uci.get('channel_coordinator','main','history_enabled')!='0':h.enabled;
     var message=warnings.length?'No history available to display.':recording?'No observations in the selected period. History recording is enabled.':'No observations in the selected period. History recording is disabled.';
-    display.replaceChildren.apply(display,warnings.concat([E('p',{'class':'wc-status'},_(message))]));clearTimeout(preparationTimer);if(h.preparing)preparationTimer=setTimeout(()=>refresh(),150);return;
+    display.replaceChildren.apply(display,warnings.concat([E('p',{'class':'wc-status'},_(message))]));return;
    }
    var start=h.start||Math.min(now-1,Math.max(cutoff,Math.min.apply(null,periods.map(function(p){return p.start;}).concat(clients.map(function(s){return s.start;}),samples.map(function(s){return s.time;}),surveys.map(function(s){return s.time;})))));
 
@@ -134,7 +134,7 @@ return view.extend({
      E('div',{'class':'wc-radar-ticks'},[100,75,50,25,0].map(function(n){return E('span',{},n+'%');}))
     ])
    ]);
-   var nodes=[E('p',{'class':'wc-caption'},h.display&&h.display.decimation?'Graph detail adapted to screen width; peaks, changes and unknown gaps are preserved.':'Showing available stored graph detail.'),heading(_('Where each radio spent its time'),_('Ribbons show channel and width; dashed outlines show radar listening. // marks breaks in the spectrum axis. Squares mark missing observations, crosses mark unavailability, and triangles mark actions. Hover or tap for details.')),
+   var nodes=[heading(_('Where each radio spent its time'),_('Ribbons show channel and width; dashed outlines show radar listening. // marks breaks in the spectrum axis. Squares mark missing observations, crosses mark unavailability, and triangles mark actions. Hover or tap for details.')),
     E('div',{'class':'wc-chart wc-spectrum-chart'},channelCanvas),legend(true),
     E('div',{'class':'wc-spectrum-keys'},[E('div',{'class':'wc-survey-key','title':popups?'Estimated congestion ranges from 0 (lowest) to 100 (highest estimated congestion). Darker grey means more or stronger overlapping networks, adjusted for advertised load. This is an estimate, not measured airtime or a percentage. Hover over the graph for measurement times.':null},[E('span',{},_('Estimated congestion')),E('div',{'class':'wc-survey-ramp'},[E('div',{'class':'wc-grey-scale','aria-hidden':'true'}),E('div',{'class':'wc-scale-ticks'},[0,25,50,75,100].map(function(n){return E('span',{},String(n));}))])]),radarKey]),
     heading(_('Clients on each radio over time'),_('Number of connected clients on each radio. Gaps mean observations are missing. Hover or tap for counts and events.')),
@@ -187,29 +187,28 @@ return view.extend({
     instances=[graphs.channelChart(channelCanvas,periods,radioNames,start,now,surveys,h.radar,h.declared_bands,h.events,h,instances[0]),graphs.clientChart(clientCanvas,clients,radioNames,start,now,h.events,h,instances[1]),graphs.trafficChart(trafficCanvas,samples,radioNames,start,now,h,instances[2])];
    }
    frame=requestAnimationFrame(draw);
-   clearTimeout(preparationTimer);if(h.preparing)preparationTimer=setTimeout(()=>refresh(),150);
   }
   function refresh(urgent){
-   clearTimeout(preparationTimer);
    if(activeRequest){if(urgent){queuedRefresh=true;generation++;historyapi.cancel();}return activeRequest;}
    var id=++generation,chosen=hours,width=graphWidth(display);requestedWidth=width;
-   activeRequest=historyapi.read({hours:chosen,width:width}).then(function(h){if(id!==generation)return;history=h;redraw(h);})
+   progress.hidden=false;progress.textContent='Loading selected history…';
+   activeRequest=historyapi.read({hours:chosen,width:width},function(p){if(id!==generation)return;progress.textContent=p.stage==='loading'?'Loading history: '+p.loaded+' of '+p.total+' blocks.':'Preparing graphs: '+p.loaded+' of '+p.total+' sections.';}).then(function(h){if(id!==generation)return;history=h;redraw(h);})
     .catch(function(e){if(id===generation)redraw(lastRendered?Object.assign({},lastRendered,{refresh_warning:"Refresh failed; displaying the previous view. "+e.message}):emptyHistory(e,chosen));})
-    .finally(function(){activeRequest=null;if(queuedRefresh&&display.isConnected){queuedRefresh=false;refresh();}});
+    .finally(function(){activeRequest=null;progress.hidden=true;if(queuedRefresh&&display.isConnected){queuedRefresh=false;refresh();}});
    return activeRequest;
   }
   selector.addEventListener('change',function(){hours=Number(selector.value);refresh(true);});
   poll.add(function(){if(display.isConnected)return refresh();},60);
   var observer=typeof ResizeObserver!='undefined'?new ResizeObserver(function(){if(!display.isConnected)return;var width=graphWidth(display);if(width===requestedWidth)return;if(history.display&&history.display.decimation===false){requestedWidth=width;return;}clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>refresh(true),200);}):null;
   if(observer)observer.observe(display);
-  window.addEventListener('pagehide',function(){generation++;historyapi.cancel();clearTimeout(resizeTimer);clearTimeout(preparationTimer);if(observer)observer.disconnect();instances.forEach(c=>c.destroy());},{once:true});
+  window.addEventListener('pagehide',function(){generation++;historyapi.cancel();clearTimeout(resizeTimer);if(observer)observer.disconnect();instances.forEach(c=>c.destroy());},{once:true});
   requestedWidth=history.pixel_width||0;redraw(history);
   return Promise.resolve(E('div',{'class':'wifi-coordinator'},[
    E('link',{rel:'stylesheet',href:L.resource('view/wifi-coordinator.css')+'?v=@WIFI_COORDINATOR_VERSION@'}),
    E('div',{'class':'wc-history-header'},[
     E('h2',{},_('Wi-Fi Coordinator: history')),
     E('label',{'class':'wc-history-period'},[E('span',{},_('Show:')),selector])
-   ]),display
+   ]),progress,display
   ]));
  },
  handleSave:null,

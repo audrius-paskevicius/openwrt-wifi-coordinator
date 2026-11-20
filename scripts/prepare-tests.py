@@ -49,6 +49,9 @@ for name in ["history-codec", "history-view", "history-export"]:
     reader = reader.replace("'./"+name+".uc'", "'../channel-coordinator/files/"+name+".uc'")
 reader = reader.replace("/tmp/wifi-history-tiles", "/tmp/wifi-history-test-tiles")
 write("history-reader-test.uc", reader)
+transfer = read(production / "history-transfer.uc")
+transfer = transfer.replace("'./history-store.uc'", "'./history-store-test.uc'")
+write("history-transfer-test.uc", transfer)
 
 main = read(production / "main.uc")
 start = main.index("function inventory()")

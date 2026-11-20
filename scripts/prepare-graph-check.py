@@ -93,6 +93,17 @@ try{
   {radio:'radio2',source:'two',start:start+14400,end,count:1}
  ],names,start,end);
  clients.update('none');
+ const clientTipPosition={x:clients.scales.x.getPixelForValue(start+3600),y:clients.scales.y.getPixelForValue(0)};
+ function checkClientTooltip(){
+  clients.tooltip.setActiveElements([{datasetIndex:0,index:0},{datasetIndex:0,index:1}],clientTipPosition);
+  assert(clients.tooltip.dataPoints.length===1&&clients.tooltip.body.length===1,'client interval endpoints produce one tooltip row');
+  clients.tooltip.setActiveElements([{datasetIndex:0,index:0},{datasetIndex:0,index:1},{datasetIndex:0,index:2},{datasetIndex:1,index:0}],clientTipPosition);
+  assert(clients.tooltip.dataPoints.length===3,'client tooltip preserves different intervals and radios');
+ }
+ checkClientTooltip();
+ clients.data.datasets.forEach(d=>{d.data=JSON.parse(JSON.stringify(d.data));});
+ clients.update('none');checkClientTooltip();
+ clients.tooltip.setActiveElements([],{x:0,y:0});clients.update('none');
  assert(clients.scales.y.ticks.every(t=>Number.isInteger(t.value)),'client axis has whole numbers');
  assert(clients.data.datasets.every(d=>d.borderWidth===traffic.data.datasets[0].borderWidth),'client and traffic line styles match');
  const cx=clients.scales.x.getPixelForValue(start+9000),cy=clients.scales.y.getPixelForValue(2);
