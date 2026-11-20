@@ -80,6 +80,8 @@ APK_TOOL=apk sh wifi-coordinator/build-apk.sh
 
 The builder writes the APK and signed `packages.adb` index to `wifi-coordinator/dist/`. For a release, separately copy `DISCLAIMER.txt` and the matching public signing key there, then generate `SHA256SUMS` covering those four files. The builder does not create these three extra release assets. [VERSION](VERSION) sets the package version and the UI stylesheet cache version. `APK_TOOL` can name a native `apk.static` or OpenWrt SDK host tool. Packages built with your key require your corresponding public key on the destination router. The published APK's private signing key is not included.
 
+The generated browser history core is checked into source. If you change `history-view.uc`, `history-codec.uc` or its export field filters, regenerate it with `node scripts/generate-history-core.cjs` and run `node scripts/generate-history-core.cjs --check` before building. Node.js is needed for regeneration and portable tests, not on the router at runtime.
+
 ## Test
 
 ```sh
@@ -89,7 +91,7 @@ node tests/check-ui.cjs
 node scripts/generate-history-core.cjs --check
 python3 scripts/prepare-tests.py
 
-# On OpenWrt with ucode, fs, nl80211, ubus, uci, and uloop modules:
+# On OpenWrt with ucode, fs, nl80211, ubus, uci, uloop and digest modules:
 sh scripts/test-ucode.sh
 ```
 

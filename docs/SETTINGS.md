@@ -16,6 +16,8 @@ The applied channel and width-change methods appear beside each radio's settings
 | Radios | Per-radio management, occupied-radio restrictions and candidate channels/widths; each radio has Placement and Driver overrides tabs. Applied methods and limitations remain visible beside that radio. |
 | Client steering | Preferred radio, shared Gentle/Strong/Decisive strength, protected clients, restart fallback permission, window, signal safeguards and shared retries. The selected-sequence preview follows unsaved edits. |
 | Survey & radar | Survey policy, cadence, duty/gap, scanner, method, evidence lifetime, DFS mode and helper. |
+| History recording & storage | Recording, retention, flash-save interval, clearing and storage diagnostics. |
+| Graph display | Shared graph reduction, marker visibility and popups; stored separately in `wifi_coordinator_display`. |
 | Advanced | Separation priority, overlap cost, movement caution, minimum residence, radar-memory decay, quiet-traffic controls and unprobeable-client verification. |
 
 Conditional fields retain their saved values. Preferred radio and connection
@@ -59,7 +61,7 @@ These are fresh-install defaults, not a migration that overwrites existing choic
 | Operation | Channel coordination and Radio Preference enabled; automatic channel planning; shared Decisive steering for preference and handoffs |
 | Channels and widths | Auto; separate radio spectrum preferred |
 | Survey | Paced, active where permitted; 10% scan duty; at least 3 seconds serving between occupied-radio visits |
-| Timing | 60 seconds between completed surveys/operations; 180-second minimum residence |
+| Timing | 120-second normal survey/operation pause; 180-second minimum residence. See the scheduling exception below. |
 | Admission | 3 service-index points, raised by evidence uncertainty when needed |
 | Client handoff | 90-second budget; decisive escalation; brief reconnect fallback enabled |
 | DFS | Preparation enabled; automatic helper; **3600-second radar-memory half-life** |
@@ -76,7 +78,7 @@ Every remaining control has a distinct operational purpose. Controls are grouped
 | --- | --- |
 | `enabled` | Stops channel surveys/planning; distinct from observation, which still scans and proposes. Client steering has its own switch. |
 | `mode` | Observe versus automatic planner-initiated channel changes. Observe still allows interrupted-operation recovery and kernel radar evacuation. Does not control preferred-radio steering. |
-| `interval` | Administrator's scan-overhead budget: normal wait after completed surveys/operations, including close comparisons. Default: 120 seconds; scan duration is additional. Startup begins after 15 seconds. |
+| `interval` | Normal wait after completed surveys/operations, including close comparisons. Default: 120 seconds; scan duration is additional. Startup begins after 15 seconds. This is not a strict minimum between all sweeps: operation completion can reset the next-scan deadline while another sweep is active; see the documented [scheduling exception](TESTING.md#default-survey-pause-120-seconds-2026-11-14-after-r22). |
 | `improvement` | Labelled Movement caution: minimum net service-index gain after movement cost, including widening. Also sets the movement-cost unit, which scales with affected clients, recent CSA departures, helpers and staging. Every step repays this margin against current evidence. Only improved spectrum separation bypasses it; evidence uncertainty can raise it. |
 | `min_dwell` | Avoids repeated moves after successful verification. Independent of survey frequency. |
 | `persist` | Whether verified wireless placements are checkpointed, at most every six hours. Separate from graph history and radar memory. |

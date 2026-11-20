@@ -1,12 +1,36 @@
 # Validation
 
-Source release: **0.7.0-r25**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
+Source release: **0.7.0-r27**. Automated runtime tests use OpenWrt 25.12.6 on a Linksys WRT3200ACM. Checks for each revision are distinguished below; earlier RF experiments are listed separately. Historical counts describe the source tested then, not the current test inventory. The r22 presentation changes were included in the public r23 release; there was no separate public r22 release. Some historical release downloads have been withdrawn; entries below are validation evidence, not a promise of current download availability.
 
 ## Reproducing current checks
 
 Run the portable source/documentation checks with `python3 scripts/check-project.py` and the UI checks with `node tests/check-ui.cjs`. These require no router access. The UI suite covers viewport requests, response-cache isolation/retry, graph display controls and existing chart semantics. For actual LuCI and Chart.js browser component checks, use the fixture generators described below; the current healthy three-radio LuCI fixture expects 58 setting descriptions, with one additional recovery acknowledgement when applicable.
 
 Generate isolated runtime fixtures with `python3 scripts/prepare-tests.py`, then run `scripts/test-ucode.sh` on an OpenWrt environment with the required ucode modules. This suite includes scanner continuity/quality, the service model, executor, recovery and archive tests. It redirects test state to dedicated temporary paths and does not operate live radios. A successful portable check does not imply this runtime suite or live RF tests were rerun.
+
+## 0.7.0-r27 Documentation and package audit (2026-11-20)
+
+Documentation now describes the browser worker, volatile block caches, current
+indexed storage, authenticated transfer and the work that remains on the router.
+Removed the obsolete server-tile loading description. Corrected the dependency
+list, Settings tab inventory and 120-second default survey pause. Clarified
+survey freshness, loaded radar-event context and the existing scheduling exception;
+these are descriptions of current code, not algorithm changes.
+
+Portable source/documentation-link checks and the full Node UI/history suite
+passed, including all nine standard spans, both viewport sizes and both detail
+modes. The generated browser core passed its source-drift check. Native build and
+package-hook shell syntax checks passed. The signed APK verified with the installed
+public key. All 58 extracted files matched their intended source; comparison with
+r26 found only eight build-time version substitutions and no runtime-code changes.
+Tracked-source and extracted-package audits found no private keys, credential
+tokens, known deployment passwords, personal network identifiers or private files.
+The release includes the canonical disclaimer, public key and checksum manifest.
+
+The build did not install the package or restart coordination. The controller
+process list and the three coordinator/preference/display configuration hashes
+were unchanged. The full OpenWrt algorithm suite and live RF experiments were
+not repeated for this documentation-only revision; their prior evidence remains below.
 
 ## 0.7.0-r26 Browser history preparation (2026-11-20)
 

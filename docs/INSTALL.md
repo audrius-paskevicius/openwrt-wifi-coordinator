@@ -13,7 +13,8 @@ The bold **Experimental, AI-generated software. Use at your own risk.** tab besi
 ## Requirements
 
 - OpenWrt 25.12 and APK v3. Live development used 25.12.6 on a Linksys WRT3200ACM.
-- LuCI, `iw`, `usteer`, `ucode`, and ucode modules `fs`, `ubus`, `uci`, `uloop`, and `nl80211`. The APK declares these dependencies.
+- LuCI, `iw`, `usteer`, `ucode`, and ucode modules `fs`, `ubus`, `uci`, `uloop`, `nl80211` and `digest`. The APK declares these dependencies.
+- A browser with JavaScript, Web Workers and Fetch support for History. Graph preparation runs in the browser; there is no router-side fallback for browsers without workers.
 - A full hostapd/wpad variant with the required neighbor reporting, beacon measurements, and BSS transition APIs. Reduced `wpad-basic` builds may lack these capabilities. Choose the appropriate full variant from your firmware's official feed; this package does not automatically replace it.
 - Working AP interfaces and an explicitly configured legal country. Shared-network handoffs require compatible security and LAN membership.
 
@@ -25,11 +26,12 @@ The APK builder declares these dependencies in the package metadata:
 
 | Dependency | Purpose |
 | --- | --- |
-| `luci-base` | LuCI views, forms, RPC and filesystem clients. Its dependencies include `cgi-io` for large history reads and `liblucihttp-ucode` for the export endpoint's form decoder. |
+| `luci-base` | LuCI views, forms, RPC and filesystem clients. Its dependencies include `liblucihttp-ucode` for the history and export endpoints' form decoder. Graph data uses the package's authenticated CGI endpoint. |
 | `iw` | Wireless information and driver interactions |
 | `usteer` | Client measurements and neighbor information |
 | `ucode` | Controller runtime |
 | `ucode-mod-fs`, `ucode-mod-ubus`, `ucode-mod-uci`, `ucode-mod-uloop`, `ucode-mod-nl80211` | Files, service APIs, configuration, event loop and wireless APIs |
+| `ucode-mod-digest` | SHA-256 integrity checks for indexed history blocks |
 
 `apk add` resolves those requirements and their dependencies using installed packages and the router's configured feeds. Missing packages need reachable feeds or separately supplied packages; a standalone APK does not bundle the OpenWrt runtime. The package hooks do not run a separate downloader or a blanket package upgrade. Chart.js is bundled, so the graphs need no CDN, npm or internet access.
 
@@ -91,7 +93,7 @@ The Settings page uses one Save & Apply workflow across both configurations; Cha
 
 Every setting uses the same native LuCI help behavior: a short explanation is always visible; hover or focus that text for full details, or click/tap to open them. Click again or press Escape to close. The existing LuCI styling and help icon are retained. Settings groups controls by responsibility; per-radio driver overrides are under Radios. Conditional controls retain their saved values while hidden. See the [complete settings reference](SETTINGS.md) for the purpose and exact scope of every retained control including the six retired timing controls and the removed width-selection threshold.
 
-History retention ranges from 1 to 120 hours. Recent records use a 1 MiB RAM buffer; immutable flash batches are scheduled every 15 minutes to six hours, selectable under Settings / History recording & storage (six hours by default, shortened to the retention window when necessary), keeping at least 4 MiB of flash free. There is no fixed archive-size cap. Heavy activity or failed offloads can shorten retained history when the RAM buffer fills. Orderly shutdown checkpoints pending history and radar memory. Unexpected power loss can lose observations since the last successful save. Shorter intervals reduce the unsaved window but increase flash writes; stalled recording or failed saves can cause longer gaps. The save interval does not change measurement frequency, channel decisions, verified-placement checkpoints or radar-memory saves. Disabling recording pauses new history; **Clear recorded history** deletes recorded placements, client counts, traffic summaries, surveys and actions while preserving planner radar memory. Radar shading from that memory can remain after clearing. Only current `batch-*.json` history archives are supported; legacy `history.json` archives are not imported. See [architecture](ARCHITECTURE.md) for scoring, timing and storage details.
+History retention ranges from 1 to 120 hours. Recent records use a 1 MiB RAM buffer; flash saves are scheduled every 15 minutes to six hours, selectable under Settings / History recording & storage (six hours by default, shortened to the retention window when necessary), keeping at least 4 MiB of flash free. Completed records enter immutable dataset/hour blocks; unfinished records use a replaceable checkpoint. Buffer pressure above 75% can trigger an earlier save. There is no fixed archive-size cap. Heavy activity or failed offloads can shorten retained history when the RAM buffer fills. Orderly shutdown checkpoints pending history and radar memory. Unexpected power loss can lose observations since the last successful save. Shorter intervals reduce the unsaved window but increase flash writes; stalled recording or failed saves can cause longer gaps. The save interval does not change measurement frequency, channel decisions, verified-placement checkpoints or radar-memory saves. Disabling recording pauses new history; **Clear recorded history** deletes recorded placements, client counts, traffic summaries, surveys and actions while preserving planner radar memory. Radar shading from that memory can remain after clearing. Current storage uses `history-index.json`, `block-*.json` and `tail-*.json`. Older `batch-*.json` archives migrate once; pre-batch `history.json` archives are not imported. See [architecture](ARCHITECTURE.md) for scoring, timing and storage details.
 
 The **History** tab contains graphs, summaries and recent actions. **Settings / History recording & storage** contains recording, retention, save-frequency and clearing controls plus collapsed **History storage** diagnostics. **Export** contains downloads only. History's **Show** selector and exports' **Period** selector are independent, and each is capped by the saved retention setting. Exports default to **All retained history**. CSV downloads one selected dataset; JSON includes all six datasets: placements, client counts, traffic, surveys, current planner radar memory and selected-period actions. The radar dataset alone need not reproduce the graph's reconstructed radar shading. Both formats stream directly without creating an export file on the router. See [export formats, privacy and completeness](EXPORT.md).
 
@@ -99,7 +101,11 @@ Recent actions now show compact per-scanner sweep summaries and retry frequencie
 
 The History page retries interrupted requests twice before showing a refresh warning. Previously loaded data remains visible where available; the warning clears after a successful refresh. The page refreshes every minute. An interruption message does not establish that saved history was lost. Permission errors and corrupt files are reported separately. Hard-refresh an already open LuCI page after upgrading to load the updated reader.
 
-History loading uses LuCI's authenticated streaming reader for RAM and archive files larger than the ordinary ubus read limit. Read errors appear above the graphs. Opening **History storage** survives refreshes. The survey background carries each last observation forward until another measurement replaces it; hover over nonzero congestion for its measurement time. A zero congestion estimate has no congestion popup. Radio, event and radar tooltips are unaffected.
+History uses the package's authenticated endpoint to obtain an active snapshot and encoded archive blocks. A browser worker decodes and prepares every selectable window, including full-detail mode. The router still checks permissions and block integrity, captures recent data and pages actions; it does not calculate graphs or precompute them while the page is closed. Downloads remain a separate, router-side streaming operation.
+
+The first visit downloads the required blocks. Returning to a window or resizing can reuse blocks held in that page's memory; a reload or a new browser starts with an empty cache. Blocks are not saved in browser storage. Switching windows cancels superseded work and keeps the previous view visible until the replacement is complete. Progress reports completed blocks or preparation sections, not seconds remaining. Read errors appear above the graphs.
+
+Opening **History storage** survives refreshes. The survey background carries observations forward within the configured evidence-freshness limit and recorded coverage; missing measurements are not clear spectrum. Hover over nonzero congestion for its measurement time and, when reduced, its observed range. A zero congestion estimate has no congestion popup. Graph popups follow the shared Graph display setting.
 
 ## Stop or remove
 
